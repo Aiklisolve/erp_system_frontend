@@ -115,10 +115,10 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                         }
                         title={!isHovered ? item.label : undefined}
                       >
-                        <span className={`flex items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-300 text-text-secondary flex-shrink-0 transition-all duration-200 shadow-md ${
-                          isHovered ? 'h-8 w-8 text-xl' : 'h-11 w-11 text-2xl'
+                        <span className={`flex items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-300 text-text-secondary flex-shrink-0 transition-all duration-200 shadow-md overflow-hidden ${
+                          isHovered ? 'h-7 w-7' : 'h-10 w-10'
                         } group-hover:scale-110 group-hover:shadow-lg`}>
-                          <span className="drop-shadow-sm">{icon}</span>
+                          <span className={`drop-shadow-sm leading-none ${isHovered ? 'text-lg' : 'text-xl'}`} style={{ fontSize: isHovered ? '1.125rem' : '1.25rem' }}>{icon}</span>
                         </span>
                         <span
                           className={`whitespace-nowrap transition-all duration-300 font-semibold ${
@@ -198,8 +198,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                         ].join(' ')
                       }
                     >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-300 text-xl shadow-md flex-shrink-0">
-                        <span className="drop-shadow-sm">{icon}</span>
+                      <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-300 shadow-md flex-shrink-0 overflow-hidden">
+                        <span className="drop-shadow-sm text-lg leading-none" style={{ fontSize: '1.125rem' }}>{icon}</span>
                       </span>
                       <span className="font-semibold">{item.label}</span>
                     </NavLink>
