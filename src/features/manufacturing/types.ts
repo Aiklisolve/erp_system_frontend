@@ -9,6 +9,7 @@ export type ProductionOrderStatus =
 export interface ProductionOrder extends BaseEntity {
   product: string;
   planned_qty: number;
+  cost: number;
   status: ProductionOrderStatus;
   start_date: string;
   end_date: string;

@@ -46,7 +46,7 @@ export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
             label="Date"
             type="date"
             value={date}
-            min={new Date().toISOString().slice(0, 10)}
+            min={initial?.date ? undefined : new Date().toISOString().slice(0, 10)}
             onChange={(e) => setDate(e.target.value)}
           />
         </div>
@@ -79,7 +79,7 @@ export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
           Cancel
         </Button>
         <Button type="submit" variant="primary" size="md">
-          Save purchase order
+          {initial ? 'Update purchase order' : 'Save purchase order'}
         </Button>
       </div>
     </form>

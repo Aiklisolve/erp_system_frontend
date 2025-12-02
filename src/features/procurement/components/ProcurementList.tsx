@@ -13,8 +13,9 @@ import { ProcurementForm } from './ProcurementForm';
 type SortDirection = 'none' | 'asc' | 'desc';
 
 export function ProcurementList() {
-  const { orders, loading, create, remove, metrics } = useProcurement();
+  const { orders, loading, create, update, remove, metrics } = useProcurement();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
 
   // Filter states
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -92,13 +93,22 @@ export function ProcurementList() {
       key: 'id',
       header: '',
       render: (row) => (
-        <button
-          type="button"
-          onClick={() => remove(row.id)}
-          className="text-[11px] text-red-500 hover:text-red-600"
-        >
-          Delete
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setEditingOrder(row)}
+            className="text-[11px] text-blue-500 hover:text-blue-600"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => remove(row.id)}
+            className="text-[11px] text-red-500 hover:text-red-600"
+          >
+            Delete
+          </button>
+        </div>
       )
     }
   ];
@@ -195,20 +205,17 @@ export function ProcurementList() {
           </select>
         </div>
 
-        {filteredOrders.length === 0 && !loading ? (
+        {orders.length === 0 && !loading ? (
           <EmptyState
-            title={orders.length === 0 ? "No purchase orders yet" : "No matching orders"}
-            description={orders.length === 0 
-              ? "Create your first demo purchase order to see it here."
-              : "Try adjusting your filters to see more results."
-            }
+            title="No purchase orders yet"
+            description="Create your first demo purchase order to see it here."
           />
         ) : (
           <Table
             columns={columns}
             data={filteredOrders}
             getRowKey={(row, index) => `${row.id}-${index}`}
-            emptyMessage="No purchase orders found."
+            emptyMessage="No matching orders found. Try adjusting your filters."
           />
         )}
       </Card>
@@ -226,6 +233,24 @@ export function ProcurementList() {
           }}
           onCancel={() => setModalOpen(false)}
         />
+      </Modal>
+
+      <Modal
+        title="Edit purchase order"
+        open={editingOrder !== null}
+        onClose={() => setEditingOrder(null)}
+        hideCloseButton
+      >
+        {editingOrder && (
+          <ProcurementForm
+            initial={editingOrder}
+            onSubmit={(values) => {
+              void update(editingOrder.id, values);
+              setEditingOrder(null);
+            }}
+            onCancel={() => setEditingOrder(null)}
+          />
+        )}
       </Modal>
     </div>
   );

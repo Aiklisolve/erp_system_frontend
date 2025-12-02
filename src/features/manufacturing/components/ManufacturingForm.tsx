@@ -12,11 +12,13 @@ type Props = {
   onSubmit: (
     values: Omit<ProductionOrder, 'id' | 'created_at' | 'updated_at'>
   ) => void;
+  onCancel?: () => void;
 };
 
-export function ManufacturingForm({ initial, onSubmit }: Props) {
+export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
   const [product, setProduct] = useState(initial?.product ?? '');
-  const [plannedQty, setPlannedQty] = useState(initial?.planned_qty ?? 0);
+  const [plannedQty, setPlannedQty] = useState<number | ''>(initial?.planned_qty ?? '');
+  const [cost, setCost] = useState<number | ''>(initial?.cost ?? '');
   const [status, setStatus] = useState<ProductionOrderStatus>(
     initial?.status ?? 'PLANNED'
   );
@@ -27,10 +29,11 @@ export function ManufacturingForm({ initial, onSubmit }: Props) {
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!product || !plannedQty) return;
+    if (!product || !plannedQty || !cost) return;
     onSubmit({
       product,
       planned_qty: Number(plannedQty),
+      cost: Number(cost),
       status,
       start_date: startDate,
       end_date: endDate
@@ -41,18 +44,26 @@ export function ManufacturingForm({ initial, onSubmit }: Props) {
     <form onSubmit={handleSubmit} className="space-y-6 text-xs">
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Basic info</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
           <Input
             label="Product"
             value={product}
             onChange={(e) => setProduct(e.target.value)}
-            placeholder="Configurable assembly or SKU"
+            placeholder="Product name"
           />
           <Input
             label="Planned quantity"
             type="number"
             value={plannedQty}
-            onChange={(e) => setPlannedQty(Number(e.target.value))}
+            placeholder="Enter quantity"
+            onChange={(e) => setPlannedQty(e.target.value === '' ? '' : Number(e.target.value))}
+          />
+          <Input
+            label="Cost (INR)"
+            type="number"
+            value={cost}
+            placeholder="Enter cost"
+            onChange={(e) => setCost(e.target.value === '' ? '' : Number(e.target.value))}
           />
         </div>
       </div>
@@ -64,12 +75,14 @@ export function ManufacturingForm({ initial, onSubmit }: Props) {
             label="Start date"
             type="date"
             value={startDate}
+            min={initial?.start_date ? undefined : new Date().toISOString().slice(0, 10)}
             onChange={(e) => setStartDate(e.target.value)}
           />
           <Input
             label="End date"
             type="date"
             value={endDate}
+            min={startDate}
             onChange={(e) => setEndDate(e.target.value)}
           />
           <Select
@@ -85,12 +98,12 @@ export function ManufacturingForm({ initial, onSubmit }: Props) {
         </div>
       </div>
 
-      <div className="sticky bottom-0 mt-4 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 flex justify-end gap-2">
-        <Button type="button" variant="ghost" size="md">
+      <div className="mt-4 border-t border-slate-200 bg-white pt-3 flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="md" onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" variant="primary" size="md">
-          Save production order
+          {initial ? 'Update production order' : 'Save production order'}
         </Button>
       </div>
     </form>
