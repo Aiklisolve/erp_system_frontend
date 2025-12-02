@@ -1,85 +1,613 @@
-import { FormEvent, useState } from 'react';
-import type { Shift } from '../types';
+import { FormEvent, useState, useEffect } from 'react';
+import type { Shift, ShiftStatus, ShiftType, Department } from '../types';
+import type { ErpRole } from '../../auth/data/staticUsers';
 import { Input } from '../../../components/ui/Input';
+import { Select } from '../../../components/ui/Select';
+import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
 
 type Props = {
   initial?: Partial<Shift>;
   onSubmit: (values: Omit<Shift, 'id' | 'created_at' | 'updated_at'>) => void;
+  onCancel?: () => void;
 };
 
-export function ShiftForm({ initial, onSubmit }: Props) {
+// Generate shift number
+function generateShiftNumber(): string {
+  const prefix = 'SHF';
+  const year = new Date().getFullYear();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `${prefix}-${year}-${random}`;
+}
+
+// ERP Roles from auth system
+const erpRoles: ErpRole[] = [
+  'ADMIN',
+  'FINANCE_MANAGER',
+  'INVENTORY_MANAGER',
+  'PROCUREMENT_OFFICER',
+  'HR_MANAGER',
+  'SALES_MANAGER',
+  'WAREHOUSE_OPERATOR',
+  'VIEWER',
+];
+
+// Mock employees for dropdown
+const mockEmployees = [
+  { id: 'emp-1', name: 'Alex Rivera', email: 'alex.rivera@erp.local', department: 'WAREHOUSE' },
+  { id: 'emp-2', name: 'Jordan Lee', email: 'jordan.lee@erp.local', department: 'CUSTOMER_SERVICE' },
+  { id: 'emp-3', name: 'Sarah Johnson', email: 'sarah.johnson@erp.local', department: 'SALES' },
+  { id: 'emp-4', name: 'Mike Wilson', email: 'mike.wilson@erp.local', department: 'FINANCE' },
+  { id: 'emp-5', name: 'Lisa Anderson', email: 'lisa.anderson@erp.local', department: 'HR' },
+];
+
+const departments: Department[] = [
+  'IT',
+  'FINANCE',
+  'OPERATIONS',
+  'SALES',
+  'HR',
+  'WAREHOUSE',
+  'PROCUREMENT',
+  'MANUFACTURING',
+  'CUSTOMER_SERVICE',
+  'ADMINISTRATION',
+  'OTHER',
+];
+
+export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
+  const [shiftNumber, setShiftNumber] = useState(initial?.shift_number ?? generateShiftNumber());
+  const [employeeId, setEmployeeId] = useState(initial?.employee_id ?? '');
   const [employeeName, setEmployeeName] = useState(initial?.employee_name ?? '');
-  const [date, setDate] = useState(
-    initial?.date ?? new Date().toISOString().slice(0, 10)
-  );
+  const [employeeEmail, setEmployeeEmail] = useState(initial?.employee_email ?? '');
+  
+  const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState(initial?.start_time ?? '08:00');
   const [endTime, setEndTime] = useState(initial?.end_time ?? '16:00');
+  const [breakDuration, setBreakDuration] = useState<number | ''>(initial?.break_duration_minutes ?? '');
+  
   const [role, setRole] = useState(initial?.role ?? '');
+  const [erpRole, setErpRole] = useState<ErpRole | ''>(initial?.erp_role ?? '');
+  const [department, setDepartment] = useState<Department | ''>(initial?.department ?? '');
+  const [jobTitle, setJobTitle] = useState(initial?.job_title ?? '');
+  const [location, setLocation] = useState(initial?.location ?? '');
+  
+  const [shiftType, setShiftType] = useState<ShiftType>(initial?.shift_type ?? 'REGULAR');
+  const [status, setStatus] = useState<ShiftStatus>(initial?.status ?? 'SCHEDULED');
+  const [isOvertime, setIsOvertime] = useState(initial?.is_overtime ?? false);
+  
+  const [scheduledBy, setScheduledBy] = useState(initial?.scheduled_by ?? '');
+  const [approvedBy, setApprovedBy] = useState(initial?.approved_by ?? '');
+  const [approvalDate, setApprovalDate] = useState(initial?.approval_date ?? '');
+  
+  const [clockInTime, setClockInTime] = useState(initial?.clock_in_time ?? '');
+  const [clockOutTime, setClockOutTime] = useState(initial?.clock_out_time ?? '');
+  const [actualHours, setActualHours] = useState<number | ''>(initial?.actual_hours ?? '');
+  
+  const [attendanceStatus, setAttendanceStatus] = useState(initial?.attendance_status ?? '');
+  const [lateMinutes, setLateMinutes] = useState<number | ''>(initial?.late_minutes ?? '');
+  const [earlyLeaveMinutes, setEarlyLeaveMinutes] = useState<number | ''>(initial?.early_leave_minutes ?? '');
+  
+  const [assignedTasks, setAssignedTasks] = useState(initial?.assigned_tasks?.join(', ') ?? '');
+  const [taskCompletionRate, setTaskCompletionRate] = useState<number | ''>(initial?.task_completion_rate ?? '');
+  
+  const [performanceRating, setPerformanceRating] = useState<number | ''>(initial?.performance_rating ?? '');
+  const [qualityScore, setQualityScore] = useState<number | ''>(initial?.quality_score ?? '');
+  
+  const [hourlyRate, setHourlyRate] = useState<number | ''>(initial?.hourly_rate ?? '');
+  const [totalPay, setTotalPay] = useState<number | ''>(initial?.total_pay ?? '');
+  const [overtimeHours, setOvertimeHours] = useState<number | ''>(initial?.overtime_hours ?? '');
+  const [overtimeRate, setOvertimeRate] = useState<number | ''>(initial?.overtime_rate ?? '');
+  const [currency, setCurrency] = useState(initial?.currency ?? 'USD');
+  
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [internalNotes, setInternalNotes] = useState(initial?.internal_notes ?? '');
+
+  // Calculate total hours
+  useEffect(() => {
+    if (startTime && endTime) {
+      const start = new Date(`2000-01-01T${startTime}`);
+      const end = new Date(`2000-01-01T${endTime}`);
+      if (end < start) {
+        // Handle overnight shifts
+        end.setDate(end.getDate() + 1);
+      }
+      const diffMs = end.getTime() - start.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      const breakHours = (Number(breakDuration) || 0) / 60;
+      const total = Math.max(0, diffHours - breakHours);
+      // Don't auto-set if user is editing actual hours
+      if (!actualHours) {
+        // This will be calculated in a separate effect
+      }
+    }
+  }, [startTime, endTime, breakDuration]);
+
+  // Calculate total pay
+  useEffect(() => {
+    const hours = Number(actualHours) || 0;
+    const rate = Number(hourlyRate) || 0;
+    const otHours = Number(overtimeHours) || 0;
+    const otRate = Number(overtimeRate) || rate * 1.5; // Default 1.5x
+    
+    if (hours > 0 && rate > 0) {
+      const regularHours = Math.max(0, hours - otHours);
+      const regularPay = regularHours * rate;
+      const overtimePay = otHours * otRate;
+      setTotalPay(regularPay + overtimePay);
+    } else {
+      setTotalPay('');
+    }
+  }, [actualHours, hourlyRate, overtimeHours, overtimeRate]);
+
+  // Auto-fill employee details when employee is selected
+  useEffect(() => {
+    if (employeeId) {
+      const employee = mockEmployees.find((e) => e.id === employeeId);
+      if (employee) {
+        setEmployeeName(employee.name);
+        setEmployeeEmail(employee.email);
+        setDepartment(employee.department || '');
+      }
+    }
+  }, [employeeId]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!employeeName || !date) return;
+    if (!employeeName || !date || !startTime || !endTime || !role) return;
+    
+    // Calculate total hours
+    const start = new Date(`2000-01-01T${startTime}`);
+    const end = new Date(`2000-01-01T${endTime}`);
+    if (end < start) end.setDate(end.getDate() + 1);
+    const diffMs = end.getTime() - start.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const breakHours = (Number(breakDuration) || 0) / 60;
+    const calculatedHours = Math.max(0, diffHours - breakHours);
+    
     onSubmit({
+      shift_number: shiftNumber,
+      employee_id: employeeId || undefined,
       employee_name: employeeName,
+      employee_email: employeeEmail || undefined,
       date,
       start_time: startTime,
       end_time: endTime,
-      role
+      break_duration_minutes: Number(breakDuration) || undefined,
+      total_hours: calculatedHours,
+      role,
+      erp_role: erpRole || undefined,
+      department: department || undefined,
+      job_title: jobTitle || undefined,
+      location: location || undefined,
+      shift_type: shiftType,
+      status,
+      is_overtime: isOvertime,
+      scheduled_by: scheduledBy || undefined,
+      approved_by: approvedBy || undefined,
+      approval_date: approvalDate || undefined,
+      clock_in_time: clockInTime || undefined,
+      clock_out_time: clockOutTime || undefined,
+      actual_hours: Number(actualHours) || undefined,
+      attendance_status: attendanceStatus as any,
+      late_minutes: Number(lateMinutes) || undefined,
+      early_leave_minutes: Number(earlyLeaveMinutes) || undefined,
+      assigned_tasks: assignedTasks ? assignedTasks.split(',').map(t => t.trim()).filter(t => t) : undefined,
+      task_completion_rate: Number(taskCompletionRate) || undefined,
+      performance_rating: Number(performanceRating) || undefined,
+      quality_score: Number(qualityScore) || undefined,
+      hourly_rate: Number(hourlyRate) || undefined,
+      total_pay: Number(totalPay) || undefined,
+      overtime_hours: Number(overtimeHours) || undefined,
+      overtime_rate: Number(overtimeRate) || undefined,
+      currency: currency || undefined,
+      notes: notes || undefined,
+      internal_notes: internalNotes || undefined,
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-xs">
+      {/* Shift Information */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Shift details</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <h3 className="text-sm font-semibold text-slate-900">Shift Information</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Input
-            label="Employee"
-            value={employeeName}
-            onChange={(e) => setEmployeeName(e.target.value)}
-            placeholder="Employee name"
+            label="Shift Number"
+            value={shiftNumber}
+            onChange={(e) => setShiftNumber(e.target.value)}
+            placeholder="Auto-generated"
           />
           <Input
             label="Date"
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
+            required
           />
+          <Select
+            label="Shift Type"
+            value={shiftType}
+            onChange={(e) => setShiftType(e.target.value as ShiftType)}
+            required
+          >
+            <option value="REGULAR">Regular</option>
+            <option value="OVERTIME">Overtime</option>
+            <option value="HOLIDAY">Holiday</option>
+            <option value="ON_CALL">On Call</option>
+            <option value="TRAINING">Training</option>
+            <option value="MEETING">Meeting</option>
+          </Select>
+          <Select
+            label="Status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as ShiftStatus)}
+            required
+          >
+            <option value="SCHEDULED">Scheduled</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="NO_SHOW">No Show</option>
+          </Select>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+      </div>
+
+      {/* Employee Information */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Employee Information</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Select
+            label="Employee"
+            value={employeeId}
+            onChange={(e) => setEmployeeId(e.target.value)}
+          >
+            <option value="">Select employee</option>
+            {mockEmployees.map((emp) => (
+              <option key={emp.id} value={emp.id}>
+                {emp.name} - {emp.department}
+              </option>
+            ))}
+          </Select>
           <Input
-            label="Start time"
-            type="time"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
+            label="Employee Name"
+            value={employeeName}
+            onChange={(e) => setEmployeeName(e.target.value)}
+            placeholder="Employee name"
+            required
           />
           <Input
-            label="End time"
-            type="time"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-          />
-          <Input
-            label="Role"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            placeholder="Role for this shift"
+            label="Email"
+            type="email"
+            value={employeeEmail}
+            onChange={(e) => setEmployeeEmail(e.target.value)}
+            placeholder="employee@company.com"
           />
         </div>
       </div>
 
-      <div className="sticky bottom-0 mt-4 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 flex justify-end gap-2">
-        <Button type="button" variant="ghost" size="md">
+      {/* Role & Department */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Role & Department</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Input
+            label="Role/Job Title"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            placeholder="Job title or role"
+            required
+          />
+          <Select
+            label="ERP Role"
+            value={erpRole}
+            onChange={(e) => setErpRole(e.target.value as ErpRole)}
+          >
+            <option value="">Select ERP role</option>
+            {erpRoles.map((r) => (
+              <option key={r} value={r}>
+                {r.replace('_', ' ')}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="Department"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value as Department)}
+          >
+            <option value="">Select department</option>
+            {departments.map((dept) => (
+              <option key={dept} value={dept}>
+                {dept.replace('_', ' ')}
+              </option>
+            ))}
+          </Select>
+          <Input
+            label="Location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="Work location"
+          />
+        </div>
+        <Input
+          label="Job Title"
+          value={jobTitle}
+          onChange={(e) => setJobTitle(e.target.value)}
+          placeholder="Specific job title"
+        />
+      </div>
+
+      {/* Time Schedule */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Time Schedule</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Input
+            label="Start Time"
+            type="time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            required
+          />
+          <Input
+            label="End Time"
+            type="time"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            required
+          />
+          <Input
+            label="Break Duration (minutes)"
+            type="number"
+            value={breakDuration}
+            onChange={(e) => setBreakDuration(e.target.value === '' ? '' : Number(e.target.value))}
+            placeholder="30"
+            min={0}
+          />
+          <div className="flex items-center gap-2 pt-6">
+            <input
+              type="checkbox"
+              id="isOvertime"
+              checked={isOvertime}
+              onChange={(e) => setIsOvertime(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            <label htmlFor="isOvertime" className="text-[11px] font-semibold text-slate-800">
+              Overtime Shift
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Time Tracking */}
+      {(status === 'IN_PROGRESS' || status === 'COMPLETED') && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900">Time Tracking</h3>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Input
+              label="Clock In Time"
+              type="time"
+              value={clockInTime}
+              onChange={(e) => setClockInTime(e.target.value)}
+            />
+            <Input
+              label="Clock Out Time"
+              type="time"
+              value={clockOutTime}
+              onChange={(e) => setClockOutTime(e.target.value)}
+            />
+            <Input
+              label="Actual Hours"
+              type="number"
+              value={actualHours}
+              onChange={(e) => setActualHours(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="8.0"
+              min={0}
+              step="0.25"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Attendance */}
+      {status === 'COMPLETED' && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900">Attendance</h3>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Select
+              label="Attendance Status"
+              value={attendanceStatus}
+              onChange={(e) => setAttendanceStatus(e.target.value)}
+            >
+              <option value="">Select status</option>
+              <option value="PRESENT">Present</option>
+              <option value="ABSENT">Absent</option>
+              <option value="LATE">Late</option>
+              <option value="EARLY_LEAVE">Early Leave</option>
+              <option value="ON_TIME">On Time</option>
+            </Select>
+            <Input
+              label="Late Minutes"
+              type="number"
+              value={lateMinutes}
+              onChange={(e) => setLateMinutes(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="0"
+              min={0}
+            />
+            <Input
+              label="Early Leave Minutes"
+              type="number"
+              value={earlyLeaveMinutes}
+              onChange={(e) => setEarlyLeaveMinutes(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder="0"
+              min={0}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Tasks & Performance */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Tasks & Performance</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Assigned Tasks"
+            value={assignedTasks}
+            onChange={(e) => setAssignedTasks(e.target.value)}
+            placeholder="Task 1, Task 2, Task 3 (comma-separated)"
+          />
+          <Input
+            label="Task Completion Rate (%)"
+            type="number"
+            value={taskCompletionRate}
+            onChange={(e) => setTaskCompletionRate(e.target.value === '' ? '' : Number(e.target.value))}
+            placeholder="100"
+            min={0}
+            max={100}
+          />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Performance Rating (1-5)"
+            type="number"
+            value={performanceRating}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (val >= 1 && val <= 5) setPerformanceRating(val);
+            }}
+            placeholder="4.5"
+            min={1}
+            max={5}
+            step="0.1"
+          />
+          <Input
+            label="Quality Score (1-5)"
+            type="number"
+            value={qualityScore}
+            onChange={(e) => {
+              const val = Number(e.target.value);
+              if (val >= 1 && val <= 5) setQualityScore(val);
+            }}
+            placeholder="4.5"
+            min={1}
+            max={5}
+            step="0.1"
+          />
+        </div>
+      </div>
+
+      {/* Payroll & Cost */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Payroll & Cost</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Input
+            label="Hourly Rate"
+            type="number"
+            value={hourlyRate}
+            onChange={(e) => setHourlyRate(e.target.value === '' ? '' : Number(e.target.value))}
+            placeholder="0.00"
+            min={0}
+            step="0.01"
+          />
+          <Input
+            label="Overtime Hours"
+            type="number"
+            value={overtimeHours}
+            onChange={(e) => setOvertimeHours(e.target.value === '' ? '' : Number(e.target.value))}
+            placeholder="0.0"
+            min={0}
+            step="0.25"
+          />
+          <Input
+            label="Overtime Rate"
+            type="number"
+            value={overtimeRate}
+            onChange={(e) => setOvertimeRate(e.target.value === '' ? '' : Number(e.target.value))}
+            placeholder="Auto: 1.5x hourly"
+            min={0}
+            step="0.01"
+          />
+          <Select
+            label="Currency"
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+          >
+            <option value="USD">USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="INR">INR (₹)</option>
+          </Select>
+        </div>
+        <Input
+          label="Total Pay"
+          type="number"
+          value={totalPay}
+          onChange={(e) => setTotalPay(e.target.value === '' ? '' : Number(e.target.value))}
+          placeholder="Auto-calculated"
+          min={0}
+          step="0.01"
+          readOnly
+          className="bg-slate-50"
+        />
+      </div>
+
+      {/* Approval */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Approval</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Input
+            label="Scheduled By"
+            value={scheduledBy}
+            onChange={(e) => setScheduledBy(e.target.value)}
+            placeholder="Scheduler name"
+          />
+          <Input
+            label="Approved By"
+            value={approvedBy}
+            onChange={(e) => setApprovedBy(e.target.value)}
+            placeholder="Manager name"
+          />
+          <Input
+            label="Approval Date"
+            type="date"
+            value={approvalDate}
+            onChange={(e) => setApprovalDate(e.target.value)}
+            max={new Date().toISOString().slice(0, 10)}
+          />
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Notes</h3>
+        <Textarea
+          label="Notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Shift notes"
+          rows={3}
+        />
+        <Textarea
+          label="Internal Notes"
+          value={internalNotes}
+          onChange={(e) => setInternalNotes(e.target.value)}
+          placeholder="Internal notes (not visible to employee)"
+          rows={3}
+        />
+      </div>
+
+      <div className="mt-4 border-t border-slate-200 bg-white pt-3 flex flex-col sm:flex-row justify-end gap-2 sticky bottom-0">
+        <Button
+          type="button"
+          variant="ghost"
+          size="md"
+          onClick={onCancel}
+          className="w-full sm:w-auto"
+        >
           Cancel
         </Button>
-        <Button type="submit" variant="primary" size="md">
-          Save shift
+        <Button type="submit" variant="primary" size="md" className="w-full sm:w-auto">
+          {initial ? 'Update Shift' : 'Create Shift'}
         </Button>
       </div>
     </form>
   );
 }
-
-
-
