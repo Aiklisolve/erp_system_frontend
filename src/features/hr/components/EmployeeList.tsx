@@ -14,10 +14,11 @@ import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
 import type { Employee } from '../types';
 import { EmployeeForm } from './EmployeeForm';
+import { HrLeaveManagement } from './HrLeaveManagement';
 
 export function EmployeeList() {
   const { employees, loading, create, update, remove, refresh, metrics } = useHr();
-  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'on_leave' | 'inactive'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'active' | 'on_leave' | 'inactive' | 'leaves'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -296,117 +297,127 @@ export function EmployeeList() {
           items={[
             { id: 'all', label: 'All Employees' },
             { id: 'active', label: 'Active' },
+            { id: 'leaves', label: 'Leave Management' },
             { id: 'on_leave', label: 'On Leave' },
             { id: 'inactive', label: 'Inactive' },
           ]}
           activeId={activeTab}
           onChange={(id) => {
-            setActiveTab(id as 'all' | 'active' | 'on_leave' | 'inactive');
+            setActiveTab(id as 'all' | 'active' | 'on_leave' | 'inactive' | 'leaves');
             setCurrentPage(1);
           }}
         />
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <Input
-              placeholder="Search by name, employee #, email, phone, role, department, or national ID..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
+        {/* Conditional Content */}
+        {activeTab === 'leaves' ? (
+          <div className="p-4">
+            <HrLeaveManagement employees={employees} />
           </div>
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full sm:w-48"
-          >
-            <option value="all">All Statuses</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {status.replace('_', ' ')}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={departmentFilter}
-            onChange={(e) => {
-              setDepartmentFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full sm:w-48"
-          >
-            <option value="all">All Departments</option>
-            {departments.map((dept) => (
-              <option key={dept} value={dept}>
-                {dept?.replace('_', ' ')}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={employmentTypeFilter}
-            onChange={(e) => {
-              setEmploymentTypeFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full sm:w-48"
-          >
-            <option value="all">All Types</option>
-            {employmentTypes.map((type) => (
-              <option key={type} value={type}>
-                {type.replace('_', ' ')}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        {/* Table */}
-        {loading ? (
-          <LoadingState label="Loading employees..." />
-        ) : filteredEmployees.length === 0 ? (
-          <EmptyState
-            title="No employees found"
-            description={
-              searchTerm || statusFilter !== 'all' || departmentFilter !== 'all' || employmentTypeFilter !== 'all' || activeTab !== 'all'
-                ? 'Try adjusting your filters to see more results.'
-                : 'Create your first employee to get started.'
-            }
-          />
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <Table
-                columns={columns}
-                data={paginatedEmployees}
-                getRowKey={(row, index) => `${row.id}-${index}`}
-              />
-            </div>
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <Select
-                  value={itemsPerPage.toString()}
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search by name, employee #, email, phone, role, department, or national ID..."
+                  value={searchTerm}
                   onChange={(e) => {
-                    setItemsPerPage(Number(e.target.value));
+                    setSearchTerm(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full sm:w-32"
-                >
-                  <option value="5">5 per page</option>
-                  <option value="10">10 per page</option>
-                  <option value="20">20 per page</option>
-                  <option value="50">50 per page</option>
-                </Select>
-                <Pagination
-                  page={currentPage}
-                  totalPages={totalPages}
-                  onChange={setCurrentPage}
                 />
               </div>
+              <Select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full sm:w-48"
+              >
+                <option value="all">All Statuses</option>
+                {statuses.map((status) => (
+                  <option key={status} value={status}>
+                    {status.replace('_', ' ')}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={departmentFilter}
+                onChange={(e) => {
+                  setDepartmentFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full sm:w-48"
+              >
+                <option value="all">All Departments</option>
+                {departments.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept?.replace('_', ' ')}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={employmentTypeFilter}
+                onChange={(e) => {
+                  setEmploymentTypeFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full sm:w-48"
+              >
+                <option value="all">All Types</option>
+                {employmentTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type.replace('_', ' ')}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            {/* Table */}
+            {loading ? (
+              <LoadingState label="Loading employees..." />
+            ) : filteredEmployees.length === 0 ? (
+              <EmptyState
+                title="No employees found"
+                description={
+                  searchTerm || statusFilter !== 'all' || departmentFilter !== 'all' || employmentTypeFilter !== 'all' || activeTab !== 'all'
+                    ? 'Try adjusting your filters to see more results.'
+                    : 'Create your first employee to get started.'
+                }
+              />
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <Table
+                    columns={columns}
+                    data={paginatedEmployees}
+                    getRowKey={(row, index) => `${row.id}-${index}`}
+                  />
+                </div>
+                {totalPages > 1 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <Select
+                      value={itemsPerPage.toString()}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="w-full sm:w-32"
+                    >
+                      <option value="5">5 per page</option>
+                      <option value="10">10 per page</option>
+                      <option value="20">20 per page</option>
+                      <option value="50">50 per page</option>
+                    </Select>
+                    <Pagination
+                      page={currentPage}
+                      totalPages={totalPages}
+                      onChange={setCurrentPage}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
