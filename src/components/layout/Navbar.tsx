@@ -1,11 +1,49 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { appConfig } from '../../config/appConfig';
 import { useSupabaseHealthCheck } from '../../hooks/useSupabaseHealthCheck';
 import { useAuth } from '../../features/auth/hooks/useAuth';
+import { getExpiresAt } from '../../lib/sessionManager';
 
 export function Navbar() {
   const { status } = useSupabaseHealthCheck();
-  const { user, logout } = useAuth();
+  const { user, logout, getUserRole } = useAuth();
+  const navigate = useNavigate();
+  const [sessionTimeRemaining, setSessionTimeRemaining] = useState(0);
+  
+  const userRole = getUserRole();
+  
+  const handleLogout = async () => {
+    try {
+      // Call logout which will clear all session data and redirect
+      await logout();
+      // The logout function in useAuth already handles redirect,
+      // but we can also use navigate as a backup
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if logout fails, redirect to login
+      navigate('/login', { replace: true });
+    }
+  };
+  
+  // Update session time remaining every minute
+  useEffect(() => {
+    const updateTimeRemaining = () => {
+      const expiresAt = getExpiresAt();
+      if (expiresAt) {
+        const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / (60 * 1000)));
+        setSessionTimeRemaining(remaining);
+      } else {
+        setSessionTimeRemaining(0);
+      }
+    };
+    
+    updateTimeRemaining();
+    const interval = setInterval(updateTimeRemaining, 60 * 1000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, [user]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -57,19 +95,28 @@ export function Navbar() {
             </span>
             {user ? (
             <div className="flex items-center gap-3">
-              <div className="flex flex-col items-end leading-tight">
-                <span className="text-xs font-medium text-slate-900 truncate max-w-[160px]">
+              <div className="hidden lg:flex flex-col items-end leading-tight">
+                <span className="text-xs font-medium text-text-primary truncate max-w-[160px]">
                   {user.email}
                 </span>
-                <span className="text-[11px] text-slate-500">Demo tenant</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-text-secondary">
+                    {userRole?.replace('_', ' ')}
+                  </span>
+                  {sessionTimeRemaining > 0 && (
+                    <span className="text-[10px] text-text-secondary">
+                      • {Math.floor(sessionTimeRemaining / 60)}h {sessionTimeRemaining % 60}m
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-light/20 text-[11px] font-semibold text-brand">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-light/20 text-[11px] font-semibold text-primary">
                 {user.email?.[0]?.toUpperCase() ?? 'U'}
               </div>
               <button
                 type="button"
-                className="rounded-full border border-slate-300 bg-slate-100 px-2.5 py-1 text-[11px] text-slate-800 hover:border-brand/70 hover:text-brand-dark transition-colors"
-                onClick={() => logout()}
+                className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] text-text-primary hover:border-primary/70 hover:text-primary transition-colors"
+                onClick={handleLogout}
               >
                 Logout
               </button>

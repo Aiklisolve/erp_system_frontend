@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { RootLayout } from './layout/RootLayout';
 import { AuthLayout } from './layout/AuthLayout';
+import { LandingPage } from '../pages/marketing/LandingPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
 import { OverviewPage } from '../pages/dashboard/OverviewPage';
@@ -20,12 +21,13 @@ import { EmployeeList } from '../features/hr/components/EmployeeList';
 import { EcommerceProductsList } from '../features/ecommerce/components/EcommerceProductsList';
 import { CampaignList } from '../features/marketing/components/CampaignList';
 import { ProtectedRoute } from './protectedRoute';
+import { ModuleProtectedRoute } from './moduleProtectedRoute';
 
 export const router = createBrowserRouter(
   [
     {
       path: '/',
-      element: <Navigate to="/dashboard" replace />
+      element: <LandingPage />
     },
     {
       path: '/login',
@@ -56,19 +58,110 @@ export const router = createBrowserRouter(
           path: '/modules/:slug',
           element: <ModuleDetailPage />
         },
-        { path: '/finance', element: <FinanceList /> },
-        { path: '/procurement', element: <ProcurementList /> },
-        { path: '/manufacturing', element: <ManufacturingList /> },
-        { path: '/inventory', element: <InventoryList /> },
-        { path: '/orders', element: <OrdersList /> },
-        { path: '/warehouse', element: <WarehouseList /> },
-        { path: '/supply-chain', element: <SupplyChainList /> },
-        { path: '/crm', element: <CustomerList /> },
-        { path: '/projects', element: <ProjectList /> },
-        { path: '/workforce', element: <WorkforceList /> },
-        { path: '/hr', element: <EmployeeList /> },
-        { path: '/ecommerce', element: <EcommerceProductsList /> },
-        { path: '/marketing', element: <CampaignList /> }
+        {
+          path: '/finance',
+          element: (
+            <ModuleProtectedRoute>
+              <FinanceList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/procurement',
+          element: (
+            <ModuleProtectedRoute>
+              <ProcurementList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/manufacturing',
+          element: (
+            <ModuleProtectedRoute>
+              <ManufacturingList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/inventory',
+          element: (
+            <ModuleProtectedRoute>
+              <InventoryList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/orders',
+          element: (
+            <ModuleProtectedRoute>
+              <OrdersList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/warehouse',
+          element: (
+            <ModuleProtectedRoute>
+              <WarehouseList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/supply-chain',
+          element: (
+            <ModuleProtectedRoute>
+              <SupplyChainList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/crm',
+          element: (
+            <ModuleProtectedRoute>
+              <CustomerList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/projects',
+          element: (
+            <ModuleProtectedRoute>
+              <ProjectList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/workforce',
+          element: (
+            <ModuleProtectedRoute>
+              <WorkforceList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/hr',
+          element: (
+            <ModuleProtectedRoute>
+              <EmployeeList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/ecommerce',
+          element: (
+            <ModuleProtectedRoute>
+              <EcommerceProductsList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/marketing',
+          element: (
+            <ModuleProtectedRoute>
+              <CampaignList />
+            </ModuleProtectedRoute>
+          )
+        }
       ]
     }
   ],

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
   ReactNode,
   createContext,
@@ -8,14 +9,17 @@ import {
 import type { User } from '@supabase/supabase-js';
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import * as authApi from '../api/authApi';
+import type { ErpRole } from '../data/staticUsers';
 
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, fullName: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string, role?: ErpRole) => Promise<void>;
   logout: () => Promise<void>;
+  getUserRole: () => ErpRole | null;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -27,34 +31,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    let sessionCheckInterval: ReturnType<typeof setInterval> | null = null;
+    let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
 
     const init = async () => {
-      // If Supabase isn't configured, immediately fall back to a local mock session
-      if (!hasSupabaseConfig) {
-        if (!isMounted) return;
-        const mockUser = {
-          id: 'mock-user',
-          email: 'demo@orbieterp.local'
-        } as User;
-        setUser(mockUser);
-        setLoading(false);
-        return;
-      }
-
       try {
-        const { data } = await supabase.auth.getUser();
-        if (!isMounted) return;
+        // Check localStorage for existing session
+        const storedUser = localStorage.getItem('user');
+        const storedToken = localStorage.getItem('token');
+        const storedSessionId = localStorage.getItem('session_id');
 
-        if (data.user) {
-          setUser(data.user);
+        if (storedUser && storedUser !== 'undefined' && storedToken && storedToken !== 'undefined') {
+          try {
+            const parsedUser = JSON.parse(storedUser);
+            
+            // Validate session if session_id exists
+            if (storedSessionId) {
+              const { validateSession } = await import('../../../lib/sessionValidator');
+              const validationResult = await validateSession(storedSessionId, storedToken);
+              
+              if (validationResult.valid) {
+                // Session is valid, fetch current user
+                const currentUser = await authApi.getCurrentUser();
+                if (!isMounted) return;
+                setUser(currentUser);
+              } else {
+                // Session is invalid, logout
+                console.log('Session validation failed on app load:', validationResult.reason);
+                await authApi.logout();
+                if (isMounted) {
+                  setUser(null);
+                }
+              }
+            } else {
+              // No session_id, try to get current user
+              const currentUser = await authApi.getCurrentUser();
+              if (!isMounted) return;
+              setUser(currentUser);
+            }
+          } catch (error) {
+            console.error('Error parsing stored user:', error);
+            await authApi.logout();
+            if (isMounted) {
+              setUser(null);
+            }
+          }
+        } else {
+          // No stored session, try to get current user (for Supabase)
+          const currentUser = await authApi.getCurrentUser();
+          if (!isMounted) return;
+          setUser(currentUser);
         }
-      } catch {
-        // if Supabase isn't configured, fall back to a local mock session
-        const mockUser = {
-          id: 'mock-user',
-          email: 'demo@orbieterp.local'
-        } as User;
-        setUser(mockUser);
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (isMounted) {
+          setUser(null);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -62,81 +94,151 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void init();
 
-    if (!hasSupabaseConfig) {
-      return () => {
-        isMounted = false;
-      };
+    let listener: { subscription: { unsubscribe: () => void } } | null = null;
+
+    if (hasSupabaseConfig) {
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (isMounted) {
+          setUser(session?.user ?? null);
+        }
+      });
+      listener = data;
     }
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    // Set up session validation check every 2 minutes
+    sessionCheckInterval = setInterval(async () => {
+      const currentUser = await authApi.getCurrentUser();
+      if (isMounted) {
+        setUser(currentUser);
+      }
+    }, 2 * 60 * 1000); // Check every 2 minutes
 
     return () => {
       isMounted = false;
-      listener.subscription.unsubscribe();
+      if (sessionCheckInterval) {
+        clearInterval(sessionCheckInterval);
+      }
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      if (listener) {
+        listener.subscription.unsubscribe();
+      }
     };
   }, []);
 
-  const handleLogin = async (email: string, password: string) => {
-    setError(null);
-
-    // In mock mode, just set a demo user and exit.
-    if (!hasSupabaseConfig) {
-      const mockUser = {
-        id: 'mock-user',
-        email
-      } as User;
-      setUser(mockUser);
+  // Inactivity timeout handler - redirects to login after 15 minutes of no activity
+  useEffect(() => {
+    // Only set up inactivity tracking if user is authenticated
+    if (!user) {
       return;
     }
 
+    const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+    let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Function to reset the inactivity timer
+    const resetInactivityTimer = () => {
+      // Clear existing timer
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+
+      // Set new timer - if it expires, logout and redirect
+      inactivityTimer = setTimeout(async () => {
+        console.log('Session expired due to inactivity');
+        await authApi.logout();
+        setUser(null);
+        // Redirect to login page
+        window.location.href = '/login';
+      }, INACTIVITY_TIMEOUT);
+    };
+
+    // List of events that indicate user activity
+    const activityEvents = [
+      'mousedown',
+      'mousemove',
+      'keypress',
+      'scroll',
+      'touchstart',
+      'click'
+    ];
+
+    // Add event listeners for user activity
+    activityEvents.forEach((event) => {
+      document.addEventListener(event, resetInactivityTimer, true);
+    });
+
+    // Initialize the timer
+    resetInactivityTimer();
+
+    // Cleanup function
+    return () => {
+      // Clear the timer
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      // Remove event listeners
+      activityEvents.forEach((event) => {
+        document.removeEventListener(event, resetInactivityTimer, true);
+      });
+    };
+  }, [user]);
+
+  const handleLogin = async (email: string, password: string) => {
+    setError(null);
     try {
       const user = await authApi.login(email, password);
       setUser(user ?? null);
     } catch (err: any) {
       setError(err?.message ?? 'Unable to login.');
+      throw err;
     }
   };
 
   const handleRegister = async (
     email: string,
     password: string,
-    fullName: string
+    fullName: string,
+    role: ErpRole = 'VIEWER'
   ) => {
     setError(null);
-
-    if (!hasSupabaseConfig) {
-      const mockUser = {
-        id: 'mock-user',
-        email,
-        user_metadata: { full_name: fullName }
-      } as unknown as User;
-      setUser(mockUser);
-      return;
-    }
-
     try {
-      const user = await authApi.register(email, password, fullName);
+      const user = await authApi.register(email, password, fullName, role);
       setUser(user ?? null);
     } catch (err: any) {
       setError(err?.message ?? 'Unable to register.');
+      throw err;
     }
   };
 
   const handleLogout = async () => {
     setError(null);
-
-    if (!hasSupabaseConfig) {
-      setUser(null);
-      return;
-    }
-
     try {
       await authApi.logout();
       setUser(null);
+      // Redirect to login page after logout
+      // Using window.location.href to ensure full page reload and clear any cached state
+      window.location.href = '/login';
     } catch (err: any) {
       setError(err?.message ?? 'Unable to logout.');
+      // Even if logout fails, clear user and redirect
+      setUser(null);
+      window.location.href = '/login';
+    }
+  };
+
+  const getUserRole = (): ErpRole | null => {
+    if (!user) return null;
+    return (user.user_metadata?.role as ErpRole) || null;
+  };
+
+  const refreshUser = async () => {
+    try {
+      const currentUser = await authApi.getCurrentUser();
+      setUser(currentUser);
+    } catch {
+      setUser(null);
     }
   };
 
@@ -148,7 +250,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         login: handleLogin,
         register: handleRegister,
-        logout: handleLogout
+        logout: handleLogout,
+        getUserRole,
+        refreshUser
       }}
     >
       {children}
