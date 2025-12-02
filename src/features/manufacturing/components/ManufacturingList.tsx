@@ -1,142 +1,213 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useManufacturing } from '../hooks/useManufacturing';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
+import { Input } from '../../../components/ui/Input';
+import { Select } from '../../../components/ui/Select';
 import { Table, type TableColumn } from '../../../components/ui/Table';
 import { Modal } from '../../../components/ui/Modal';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { LoadingState } from '../../../components/ui/LoadingState';
 import { StatCard } from '../../../components/ui/StatCard';
-import type { ProductionOrder, ProductionOrderStatus } from '../types';
+import { Tabs } from '../../../components/ui/Tabs';
+import { Badge } from '../../../components/ui/Badge';
+import { Pagination } from '../../../components/ui/Pagination';
+import type { ProductionOrder } from '../types';
 import { ManufacturingForm } from './ManufacturingForm';
-
-type SortDirection = 'none' | 'asc' | 'desc';
 
 export function ManufacturingList() {
   const { orders, loading, create, update, remove, metrics } = useManufacturing();
+  const [activeTab, setActiveTab] = useState<'all' | 'planned' | 'in_progress' | 'completed' | 'on_hold'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
-  // Filter states
-  const [productSearch, setProductSearch] = useState('');
-  const [qtySort, setQtySort] = useState<SortDirection>('none');
-  const [costSort, setCostSort] = useState<SortDirection>('none');
-  const [startDateSort, setStartDateSort] = useState<SortDirection>('none');
-  const [endDateSort, setEndDateSort] = useState<SortDirection>('none');
-  const [statusFilter, setStatusFilter] = useState<ProductionOrderStatus | 'ALL'>('ALL');
+  // Filter orders based on active tab
+  const filteredByTab = orders.filter((order) => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'planned') return order.status === 'PLANNED' || order.status === 'SCHEDULED' || order.status === 'DRAFT';
+    if (activeTab === 'in_progress') return order.status === 'IN_PROGRESS' || order.status === 'RELEASED';
+    if (activeTab === 'completed') return order.status === 'COMPLETED' || order.status === 'CLOSED';
+    if (activeTab === 'on_hold') return order.status === 'ON_HOLD' || order.status === 'CANCELLED';
+    return true;
+  });
 
-  // Clear other sorts when one is selected
-  const clearOtherSorts = (keep: 'qty' | 'cost' | 'start' | 'end') => {
-    if (keep !== 'qty') setQtySort('none');
-    if (keep !== 'cost') setCostSort('none');
-    if (keep !== 'start') setStartDateSort('none');
-    if (keep !== 'end') setEndDateSort('none');
-  };
+  // Apply search and filters
+  const filteredOrders = filteredByTab.filter((order) => {
+    const matchesSearch =
+      searchTerm === '' ||
+      order.production_order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.work_order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.product_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.batch_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-  // Apply filters and sorting
-  const filteredOrders = useMemo(() => {
-    let result = [...orders];
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+    const matchesPriority = priorityFilter === 'all' || order.priority === priorityFilter;
 
-    // Filter by product search
-    if (productSearch.trim()) {
-      result = result.filter((order) =>
-        order.product.toLowerCase().includes(productSearch.toLowerCase())
-      );
-    }
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
 
-    // Filter by status
-    if (statusFilter !== 'ALL') {
-      result = result.filter((order) => order.status === statusFilter);
-    }
+  // Pagination
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
 
-    // Sort by planned quantity
-    if (qtySort !== 'none') {
-      result.sort((a, b) =>
-        qtySort === 'asc'
-          ? a.planned_qty - b.planned_qty
-          : b.planned_qty - a.planned_qty
-      );
-    }
+  // Calculate metrics
+  const totalProduction = orders.reduce((sum, order) => sum + order.planned_qty, 0);
+  const inProgressCount = orders.filter((o) => o.status === 'IN_PROGRESS' || o.status === 'RELEASED').length;
+  const completedCount = orders.filter((o) => o.status === 'COMPLETED').length;
+  const totalCost = orders.reduce((sum, order) => sum + order.cost, 0);
+  const avgEfficiency = orders.filter(o => o.efficiency_percentage).reduce((sum, o) => sum + (o.efficiency_percentage || 0), 0) / orders.filter(o => o.efficiency_percentage).length || 0;
 
-    // Sort by cost
-    if (costSort !== 'none') {
-      result.sort((a, b) =>
-        costSort === 'asc'
-          ? a.cost - b.cost
-          : b.cost - a.cost
-      );
-    }
-
-    // Sort by start date
-    if (startDateSort !== 'none') {
-      result.sort((a, b) => {
-        const dateA = new Date(a.start_date).getTime();
-        const dateB = new Date(b.start_date).getTime();
-        return startDateSort === 'asc' ? dateA - dateB : dateB - dateA;
-      });
-    }
-
-    // Sort by end date
-    if (endDateSort !== 'none') {
-      result.sort((a, b) => {
-        const dateA = new Date(a.end_date).getTime();
-        const dateB = new Date(b.end_date).getTime();
-        return endDateSort === 'asc' ? dateA - dateB : dateB - dateA;
-      });
-    }
-
-    return result;
-  }, [orders, productSearch, statusFilter, qtySort, costSort, startDateSort, endDateSort]);
+  const tabs = [
+    { id: 'all', label: 'All Orders', count: orders.length },
+    { id: 'planned', label: 'Planned', count: orders.filter((o) => o.status === 'PLANNED' || o.status === 'SCHEDULED' || o.status === 'DRAFT').length },
+    { id: 'in_progress', label: 'In Progress', count: inProgressCount },
+    { id: 'completed', label: 'Completed', count: completedCount },
+    { id: 'on_hold', label: 'On Hold', count: orders.filter((o) => o.status === 'ON_HOLD' || o.status === 'CANCELLED').length }
+  ];
 
   const columns: TableColumn<ProductionOrder>[] = [
-    { key: 'product', header: 'Product' },
-    { key: 'planned_qty', header: 'Planned qty' },
     {
-      key: 'cost',
-      header: 'Cost',
-      render: (row) =>
-        row.cost.toLocaleString(undefined, {
-          style: 'currency',
-          currency: 'INR'
-        })
+      key: 'production_order_number',
+      header: 'Production Order #',
+      render: (row) => (
+        <div className="font-medium text-slate-900">
+          {row.production_order_number}
+          {row.work_order_number && (
+            <div className="text-[10px] text-slate-500">WO: {row.work_order_number}</div>
+          )}
+        </div>
+      )
     },
-    { key: 'start_date', header: 'Start' },
-    { key: 'end_date', header: 'End' },
+    {
+      key: 'start_date',
+      header: 'Start Date',
+      render: (row) => (
+        <div>
+          <div className="text-xs text-slate-900">{new Date(row.start_date).toLocaleDateString()}</div>
+          {row.end_date && (
+            <div className="text-[10px] text-slate-500">End: {new Date(row.end_date).toLocaleDateString()}</div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'product',
+      header: 'Product',
+      render: (row) => (
+        <div>
+          <div className="text-xs font-medium text-slate-900">{row.product}</div>
+          {row.product_code && (
+            <div className="text-[10px] text-slate-500">{row.product_code}</div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'priority',
+      header: 'Priority',
+      render: (row) => (
+        <div className="flex items-center gap-1">
+          <span className={`w-2 h-2 rounded-full ${
+            row.priority === 'URGENT' ? 'bg-red-500' :
+            row.priority === 'HIGH' ? 'bg-orange-500' :
+            row.priority === 'MEDIUM' ? 'bg-yellow-500' :
+            'bg-green-500'
+          }`} />
+          <span className="text-xs text-slate-600">{row.priority}</span>
+        </div>
+      )
+    },
     {
       key: 'status',
       header: 'Status',
       render: (row) => (
-        <span
-          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-            row.status === 'PLANNED'
-              ? 'bg-slate-100 text-slate-700'
-              : row.status === 'IN_PROGRESS'
-              ? 'bg-sky-100 text-sky-800'
-              : row.status === 'COMPLETED'
-              ? 'bg-emerald-100 text-emerald-800'
-              : 'bg-red-100 text-red-700'
-          }`}
+        <Badge
+          tone={
+            row.status === 'COMPLETED' || row.status === 'CLOSED'
+              ? 'success'
+              : row.status === 'IN_PROGRESS' || row.status === 'RELEASED'
+              ? 'brand'
+              : row.status === 'PLANNED' || row.status === 'SCHEDULED'
+              ? 'warning'
+              : 'neutral'
+          }
         >
-          {row.status.replace('_', ' ')}
-        </span>
+          {row.status.replace(/_/g, ' ')}
+        </Badge>
       )
     },
     {
-      key: 'id',
+      key: 'quantity',
+      header: 'Quantity',
+      render: (row) => (
+        <div className="text-xs">
+          <div className="font-medium text-slate-900">
+            {row.produced_qty || 0} / {row.planned_qty} {row.unit}
+          </div>
+          {row.progress_percentage !== undefined && (
+            <div className="text-[10px] text-slate-500">
+              {row.progress_percentage.toFixed(0)}% complete
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'cost',
+      header: 'Cost',
+      render: (row) => (
+        <div className="text-right">
+          <div className="text-xs font-semibold text-slate-900">
+            {row.currency} {row.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          {row.actual_cost && row.actual_cost !== row.cost && (
+            <div className="text-[10px] text-slate-500">
+              Actual: {row.currency} {row.actual_cost.toLocaleString()}
+            </div>
+          )}
+        </div>
+      )
+    },
+    {
+      key: 'production_type',
+      header: 'Type',
+      render: (row) => (
+        <Badge tone="neutral">
+          {row.production_type.replace(/_/g, ' ')}
+        </Badge>
+      )
+    },
+    {
+      key: 'actions',
       header: '',
       render: (row) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 justify-end">
           <button
             type="button"
-            onClick={() => setEditingOrder(row)}
-            className="text-[11px] text-blue-500 hover:text-blue-600"
+            onClick={() => {
+              setEditingOrder(row);
+              setModalOpen(true);
+            }}
+            className="text-[11px] text-primary hover:text-primary-light font-medium"
           >
             Edit
           </button>
           <button
             type="button"
-            onClick={() => remove(row.id)}
-            className="text-[11px] text-red-500 hover:text-red-600"
+            onClick={() => {
+              if (window.confirm('Are you sure you want to delete this production order?')) {
+                remove(row.id);
+              }
+            }}
+            className="text-[11px] text-red-600 hover:text-red-700 font-medium"
           >
             Delete
           </button>
@@ -145,182 +216,205 @@ export function ManufacturingList() {
     }
   ];
 
+  const handleCreate = async (data: Omit<ProductionOrder, 'id' | 'created_at' | 'updated_at'>) => {
+    await create(data);
+    setModalOpen(false);
+    setEditingOrder(null);
+  };
+
+  const handleUpdate = async (data: Omit<ProductionOrder, 'id' | 'created_at' | 'updated_at'>) => {
+    if (editingOrder) {
+      await update(editingOrder.id, data);
+      setModalOpen(false);
+      setEditingOrder(null);
+    }
+  };
+
+  if (loading) {
+    return <LoadingState label="Loading production orders..." />;
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl md:text-2xl font-semibold text-slate-900">
-            Manufacturing
-          </h1>
-          <p className="text-xs text-slate-600 max-w-xl">
-            Plan and monitor production orders across your facilities using simple,
-            Supabase-ready mock data.
+          <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Manufacturing</h1>
+          <p className="text-xs text-slate-600 max-w-2xl mt-1">
+            Manage production orders, track manufacturing progress, and monitor shop floor operations
           </p>
         </div>
-        <Button variant="primary" size="sm" onClick={() => setModalOpen(true)}>
-          New production order
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => {
+            setEditingOrder(null);
+            setModalOpen(true);
+          }}
+        >
+          + New Production Order
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
-          label="Total production orders"
-          value={metrics.total.toString()}
-          helper="All demo orders in this tenant."
-          trend="up"
-          variant="teal"
+          label="Total Orders"
+          value={orders.length.toString()}
         />
         <StatCard
-          label="In progress"
-          value={metrics.inProgress.toString()}
-          helper="Currently running on the shop floor."
-          trend="up"
-          variant="blue"
+          label="In Progress"
+          value={inProgressCount.toString()}
         />
         <StatCard
           label="Completed"
-          value={metrics.completed.toString()}
-          helper="Closed in the selected horizon."
-          trend="flat"
-          variant="purple"
+          value={completedCount.toString()}
+        />
+        <StatCard
+          label="Total Cost"
+          value={`$${totalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+        />
+        <StatCard
+          label="Avg Efficiency"
+          value={`${avgEfficiency.toFixed(1)}%`}
         />
       </div>
 
-      <Card className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-900">
-            Production orders
-          </h2>
-          {loading && <LoadingState label="Loading production orders..." />}
+      {/* Tabs */}
+      <Tabs
+        items={tabs.map((tab) => ({
+          id: tab.id,
+          label: `${tab.label} (${tab.count})`
+        }))}
+        activeId={activeTab}
+        onChange={(id) => {
+          setActiveTab(id as any);
+          setCurrentPage(1);
+        }}
+      />
+
+      {/* Filters */}
+      <Card>
+        <div className="p-4 border-b border-slate-200">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Search
+              </label>
+              <Input
+                placeholder="Search by PO #, product, batch, customer..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Status
+              </label>
+              <Select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="all">All Status</option>
+                <option value="DRAFT">Draft</option>
+                <option value="PLANNED">Planned</option>
+                <option value="SCHEDULED">Scheduled</option>
+                <option value="RELEASED">Released</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="ON_HOLD">On Hold</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="CLOSED">Closed</option>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Priority
+              </label>
+              <Select
+                value={priorityFilter}
+                onChange={(e) => {
+                  setPriorityFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="all">All Priorities</option>
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </Select>
+            </div>
+          </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 text-xs font-sans">
-          <input
-            type="text"
-            placeholder="Search product..."
-            value={productSearch}
-            onChange={(e) => setProductSearch(e.target.value)}
-            className="font-sans rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-
-          <select
-            value={qtySort}
-            onChange={(e) => {
-              const val = e.target.value as SortDirection;
-              setQtySort(val);
-              if (val !== 'none') clearOtherSorts('qty');
-            }}
-            className="font-sans rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="none">Qty: Default</option>
-            <option value="asc">Qty: Low to high</option>
-            <option value="desc">Qty: High to low</option>
-          </select>
-
-          <select
-            value={costSort}
-            onChange={(e) => {
-              const val = e.target.value as SortDirection;
-              setCostSort(val);
-              if (val !== 'none') clearOtherSorts('cost');
-            }}
-            className="font-sans rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="none">Cost: Default</option>
-            <option value="asc">Cost: Low to high</option>
-            <option value="desc">Cost: High to low</option>
-          </select>
-
-          <select
-            value={startDateSort}
-            onChange={(e) => {
-              const val = e.target.value as SortDirection;
-              setStartDateSort(val);
-              if (val !== 'none') clearOtherSorts('start');
-            }}
-            className="font-sans rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="none">Start: Default</option>
-            <option value="asc">Start: Oldest first</option>
-            <option value="desc">Start: Newest first</option>
-          </select>
-
-          <select
-            value={endDateSort}
-            onChange={(e) => {
-              const val = e.target.value as SortDirection;
-              setEndDateSort(val);
-              if (val !== 'none') clearOtherSorts('end');
-            }}
-            className="font-sans rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="none">End: Default</option>
-            <option value="asc">End: Oldest first</option>
-            <option value="desc">End: Newest first</option>
-          </select>
-
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as ProductionOrderStatus | 'ALL')}
-            className="font-sans rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="ALL">Status: All</option>
-            <option value="PLANNED">Planned</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-        </div>
-
-        {orders.length === 0 && !loading ? (
-          <EmptyState
-            title="No production orders yet"
-            description="Create your first demo production order to see it here."
-          />
+        {/* Table */}
+        {paginatedOrders.length === 0 ? (
+          <div className="p-8">
+            <EmptyState
+              title="No production orders found"
+              description="Create your first production order or adjust your filters"
+            />
+            <div className="mt-4 text-center">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => {
+                  setEditingOrder(null);
+                  setModalOpen(true);
+                }}
+              >
+                + New Production Order
+              </Button>
+            </div>
+          </div>
         ) : (
-          <Table
-            columns={columns}
-            data={filteredOrders}
-            getRowKey={(row, index) => `${row.id}-${index}`}
-            emptyMessage="No matching orders found. Try adjusting your filters."
-          />
+          <>
+            <Table
+              data={paginatedOrders}
+              columns={columns}
+              getRowKey={(row, index) => `${row.id}-${index}`}
+            />
+
+            {/* Pagination */}
+            <div className="p-4 border-t border-slate-200">
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                onChange={setCurrentPage}
+              />
+              <div className="mt-2 text-center text-xs text-slate-600">
+                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredOrders.length)} of {filteredOrders.length} production orders
+              </div>
+            </div>
+          </>
         )}
       </Card>
 
+      {/* Modal */}
       <Modal
-        title="New production order"
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        hideCloseButton
+        onClose={() => {
+          setModalOpen(false);
+          setEditingOrder(null);
+        }}
+        title={editingOrder ? 'Edit Production Order' : 'New Production Order'}
       >
         <ManufacturingForm
-          onSubmit={(values) => {
-            void create(values);
+          initial={editingOrder || undefined}
+          onSubmit={editingOrder ? handleUpdate : handleCreate}
+          onCancel={() => {
             setModalOpen(false);
+            setEditingOrder(null);
           }}
-          onCancel={() => setModalOpen(false)}
         />
-      </Modal>
-
-      <Modal
-        title="Edit production order"
-        open={editingOrder !== null}
-        onClose={() => setEditingOrder(null)}
-        hideCloseButton
-      >
-        {editingOrder && (
-          <ManufacturingForm
-            initial={editingOrder}
-            onSubmit={(values) => {
-              void update(editingOrder.id, values);
-              setEditingOrder(null);
-            }}
-            onCancel={() => setEditingOrder(null)}
-          />
-        )}
       </Modal>
     </div>
   );
 }
-
