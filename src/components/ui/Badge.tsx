@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 
 type BadgeVariant = 'solid' | 'outline';
-type BadgeTone = 'brand' | 'neutral';
+type BadgeTone = 'brand' | 'neutral' | 'success' | 'warning' | 'danger';
 
 type BadgeProps = {
   children: ReactNode;
@@ -21,12 +21,24 @@ export function Badge({
 
   const tones: Record<BadgeTone, Record<BadgeVariant, string>> = {
     brand: {
-      solid: 'bg-emerald-500/10 text-emerald-800 border border-emerald-400/60',
-      outline: 'border border-emerald-400/60 text-emerald-700'
+      solid: 'bg-primary-light/10 text-primary border border-primary/40',
+      outline: 'border border-primary/40 text-primary'
     },
     neutral: {
-      solid: 'bg-slate-100 text-slate-800 border border-slate-300',
-      outline: 'border border-slate-300 text-slate-600'
+      solid: 'bg-slate-100 text-slate-700 border border-slate-200',
+      outline: 'border border-slate-200 text-slate-700'
+    },
+    success: {
+      solid: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+      outline: 'border border-emerald-200 text-emerald-700'
+    },
+    warning: {
+      solid: 'bg-amber-50 text-amber-700 border border-amber-200',
+      outline: 'border border-amber-200 text-amber-700'
+    },
+    danger: {
+      solid: 'bg-red-50 text-red-700 border border-red-200',
+      outline: 'border border-red-200 text-red-700'
     }
   };
 
