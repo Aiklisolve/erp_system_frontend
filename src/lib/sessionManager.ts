@@ -68,13 +68,35 @@ export function getSession(): SessionData | null {
 }
 
 export function clearSession(): void {
+  // Clear all session-related localStorage items
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem('static_user');
+  localStorage.removeItem('static_users'); // Registration data
   localStorage.removeItem('user');
   localStorage.removeItem('token');
   localStorage.removeItem('session_id');
   localStorage.removeItem('expires_at');
   localStorage.removeItem('is_active');
+  localStorage.removeItem('otp'); // OTP if stored
+  
+  // Clear any other auth-related items
+  const authKeys = [
+    'auth_token',
+    'access_token',
+    'refresh_token',
+    'auth_user',
+    'current_user',
+    'user_session',
+    'login_time',
+    'last_activity'
+  ];
+  
+  authKeys.forEach(key => {
+    localStorage.removeItem(key);
+  });
+  
+  // Log for debugging (can be removed in production)
+  console.log('All session data cleared from localStorage');
 }
 
 export function isSessionValid(): boolean {

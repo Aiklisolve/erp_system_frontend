@@ -215,15 +215,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handleLogout = async () => {
     setError(null);
     try {
-      await authApi.logout();
+      // Clear user state first
       setUser(null);
+      
+      // Call logout API which will clear all localStorage
+      await authApi.logout();
+      
+      // Ensure all state is cleared
+      setUser(null);
+      setError(null);
+      
       // Redirect to login page after logout
       // Using window.location.href to ensure full page reload and clear any cached state
       window.location.href = '/login';
     } catch (err: any) {
       setError(err?.message ?? 'Unable to logout.');
-      // Even if logout fails, clear user and redirect
+      // Even if logout fails, clear user state and localStorage
       setUser(null);
+      
+      // Force clear localStorage as fallback
+      try {
+        const { clearSession } = await import('../../../lib/sessionManager');
+        clearSession();
+      } catch {
+        // If import fails, manually clear critical items
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        localStorage.removeItem('session_id');
+        localStorage.removeItem('erp_session');
+      }
+      
+      // Redirect to login
       window.location.href = '/login';
     }
   };

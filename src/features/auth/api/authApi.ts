@@ -165,8 +165,32 @@ export async function logout(): Promise<void> {
     }
   }
 
-  // Clear session and localStorage
+  // Clear session and all localStorage data
   clearSession();
+  
+  // Clear any remaining localStorage items that might have been missed
+  // This ensures a complete cleanup
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (
+        key.includes('session') ||
+        key.includes('auth') ||
+        key.includes('token') ||
+        key.includes('user') ||
+        key.includes('login') ||
+        key === 'otp' ||
+        key === 'is_active' ||
+        key === 'expires_at'
+      )) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+  } catch (error) {
+    console.error('Error during comprehensive localStorage cleanup:', error);
+  }
   
   if (authMode === 'supabase' && hasSupabaseConfig) {
     try {
@@ -175,6 +199,8 @@ export async function logout(): Promise<void> {
       handleApiError('auth.logout', error);
     }
   }
+  
+  console.log('Logout complete: All localStorage data cleared');
 }
 
 // Generate a 4-digit OTP for demo purposes

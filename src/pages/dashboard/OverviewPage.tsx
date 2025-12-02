@@ -8,38 +8,47 @@ export function OverviewPage() {
   return (
     <div className="space-y-8">
       {/* Hero */}
-      <section className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-dark">
-            Unified control
-          </p>
-          <h1 className="text-2xl md:text-3xl font-semibold text-slate-900">
-            Unified ERP System Dashboard
+      <section className="flex flex-col gap-4 sm:gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="space-y-3 sm:space-y-4 flex-1 min-w-0">
+          <div className="inline-flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-primary-light/10 border border-primary/20">
+            <span className="text-[10px] sm:text-xs font-semibold text-primary uppercase tracking-wide">
+              Unified Control Center
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 leading-tight">
+            ERP System Dashboard
           </h1>
-          <p className="text-xs md:text-sm text-slate-600 max-w-xl">
-            See finance, operations, people, and growth in one place. This demo mirrors
-            how a modern SaaS ERP surfaces the health of your business at a glance.
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 max-w-2xl leading-relaxed">
+            Monitor finance, operations, people, and growth metrics in one unified dashboard. 
+            Real-time insights to drive your business forward.
           </p>
         </div>
-        <Card className="flex w-full max-w-xs flex-col gap-3 border-dashed border-emerald-200 bg-emerald-50/60">
-          <p className="text-[11px] font-medium text-emerald-800">
-            Today&apos;s snapshot
-          </p>
-          <div className="flex items-center justify-between text-xs text-slate-700">
-            <span>Data freshness</span>
-            <span className="font-semibold text-emerald-700">Demo · Live UI</span>
+        <Card className="flex w-full sm:max-w-sm flex-col gap-3 sm:gap-4 p-4 sm:p-5 border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-emerald-800">
+              System Status
+            </p>
+            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
-          <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-emerald-100">
-            <div className="absolute inset-y-0 left-0 w-3/4 rounded-full bg-emerald-500" />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-700">
+              <span>Data Source</span>
+              <span className="font-semibold text-emerald-700 px-2 py-1 rounded bg-emerald-100">
+                Demo Mode
+              </span>
+            </div>
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-emerald-100">
+              <div className="absolute inset-y-0 left-0 w-3/4 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600" />
+            </div>
+            <p className="text-[11px] text-slate-600">
+              Connect Supabase for production data integration.
+            </p>
           </div>
-          <p className="text-[11px] text-slate-500">
-            Connect Supabase to replace mock data with production-grade metrics.
-          </p>
         </Card>
       </section>
 
       {/* KPI row */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Revenue (MTD)"
           value="$248,400"
@@ -170,35 +179,38 @@ export function OverviewPage() {
         </Card>
       </section>
 
-      {/* Modules & recent tables */}
-      <section className="grid gap-4 lg:grid-cols-[1.2fr,1.1fr]">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Quick module shortcuts
-            </h2>
-            <p className="text-[11px] text-slate-500">
-              Open workspaces from a single grid.
-            </p>
-          </div>
-          <ModuleGrid />
+      {/* Quick Module Shortcuts - Full Width */}
+      <section className="space-y-3 sm:space-y-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900">
+            Quick Module Shortcuts
+          </h2>
+          <p className="text-xs text-slate-500">
+            Access all your ERP modules from one place
+          </p>
         </div>
+        <Card className="p-4 sm:p-5 lg:p-6 border border-slate-200 shadow-sm w-full">
+          <ModuleGrid />
+        </Card>
+      </section>
 
-        <Card className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">
+      {/* Recent Transactions - Below Module Shortcuts */}
+      <section className="space-y-3 sm:space-y-4">
+        <Card className="space-y-3 sm:space-y-4 w-full">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <h2 className="text-sm sm:text-base font-semibold text-slate-900">
               Recent transactions
             </h2>
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <span>Filter</span>
+            <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-slate-500 w-full sm:w-auto">
+              <span className="hidden sm:inline">Filter</span>
               <input
                 placeholder="Search finance..."
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] text-slate-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
+                className="flex-1 sm:flex-initial rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] sm:text-[11px] text-slate-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
               />
             </div>
           </div>
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <table className="min-w-full text-[11px]">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+            <table className="min-w-full text-[10px] sm:text-[11px]">
               <thead className="bg-slate-50 text-slate-500">
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold">Date</th>
