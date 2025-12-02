@@ -14,8 +14,6 @@ import { Pagination } from '../../../components/ui/Pagination';
 import type { Customer, ErpUser } from '../types';
 import { CustomerForm } from './CustomerForm';
 import { UserRegistrationForm } from './UserRegistrationForm';
-import { LeaveManagement } from './LeaveManagement';
-import { TaskManagement } from './TaskManagement';
 import { toast } from '../../../lib/toast';
 import * as crmApi from '../api/crmApi';
 
@@ -27,7 +25,7 @@ export function CustomerList() {
   const [usersLoading, setUsersLoading] = useState(true);
   
   // Tab state
-  const [activeTab, setActiveTab] = useState<'users' | 'customers' | 'leaves' | 'tasks'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'customers'>('users');
   
   // Modal states
   const [modalOpen, setModalOpen] = useState(false);
@@ -305,7 +303,7 @@ export function CustomerList() {
     }
   };
 
-  const loading = (activeTab === 'leaves' || activeTab === 'tasks') ? false : (activeTab === 'users' ? usersLoading : customersLoading);
+  const loading = activeTab === 'users' ? usersLoading : customersLoading;
 
   if (loading) {
     return <LoadingState label={`Loading ${activeTab}...`} />;
@@ -317,22 +315,12 @@ export function CustomerList() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl md:text-2xl font-semibold text-slate-900">
-            {activeTab === 'users' 
-              ? 'User Management' 
-              : activeTab === 'customers' 
-              ? 'Customer Management' 
-              : activeTab === 'leaves'
-              ? 'Leave Management'
-              : 'Task Management'}
+            {activeTab === 'users' ? 'User Management' : 'Customer Management'}
           </h1>
           <p className="text-xs text-slate-600 max-w-2xl mt-1">
             {activeTab === 'users' 
               ? 'Register and manage ERP system users with role-based access'
-              : activeTab === 'customers'
-              ? 'Manage customer relationships and track customer information'
-              : activeTab === 'leaves'
-              ? 'Manage employee leave requests and track leave balances'
-              : 'Create and assign tasks to employees, track progress and deadlines'
+              : 'Manage customer relationships and track customer information'
             }
           </p>
         </div>
@@ -396,9 +384,7 @@ export function CustomerList() {
       <Tabs
         items={[
           { id: 'users', label: `ERP Users (${users.length})` },
-          { id: 'customers', label: `Customers (${customers.length})` },
-          { id: 'leaves', label: `Leave Management` },
-          { id: 'tasks', label: `Task Management` }
+          { id: 'customers', label: `Customers (${customers.length})` }
         ]}
         activeId={activeTab}
         onChange={(id) => {
@@ -407,10 +393,6 @@ export function CustomerList() {
           setSearchTerm('');
         }}
       />
-
-      {/* Tab Content for Leaves and Tasks */}
-      {activeTab === 'leaves' && <LeaveManagement employees={users} />}
-      {activeTab === 'tasks' && <TaskManagement employees={users} />}
 
       {/* Search Filter */}
       <Card>

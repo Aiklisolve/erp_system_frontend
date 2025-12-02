@@ -26,6 +26,7 @@ export function RegisterPage() {
   const [selectedRole, setSelectedRole] = useState<ErpRole>('VIEWER');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showRoleHelp, setShowRoleHelp] = useState(false);
 
   const authMode = getAuthMode();
 
@@ -46,71 +47,58 @@ export function RegisterPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-text-primary">Create Account</h2>
-        <p className="text-sm text-text-secondary">
-          Sign up to get started with {appConfig.brandName}
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary/10 to-teal-600/10 border border-primary/20 px-4 py-2 text-xs font-medium text-primary">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+          </span>
+          New Account
+        </div>
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">Create Account</h2>
+        <p className="text-sm text-slate-600">
+          Join OrbitERP and streamline your business operations
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
-          <label htmlFor="fullName" className="block text-xs font-semibold text-text-primary">
-            Full Name
+          <label htmlFor="fullName" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+            <span>👤</span> Full Name
           </label>
           <input
             id="fullName"
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-text-primary"
+            className="w-full px-4 py-3 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 placeholder:text-slate-400 transition-all"
             placeholder="John Doe"
             required
             autoComplete="name"
+            disabled={loading}
           />
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="email" className="block text-xs font-semibold text-text-primary">
-            Email Address
+          <label htmlFor="email" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+            <span>📧</span> Email Address
           </label>
           <input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-text-primary"
-            placeholder="your.email@erp.local"
+            className="w-full px-4 py-3 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 placeholder:text-slate-400 transition-all"
+            placeholder="your.email@company.com"
             required
             autoComplete="email"
+            disabled={loading}
           />
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="role" className="block text-xs font-semibold text-text-primary">
-            Select Your Role
-          </label>
-          <select
-            id="role"
-            value={selectedRole}
-            onChange={(e) => setSelectedRole(e.target.value as ErpRole)}
-            className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-text-primary"
-            required
-          >
-            {erpRoles.map((role) => (
-              <option key={role} value={role}>
-                {role.replace('_', ' ')} - {roleDescriptions[role]}
-              </option>
-            ))}
-          </select>
-          <p className="text-[10px] text-text-secondary mt-1">
-            {roleDescriptions[selectedRole]}
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="password" className="block text-xs font-semibold text-text-primary">
-            Password
+          <label htmlFor="password" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+            <span>🔒</span> Password
           </label>
           <div className="relative">
             <input
@@ -118,35 +106,27 @@ export function RegisterPage() {
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2.5 pr-12 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-text-primary"
-              placeholder="Create a password"
+              className="w-full px-4 py-3 pr-12 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 placeholder:text-slate-400 transition-all"
+              placeholder="Create a strong password"
               required
               autoComplete="new-password"
-              minLength={6}
+              disabled={loading}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-primary transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors p-1"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
+              disabled={loading}
             >
-              {showPassword ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              )}
+              {showPassword ? '👁️' : '👁️‍🗨️'}
             </button>
           </div>
         </div>
 
         <div className="space-y-2">
-          <label htmlFor="confirmPassword" className="block text-xs font-semibold text-text-primary">
-            Confirm Password
+          <label htmlFor="confirmPassword" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+            <span>🔐</span> Confirm Password
           </label>
           <div className="relative">
             <input
@@ -154,55 +134,89 @@ export function RegisterPage() {
               type={showConfirmPassword ? 'text' : 'password'}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-2.5 pr-12 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-text-primary"
-              placeholder="Confirm your password"
+              className="w-full px-4 py-3 pr-12 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 placeholder:text-slate-400 transition-all"
+              placeholder="Re-enter your password"
               required
               autoComplete="new-password"
-              minLength={6}
+              disabled={loading}
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-primary transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors p-1"
               aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              disabled={loading}
             >
-              {showConfirmPassword ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              )}
+              {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
             </button>
           </div>
           {password && confirmPassword && password !== confirmPassword && (
-            <p className="text-[10px] text-red-600">Passwords do not match</p>
+            <p className="text-xs text-red-600 flex items-center gap-1">
+              <span>⚠️</span> Passwords do not match
+            </p>
           )}
         </div>
 
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+              <span>🎯</span> Select Your Role
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowRoleHelp(!showRoleHelp)}
+              className="text-xs text-primary hover:text-teal-700 font-semibold transition-colors"
+            >
+              {showRoleHelp ? '✕ Hide' : '📋 Show'} Role Info
+            </button>
+          </div>
+          
+          {showRoleHelp && (
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-2 text-xs">
+              {erpRoles.map((role) => (
+                <div key={role} className="flex items-start gap-2">
+                  <span className="font-bold text-primary min-w-[140px]">{role.replace('_', ' ')}:</span>
+                  <span className="text-slate-600">{roleDescriptions[role]}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <select
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value as ErpRole)}
+            className="w-full px-4 py-3 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 transition-all"
+            disabled={loading}
+          >
+            {erpRoles.map((role) => (
+              <option key={role} value={role}>
+                {role.replace('_', ' ')}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-700">
-            {error}
+          <div className="rounded-2xl bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 px-5 py-4 text-sm text-red-700 flex items-center gap-3">
+            <span className="text-xl">⚠️</span>
+            <span>{error}</span>
           </div>
         )}
 
         <button
           type="submit"
-          disabled={loading || !fullName || !email || !password || password !== confirmPassword}
-          className="w-full bg-primary text-white py-3 rounded-xl font-semibold text-sm transition-all hover:bg-[#0f766e] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          disabled={loading || !fullName || !email || !password || !confirmPassword || password !== confirmPassword}
+          className="w-full bg-gradient-to-r from-primary to-teal-600 text-white py-4 rounded-xl font-bold text-base transition-all hover:shadow-2xl hover:shadow-primary/40 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
         >
           {loading ? (
             <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" />
               Creating account...
             </>
           ) : (
             <>
-              Create Account
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              🚀 Create Account
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </>
@@ -210,18 +224,21 @@ export function RegisterPage() {
         </button>
       </form>
 
-      <div className="text-center space-y-2">
-        <p className="text-xs text-text-secondary">
+      <div className="text-center space-y-3">
+        <p className="text-sm text-slate-600">
           Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-primary hover:underline">
-            Sign in
+          <Link to="/login" className="font-bold text-primary hover:text-teal-700 transition-colors">
+            Sign in →
           </Link>
         </p>
-        {authMode === 'static' && (
-          <p className="text-[10px] text-text-secondary">
-            Using static demo mode. Configure Supabase to enable real user registration.
+        <div className="pt-3 border-t border-slate-200">
+          <p className="text-xs text-slate-500">
+            By creating an account, you agree to our{' '}
+            <Link to="/terms" className="text-primary hover:underline">Terms</Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
           </p>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -15,7 +15,8 @@ export type ModuleRoute =
   | '/workforce'
   | '/hr'
   | '/ecommerce'
-  | '/marketing';
+  | '/marketing'
+  | '/internal-tasks';
 
 export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
   ADMIN: [
@@ -33,7 +34,8 @@ export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
     '/workforce',
     '/hr',
     '/ecommerce',
-    '/marketing'
+    '/marketing',
+    '/internal-tasks'
   ],
   FINANCE_MANAGER: [
     '/dashboard',
@@ -62,7 +64,8 @@ export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
     '/dashboard',
     '/hr',
     '/workforce',
-    '/projects'
+    '/projects',
+    '/internal-tasks'
   ],
   SALES_MANAGER: [
     '/dashboard',
@@ -70,7 +73,8 @@ export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
     '/orders',
     '/ecommerce',
     '/marketing',
-    '/projects'
+    '/projects',
+    '/internal-tasks'
   ],
   WAREHOUSE_OPERATOR: [
     '/dashboard',

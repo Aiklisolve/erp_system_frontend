@@ -37,7 +37,6 @@ export function LoginPage() {
         setOtpSent(true);
         setShowSuccessPopup(true);
         setStep(2);
-        // Hide popup after 3 seconds
         setTimeout(() => {
           setShowSuccessPopup(false);
         }, 3000);
@@ -61,9 +60,7 @@ export function LoginPage() {
     try {
       const user = await verifyOTPAndLogin(email, otp);
       if (user) {
-        // Refresh auth context to update user state
         await refreshUser();
-        // Navigate to dashboard
         navigate('/dashboard', { replace: true });
       }
     } catch (err: any) {
@@ -85,31 +82,41 @@ export function LoginPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold text-text-primary">Welcome Back</h2>
-        <p className="text-sm text-text-secondary">
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-primary/10 to-teal-600/10 border border-primary/20 px-4 py-2 text-xs font-medium text-primary">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+          </span>
+          Secure Login
+        </div>
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">Welcome Back</h2>
+        <p className="text-sm text-slate-600">
           Sign in to access your ERP dashboard
         </p>
       </div>
 
       {authMode === 'static' && (
-        <div className="rounded-xl border border-primary/20 bg-primary-light/5 p-4 space-y-3">
+        <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/5 to-teal-600/5 p-5 space-y-4 shadow-lg">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-primary">Demo Mode - Quick Login</p>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🎭</span>
+              <p className="text-sm font-bold text-primary">Demo Mode - Quick Login</p>
+            </div>
             <button
               type="button"
               onClick={() => setShowRoleHelp(!showRoleHelp)}
-              className="text-xs text-primary hover:underline"
+              className="text-xs text-primary hover:text-teal-700 font-semibold transition-colors"
             >
-              {showRoleHelp ? 'Hide' : 'Show'} Role Info
+              {showRoleHelp ? '✕ Hide' : '📋 Show'} Roles
             </button>
           </div>
           {showRoleHelp && (
-            <div className="grid grid-cols-2 gap-2 text-[10px] text-text-secondary">
+            <div className="grid grid-cols-2 gap-3 text-[10px]">
               {Object.entries(roleDescriptions).map(([role, desc]) => (
-                <div key={role} className="p-2 bg-white rounded border border-slate-200">
-                  <p className="font-semibold text-primary">{role.replace('_', ' ')}</p>
-                  <p className="mt-1">{desc}</p>
+                <div key={role} className="p-3 bg-white/80 backdrop-blur rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                  <p className="font-bold text-primary mb-1">{role.replace('_', ' ')}</p>
+                  <p className="text-slate-600 leading-relaxed">{desc}</p>
                 </div>
               ))}
             </div>
@@ -120,10 +127,10 @@ export function LoginPage() {
                 key={user.id}
                 type="button"
                 onClick={() => handleRoleSelect(user.role)}
-                className={`px-3 py-1.5 text-[11px] font-medium rounded-lg border transition-all ${
+                className={`px-4 py-2 text-xs font-semibold rounded-xl border-2 transition-all ${
                   selectedRole === user.role
-                    ? 'bg-primary text-white border-primary'
-                    : 'bg-white text-text-secondary border-slate-200 hover:border-primary/50'
+                    ? 'bg-gradient-to-r from-primary to-teal-600 text-white border-primary shadow-lg scale-105'
+                    : 'bg-white text-slate-700 border-slate-200 hover:border-primary/50 hover:shadow-md'
                 }`}
               >
                 {user.role.replace('_', ' ')}
@@ -135,8 +142,8 @@ export function LoginPage() {
 
       {showSuccessPopup && (
         <div className="fixed top-4 right-4 z-50 animate-slideInRight">
-          <div className="bg-gradient-to-r from-primary to-[#0f766e] text-white px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 border border-primary/40">
-            <span className="text-2xl font-bold bg-white/20 w-10 h-10 rounded-full flex items-center justify-center">
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-emerald-400">
+            <span className="text-2xl font-bold bg-white/20 w-12 h-12 rounded-full flex items-center justify-center">
               ✓
             </span>
             <p className="m-0 text-sm font-semibold">OTP sent successfully!</p>
@@ -144,19 +151,19 @@ export function LoginPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {step === 1 ? (
           <>
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-xs font-semibold text-text-primary">
-                Email Address
+              <label htmlFor="email" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span>📧</span> Email Address
               </label>
               <input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-text-primary"
+                className="w-full px-4 py-3 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 placeholder:text-slate-400 transition-all"
                 placeholder="your.email@erp.local"
                 required
                 autoComplete="email"
@@ -165,8 +172,8 @@ export function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="block text-xs font-semibold text-text-primary">
-                Password
+              <label htmlFor="password" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span>🔒</span> Password
               </label>
               <div className="relative">
                 <input
@@ -174,7 +181,7 @@ export function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 pr-12 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-text-primary"
+                  className="w-full px-4 py-3 pr-12 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 placeholder:text-slate-400 transition-all"
                   placeholder="Enter your password"
                   required
                   autoComplete="current-password"
@@ -183,7 +190,7 @@ export function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-primary transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors p-1"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   disabled={loading}
                 >
@@ -203,23 +210,23 @@ export function LoginPage() {
           </>
         ) : (
           <>
-            <div className="rounded-xl bg-primary-light/10 border border-primary/30 p-4 mb-2">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary text-white rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold">
+            <div className="rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 p-5 mb-2">
+              <div className="flex items-center gap-4">
+                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold shadow-lg">
                   ✓
                 </div>
                 <div>
-                  <p className="text-primary font-bold text-sm m-0">OTP Sent Successfully!</p>
-                  <p className="text-text-secondary text-xs m-0 mt-1">
-                    Sent to {email}
+                  <p className="text-emerald-700 font-bold text-base m-0">OTP Sent Successfully!</p>
+                  <p className="text-emerald-600 text-sm m-0 mt-1">
+                    📧 Sent to {email}
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="otp" className="block text-xs font-semibold text-text-primary">
-                Enter Verification Code (OTP)
+              <label htmlFor="otp" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+                <span>🔐</span> Enter Verification Code (OTP)
               </label>
               <input
                 id="otp"
@@ -229,7 +236,7 @@ export function LoginPage() {
                   const value = e.target.value.replace(/\D/g, '').slice(0, 4);
                   setOtp(value);
                 }}
-                className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-text-primary font-bold text-center tracking-widest"
+                className="w-full px-4 py-4 text-2xl border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 font-bold text-center tracking-widest transition-all"
                 placeholder="0000"
                 maxLength={4}
                 autoComplete="one-time-code"
@@ -240,9 +247,9 @@ export function LoginPage() {
             </div>
 
             {receivedOtp && (
-              <div className="rounded-xl bg-primary-light/10 border border-primary/30 p-3 text-center">
-                <p className="text-primary text-xs font-semibold m-0">
-                  Your OTP: <span className="font-bold text-base tracking-wider">{receivedOtp}</span>
+              <div className="rounded-2xl bg-gradient-to-r from-primary/10 to-teal-600/10 border-2 border-primary/30 p-4 text-center">
+                <p className="text-primary text-sm font-semibold m-0">
+                  🎯 Your OTP: <span className="font-bold text-2xl tracking-wider ml-2">{receivedOtp}</span>
                 </p>
               </div>
             )}
@@ -255,7 +262,7 @@ export function LoginPage() {
                 setLocalError(null);
                 setOtpSent(false);
               }}
-              className="text-primary hover:text-[#0f766e] text-xs font-semibold transition-colors flex items-center gap-2"
+              className="text-primary hover:text-teal-700 text-sm font-bold transition-colors flex items-center gap-2"
             >
               <span>←</span> Back to credentials
             </button>
@@ -263,25 +270,26 @@ export function LoginPage() {
         )}
 
         {(error || localError) && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-xs text-red-700">
-            {localError || error}
+          <div className="rounded-2xl bg-gradient-to-r from-red-50 to-rose-50 border-2 border-red-200 px-5 py-4 text-sm text-red-700 flex items-center gap-3">
+            <span className="text-xl">⚠️</span>
+            <span>{localError || error}</span>
           </div>
         )}
 
         <button
           type="submit"
           disabled={loading || (step === 1 ? (!email || !password) : !otp || otp.length !== 4)}
-          className="w-full bg-primary text-white py-3 rounded-xl font-semibold text-sm transition-all hover:bg-[#0f766e] hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-gradient-to-r from-primary to-teal-600 text-white py-4 rounded-xl font-bold text-base transition-all hover:shadow-2xl hover:shadow-primary/40 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
         >
           {loading ? (
             <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" />
               {step === 1 ? 'Sending OTP...' : 'Verifying...'}
             </>
           ) : (
             <>
-              {step === 1 ? 'Send OTP' : 'Verify & Login'}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {step === 1 ? '📨 Send OTP' : '🔓 Verify & Login'}
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </>
@@ -289,18 +297,18 @@ export function LoginPage() {
         </button>
       </form>
 
-      <div className="text-center space-y-2">
-        <p className="text-xs text-text-secondary">
+      <div className="text-center space-y-3">
+        <p className="text-sm text-slate-600">
           Don&apos;t have an account?{' '}
-          <Link to="/register" className="font-semibold text-primary hover:underline">
-            Create account
+          <Link to="/register" className="font-bold text-primary hover:text-teal-700 transition-colors">
+            Create account →
           </Link>
         </p>
-        {authMode === 'static' && (
-          <p className="text-[10px] text-text-secondary">
-            Using static demo users. Configure Supabase to enable real authentication.
+        <div className="pt-3 border-t border-slate-200">
+          <p className="text-xs text-slate-500">
+            Protected by enterprise-grade security 🔒
           </p>
-        )}
+        </div>
       </div>
     </div>
   );
