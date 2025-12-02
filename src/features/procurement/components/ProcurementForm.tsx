@@ -7,9 +7,10 @@ import { Button } from '../../../components/ui/Button';
 type Props = {
   initial?: Partial<PurchaseOrder>;
   onSubmit: (values: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>) => void;
+  onCancel?: () => void;
 };
 
-export function ProcurementForm({ initial, onSubmit }: Props) {
+export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
   const [supplier, setSupplier] = useState(initial?.supplier ?? '');
   const [date, setDate] = useState(
     initial?.date ?? new Date().toISOString().slice(0, 10)
@@ -17,7 +18,7 @@ export function ProcurementForm({ initial, onSubmit }: Props) {
   const [status, setStatus] = useState<PurchaseOrderStatus>(
     initial?.status ?? 'DRAFT'
   );
-  const [totalAmount, setTotalAmount] = useState(initial?.total_amount ?? 0);
+  const [totalAmount, setTotalAmount] = useState<number | ''>(initial?.total_amount ?? '');
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -39,12 +40,13 @@ export function ProcurementForm({ initial, onSubmit }: Props) {
             label="Supplier"
             value={supplier}
             onChange={(e) => setSupplier(e.target.value)}
-            placeholder="Acme Components"
+            placeholder="Supplier name"
           />
           <Input
             label="Date"
             type="date"
             value={date}
+            min={new Date().toISOString().slice(0, 10)}
             onChange={(e) => setDate(e.target.value)}
           />
         </div>
@@ -54,10 +56,11 @@ export function ProcurementForm({ initial, onSubmit }: Props) {
         <h3 className="text-sm font-semibold text-slate-900">Amounts & status</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
-            label="Total amount (USD)"
+            label="Total amount (INR)"
             type="number"
             value={totalAmount}
-            onChange={(e) => setTotalAmount(Number(e.target.value))}
+            placeholder="Enter amount"
+            onChange={(e) => setTotalAmount(e.target.value === '' ? '' : Number(e.target.value))}
           />
           <Select
             label="Status"
@@ -71,8 +74,8 @@ export function ProcurementForm({ initial, onSubmit }: Props) {
         </div>
       </div>
 
-      <div className="sticky bottom-0 mt-4 -mx-4 border-t border-slate-200 bg-white px-4 pt-3 flex justify-end gap-2">
-        <Button type="button" variant="ghost" size="md">
+      <div className="mt-4 border-t border-slate-200 bg-white pt-3 flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="md" onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" variant="primary" size="md">
