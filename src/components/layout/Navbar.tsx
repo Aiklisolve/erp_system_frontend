@@ -118,7 +118,6 @@ export function Navbar({ onMenuClick }: NavbarProps) {
           <div className="hidden md:flex flex-1">
             <div className="relative w-full max-w-md">
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400 text-xs">
-                🔍
               </span>
               <input
                 type="search"

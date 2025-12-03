@@ -605,28 +605,44 @@ export function InventoryList() {
                     getRowKey={(row, index) => `${row.id}-${index}`}
                   />
                 </div>
-                {totalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <Select
-                      value={itemsPerPage.toString()}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      className="w-full sm:w-32"
-                    >
-                      <option value="5">5 per page</option>
-                      <option value="10">10 per page</option>
-                      <option value="20">20 per page</option>
-                      <option value="50">50 per page</option>
-                    </Select>
-                    <Pagination
-                      page={currentPage}
-                      totalPages={totalPages}
-                      onChange={setCurrentPage}
-                    />
+                {/* Pagination */}
+                <div className="px-4 py-3 border-t border-slate-200">
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Left: Page size selector */}
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <span>Show</span>
+                      <select
+                        value={itemsPerPage}
+                        onChange={(e) => {
+                          setItemsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                        className="border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <span>per page</span>
+                    </div>
+
+                    {/* Center: Page numbers */}
+                    <div className="flex-1 flex justify-center">
+                      <Pagination
+                        page={currentPage}
+                        totalPages={totalPages}
+                        onChange={setCurrentPage}
+                      />
+                    </div>
+
+                    {/* Right: Showing info */}
+                    <div className="text-xs text-slate-600 whitespace-nowrap">
+                      Showing <span className="font-medium text-slate-900">{startIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(startIndex + itemsPerPage, filteredItems.length)}</span> of <span className="font-medium text-slate-900">{filteredItems.length}</span>
+                    </div>
                   </div>
-                )}
+                </div>
               </>
             )}
           </div>
@@ -679,28 +695,44 @@ export function InventoryList() {
                     getRowKey={(row, index) => `${row.usage_id}-${index}`}
                   />
                 </div>
-                {assignedTotalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <Select
-                      value={assignedItemsPerPage.toString()}
-                      onChange={(e) => {
-                        setAssignedItemsPerPage(Number(e.target.value));
-                        setAssignedPage(1);
-                      }}
-                      className="w-full sm:w-32"
-                    >
-                      <option value="5">5 per page</option>
-                      <option value="10">10 per page</option>
-                      <option value="20">20 per page</option>
-                      <option value="50">50 per page</option>
-                    </Select>
-                    <Pagination
-                      page={assignedPage}
-                      totalPages={assignedTotalPages}
-                      onChange={setAssignedPage}
-                    />
+                {/* Pagination */}
+                <div className="px-4 py-3 border-t border-slate-200">
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Left: Page size selector */}
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <span>Show</span>
+                      <select
+                        value={assignedItemsPerPage}
+                        onChange={(e) => {
+                          setAssignedItemsPerPage(Number(e.target.value));
+                          setAssignedPage(1);
+                        }}
+                        className="border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <span>per page</span>
+                    </div>
+
+                    {/* Center: Page numbers */}
+                    <div className="flex-1 flex justify-center">
+                      <Pagination
+                        page={assignedPage}
+                        totalPages={assignedTotalPages}
+                        onChange={setAssignedPage}
+                      />
+                    </div>
+
+                    {/* Right: Showing info */}
+                    <div className="text-xs text-slate-600 whitespace-nowrap">
+                      Showing <span className="font-medium text-slate-900">{assignedStartIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(assignedStartIndex + assignedItemsPerPage, filteredAssigned.length)}</span> of <span className="font-medium text-slate-900">{filteredAssigned.length}</span>
+                    </div>
                   </div>
-                )}
+                </div>
               </>
             )}
           </div>
@@ -778,28 +810,44 @@ export function InventoryList() {
                     getRowKey={(row, index) => `vendor-${row.id}-${index}`}
                   />
                 </div>
-                {vendorTotalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <Select
-                      value={vendorItemsPerPage.toString()}
-                      onChange={(e) => {
-                        setVendorItemsPerPage(Number(e.target.value));
-                        setVendorPage(1);
-                      }}
-                      className="w-full sm:w-32"
-                    >
-                      <option value="5">5 per page</option>
-                      <option value="10">10 per page</option>
-                      <option value="20">20 per page</option>
-                      <option value="50">50 per page</option>
-                    </Select>
-                    <Pagination
-                      page={vendorPage}
-                      totalPages={vendorTotalPages}
-                      onChange={setVendorPage}
-                    />
+                {/* Pagination */}
+                <div className="px-4 py-3 border-t border-slate-200">
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Left: Page size selector */}
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <span>Show</span>
+                      <select
+                        value={vendorItemsPerPage}
+                        onChange={(e) => {
+                          setVendorItemsPerPage(Number(e.target.value));
+                          setVendorPage(1);
+                        }}
+                        className="border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <span>per page</span>
+                    </div>
+
+                    {/* Center: Page numbers */}
+                    <div className="flex-1 flex justify-center">
+                      <Pagination
+                        page={vendorPage}
+                        totalPages={vendorTotalPages}
+                        onChange={setVendorPage}
+                      />
+                    </div>
+
+                    {/* Right: Showing info */}
+                    <div className="text-xs text-slate-600 whitespace-nowrap">
+                      Showing <span className="font-medium text-slate-900">{vendorStartIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(vendorStartIndex + vendorItemsPerPage, filteredVendors.length)}</span> of <span className="font-medium text-slate-900">{filteredVendors.length}</span>
+                    </div>
                   </div>
-                )}
+                </div>
               </>
             )}
           </div>
@@ -882,28 +930,44 @@ export function InventoryList() {
                     getRowKey={(row, index) => `category-${row.category_id}-${index}`}
                   />
                 </div>
-                {categoryTotalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <Select
-                      value={categoryItemsPerPage.toString()}
-                      onChange={(e) => {
-                        setCategoryItemsPerPage(Number(e.target.value));
-                        setCategoryPage(1);
-                      }}
-                      className="w-full sm:w-32"
-                    >
-                      <option value="5">5 per page</option>
-                      <option value="10">10 per page</option>
-                      <option value="20">20 per page</option>
-                      <option value="50">50 per page</option>
-                    </Select>
-                    <Pagination
-                      page={categoryPage}
-                      totalPages={categoryTotalPages}
-                      onChange={setCategoryPage}
-                    />
+                {/* Pagination */}
+                <div className="px-4 py-3 border-t border-slate-200">
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Left: Page size selector */}
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <span>Show</span>
+                      <select
+                        value={categoryItemsPerPage}
+                        onChange={(e) => {
+                          setCategoryItemsPerPage(Number(e.target.value));
+                          setCategoryPage(1);
+                        }}
+                        className="border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <span>per page</span>
+                    </div>
+
+                    {/* Center: Page numbers */}
+                    <div className="flex-1 flex justify-center">
+                      <Pagination
+                        page={categoryPage}
+                        totalPages={categoryTotalPages}
+                        onChange={setCategoryPage}
+                      />
+                    </div>
+
+                    {/* Right: Showing info */}
+                    <div className="text-xs text-slate-600 whitespace-nowrap">
+                      Showing <span className="font-medium text-slate-900">{categoryStartIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(categoryStartIndex + categoryItemsPerPage, filteredCategories.length)}</span> of <span className="font-medium text-slate-900">{filteredCategories.length}</span>
+                    </div>
                   </div>
-                )}
+                </div>
               </>
             )}
           </div>

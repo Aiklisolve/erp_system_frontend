@@ -30,7 +30,7 @@ export function FinanceList() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Filter transactions based on search and filters
   const filteredTransactions = transactions.filter((txn) => {
@@ -406,14 +406,41 @@ export function FinanceList() {
               />
 
               {/* Pagination */}
-              <div className="p-4 border-t border-slate-200">
-                <Pagination
-                  page={currentPage}
-                  totalPages={totalPages}
-                  onChange={setCurrentPage}
-                />
-                <div className="mt-2 text-center text-xs text-slate-600">
-                  Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+              <div className="px-4 py-3 border-t border-slate-200">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left: Page size selector */}
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <span>Show</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                    >
+                      <option value={5}>5</option>
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span>per page</span>
+                  </div>
+
+                  {/* Center: Page numbers */}
+                  <div className="flex-1 flex justify-center">
+                    <Pagination
+                      page={currentPage}
+                      totalPages={totalPages}
+                      onChange={setCurrentPage}
+                    />
+                  </div>
+
+                  {/* Right: Showing info */}
+                  <div className="text-xs text-slate-600 whitespace-nowrap">
+                    Showing <span className="font-medium text-slate-900">{startIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(startIndex + itemsPerPage, filteredTransactions.length)}</span> of <span className="font-medium text-slate-900">{filteredTransactions.length}</span>
+                  </div>
                 </div>
               </div>
             </>
