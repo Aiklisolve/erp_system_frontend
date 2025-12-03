@@ -102,8 +102,8 @@ export function SupportPage() {
             <div className="text-5xl mb-4">📧</div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Email Support</h3>
             <p className="text-slate-600 mb-4">Get help via email</p>
-            <a href="mailto:support@aiklisolve.com" className="text-primary font-semibold hover:underline">
-              support@aiklisolve.com
+            <a href="mailto:aiklisolvetechnologies@gmail.com" className="text-primary font-semibold hover:underline">
+            aiklisolvetechnologies@gmail.com
             </a>
           </div>
           
@@ -120,8 +120,8 @@ export function SupportPage() {
             <div className="text-5xl mb-4">📞</div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">Phone Support</h3>
             <p className="text-slate-600 mb-4">Call us directly</p>
-            <a href="tel:+15551234567" className="text-primary font-semibold hover:underline">
-              +1 (555) 123-4567
+            <a href="tel:+91 7893678950" className="text-primary font-semibold hover:underline">
+            +91 7893678950
             </a>
           </div>
         </div>

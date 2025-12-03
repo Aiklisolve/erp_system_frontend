@@ -122,9 +122,9 @@ export function PrivacyPage() {
             </p>
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-4">
               <p className="text-slate-900 font-semibold mb-2">{appConfig.brandName} Support</p>
-              <p className="text-slate-600">Email: privacy@aiklisolve.com</p>
-              <p className="text-slate-600">Phone: +1 (555) 123-4567</p>
-              <p className="text-slate-600">Address: 123 Business Street, Suite 100, City, State 12345</p>
+              <p className="text-slate-600">Email: aiklisolvetechnologies@gmail.com</p>
+              <p className="text-slate-600">Phone: +91 7893678950</p>
+              <p className="text-slate-600">Address: Saroornagar, Hyderabad 500035</p>
             </div>
           </div>
 
