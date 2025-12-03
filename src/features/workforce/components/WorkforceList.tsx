@@ -455,6 +455,7 @@ export function WorkforceList() {
           setModalOpen(false);
           setEditingShift(null);
         }}
+        hideCloseButton
       >
         <ShiftForm
           initial={editingShift || undefined}

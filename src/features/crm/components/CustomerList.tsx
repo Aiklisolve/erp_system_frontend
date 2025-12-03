@@ -570,6 +570,7 @@ export function CustomerList() {
             setEditingUser(null);
           }}
           title={editingUser ? 'Edit User' : 'Register New User'}
+          hideCloseButton
         >
           <UserRegistrationForm
             initial={editingUser || undefined}

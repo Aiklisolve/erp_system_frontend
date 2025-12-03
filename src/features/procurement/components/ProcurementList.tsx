@@ -441,6 +441,7 @@ export function ProcurementList() {
           setEditingOrder(null);
         }}
         title={editingOrder ? 'Edit Purchase Order' : 'New Purchase Order'}
+        hideCloseButton
       >
         <ProcurementForm
           initial={editingOrder || undefined}

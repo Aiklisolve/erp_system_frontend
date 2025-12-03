@@ -462,6 +462,7 @@ export function FinanceList() {
             setEditingTransaction(null);
           }}
           title={editingTransaction ? 'Edit Transaction' : 'New Transaction'}
+          hideCloseButton
         >
           <FinanceForm
             initial={editingTransaction || undefined}

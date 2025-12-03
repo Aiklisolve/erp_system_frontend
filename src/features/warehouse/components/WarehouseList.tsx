@@ -416,6 +416,7 @@ export function WarehouseList() {
           setModalOpen(false);
           setEditingMovement(null);
         }}
+        hideCloseButton
       >
         <WarehouseForm
           initial={editingMovement || undefined}

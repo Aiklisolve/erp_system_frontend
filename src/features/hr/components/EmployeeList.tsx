@@ -468,6 +468,7 @@ export function EmployeeList() {
           setModalOpen(false);
           setEditingEmployee(null);
         }}
+        hideCloseButton
       >
         <EmployeeForm
           initial={editingEmployee || undefined}

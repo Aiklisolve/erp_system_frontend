@@ -477,6 +477,7 @@ export function CampaignList() {
           setModalOpen(false);
           setEditingCampaign(null);
         }}
+        hideCloseButton
       >
         <CampaignForm
           initial={editingCampaign || undefined}

@@ -435,6 +435,7 @@ export function SupplyChainList() {
           setModalOpen(false);
           setEditingSupplier(null);
         }}
+        hideCloseButton
       >
         <SupplierForm
           initial={editingSupplier || undefined}

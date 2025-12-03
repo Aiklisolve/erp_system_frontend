@@ -373,6 +373,7 @@ export function OrdersList() {
           setModalOpen(false);
           setEditingOrder(null);
         }}
+        hideCloseButton
       >
         <OrderForm
           initial={editingOrder || undefined}

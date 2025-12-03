@@ -451,6 +451,7 @@ export function ManufacturingList() {
           setEditingOrder(null);
         }}
         title={editingOrder ? 'Edit Production Order' : 'New Production Order'}
+        hideCloseButton
       >
         <ManufacturingForm
           initial={editingOrder || undefined}

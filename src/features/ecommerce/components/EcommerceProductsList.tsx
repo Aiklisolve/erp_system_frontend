@@ -435,6 +435,7 @@ export function EcommerceProductsList() {
           setModalOpen(false);
           setEditingProduct(null);
         }}
+        hideCloseButton
       >
         <ProductForm
           initial={editingProduct || undefined}

@@ -982,6 +982,7 @@ export function InventoryList() {
           setModalOpen(false);
           setEditingItem(null);
         }}
+        hideCloseButton
       >
         <InventoryForm
           initial={editingItem || undefined}
@@ -1000,6 +1001,7 @@ export function InventoryList() {
           setVendorModalOpen(false);
           setEditingVendor(null);
         }}
+        hideCloseButton
       >
         <VendorForm
           initial={editingVendor || undefined}
@@ -1018,6 +1020,7 @@ export function InventoryList() {
           setCategoryModalOpen(false);
           setEditingCategory(null);
         }}
+        hideCloseButton
       >
         <CategoryForm
           initial={editingCategory || undefined}
@@ -1033,6 +1036,7 @@ export function InventoryList() {
         title="Assign Inventory"
         open={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
+        hideCloseButton
       >
         <AssignInventoryForm
           onSubmit={handleAssignSubmit}

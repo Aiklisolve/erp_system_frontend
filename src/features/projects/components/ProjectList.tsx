@@ -520,6 +520,7 @@ export function ProjectList() {
           setModalOpen(false);
           setEditingProject(null);
         }}
+        hideCloseButton
       >
         <ProjectForm
           initial={editingProject || undefined}
