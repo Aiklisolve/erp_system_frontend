@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useEcommerce } from '../hooks/useEcommerce';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { ProductForm } from './ProductForm';
 
 export function EcommerceProductsList() {
   const { products, loading, createProduct, updateProduct, removeProduct, refresh, metrics } = useEcommerce();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'out_of_stock' | 'inactive'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -199,7 +201,7 @@ export function EcommerceProductsList() {
           </button>
           <button
             type="button"
-            onClick={() => removeProduct(row.id)}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-500 hover:text-red-600"
           >
             Delete
@@ -210,13 +212,30 @@ export function EcommerceProductsList() {
   ];
 
   const handleFormSubmit = async (data: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingProduct) {
-      await updateProduct(editingProduct.id, data);
-    } else {
-      await createProduct(data);
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, data);
+        showToast('success', 'Product Updated', `Product "${data.name}" has been updated successfully.`);
+      } else {
+        await createProduct(data);
+        showToast('success', 'Product Created', `Product "${data.name}" has been created successfully.`);
+      }
+      setModalOpen(false);
+      setEditingProduct(null);
+    } catch (error) {
+      showToast('error', 'Operation Failed', 'Failed to save product. Please try again.');
     }
-    setModalOpen(false);
-    setEditingProduct(null);
+  };
+
+  const handleDelete = async (product: Product) => {
+    if (window.confirm('Are you sure you want to delete this product?')) {
+      try {
+        await removeProduct(product.id);
+        showToast('success', 'Product Deleted', `Product "${product.name}" has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete product. Please try again.');
+      }
+    }
   };
 
   return (

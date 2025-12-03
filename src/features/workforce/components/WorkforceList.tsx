@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useWorkforce } from '../hooks/useWorkforce';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { ShiftForm } from './ShiftForm';
 
 export function WorkforceList() {
   const { shifts, loading, create, update, remove, refresh, metrics } = useWorkforce();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'scheduled' | 'in_progress' | 'completed'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
@@ -207,7 +209,7 @@ export function WorkforceList() {
           </button>
           <button
             type="button"
-            onClick={() => remove(row.id)}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-500 hover:text-red-600"
           >
             Delete
@@ -218,13 +220,30 @@ export function WorkforceList() {
   ];
 
   const handleFormSubmit = async (data: Omit<Shift, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingShift) {
-      await update(editingShift.id, data);
-    } else {
-      await create(data);
+    try {
+      if (editingShift) {
+        await update(editingShift.id, data);
+        showToast('success', 'Shift Updated', `Shift for "${data.employee_name}" has been updated successfully.`);
+      } else {
+        await create(data);
+        showToast('success', 'Shift Created', `Shift for "${data.employee_name}" has been created successfully.`);
+      }
+      setModalOpen(false);
+      setEditingShift(null);
+    } catch (error) {
+      showToast('error', 'Operation Failed', 'Failed to save shift. Please try again.');
     }
-    setModalOpen(false);
-    setEditingShift(null);
+  };
+
+  const handleDelete = async (shift: Shift) => {
+    if (window.confirm('Are you sure you want to delete this shift?')) {
+      try {
+        await remove(shift.id);
+        showToast('success', 'Shift Deleted', `Shift for "${shift.employee_name}" has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete shift. Please try again.');
+      }
+    }
   };
 
   return (

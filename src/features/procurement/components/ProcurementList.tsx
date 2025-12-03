@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useProcurement } from '../hooks/useProcurement';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { ProcurementForm } from './ProcurementForm';
 
 export function ProcurementList() {
   const { orders, loading, create, update, remove, metrics } = useProcurement();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'draft' | 'pending' | 'approved' | 'sent' | 'received'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<PurchaseOrder | null>(null);
@@ -197,11 +199,7 @@ export function ProcurementList() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm('Are you sure you want to delete this purchase order?')) {
-                remove(row.id);
-              }
-            }}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-600 hover:text-red-700 font-medium"
           >
             Delete
@@ -212,16 +210,37 @@ export function ProcurementList() {
   ];
 
   const handleCreate = async (data: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>) => {
-    await create(data);
-    setModalOpen(false);
-    setEditingOrder(null);
+    try {
+      await create(data);
+      setModalOpen(false);
+      setEditingOrder(null);
+      showToast('success', 'Purchase Order Created', `PO ${data.po_number} has been created successfully.`);
+    } catch (error) {
+      showToast('error', 'Creation Failed', 'Failed to create purchase order. Please try again.');
+    }
   };
 
   const handleUpdate = async (data: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>) => {
     if (editingOrder) {
-      await update(editingOrder.id, data);
-      setModalOpen(false);
-      setEditingOrder(null);
+      try {
+        await update(editingOrder.id, data);
+        setModalOpen(false);
+        setEditingOrder(null);
+        showToast('success', 'Purchase Order Updated', `PO ${data.po_number} has been updated successfully.`);
+      } catch (error) {
+        showToast('error', 'Update Failed', 'Failed to update purchase order. Please try again.');
+      }
+    }
+  };
+
+  const handleDelete = async (order: PurchaseOrder) => {
+    if (window.confirm('Are you sure you want to delete this purchase order?')) {
+      try {
+        await remove(order.id);
+        showToast('success', 'Purchase Order Deleted', `PO ${order.po_number} has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete purchase order. Please try again.');
+      }
     }
   };
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useManufacturing } from '../hooks/useManufacturing';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { ManufacturingForm } from './ManufacturingForm';
 
 export function ManufacturingList() {
   const { orders, loading, create, update, remove, metrics } = useManufacturing();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'planned' | 'in_progress' | 'completed' | 'on_hold'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<ProductionOrder | null>(null);
@@ -202,11 +204,7 @@ export function ManufacturingList() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm('Are you sure you want to delete this production order?')) {
-                remove(row.id);
-              }
-            }}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-600 hover:text-red-700 font-medium"
           >
             Delete
@@ -217,16 +215,37 @@ export function ManufacturingList() {
   ];
 
   const handleCreate = async (data: Omit<ProductionOrder, 'id' | 'created_at' | 'updated_at'>) => {
-    await create(data);
-    setModalOpen(false);
-    setEditingOrder(null);
+    try {
+      await create(data);
+      setModalOpen(false);
+      setEditingOrder(null);
+      showToast('success', 'Production Order Created', `Order ${data.production_order_number} has been created successfully.`);
+    } catch (error) {
+      showToast('error', 'Creation Failed', 'Failed to create production order. Please try again.');
+    }
   };
 
   const handleUpdate = async (data: Omit<ProductionOrder, 'id' | 'created_at' | 'updated_at'>) => {
     if (editingOrder) {
-      await update(editingOrder.id, data);
-      setModalOpen(false);
-      setEditingOrder(null);
+      try {
+        await update(editingOrder.id, data);
+        setModalOpen(false);
+        setEditingOrder(null);
+        showToast('success', 'Production Order Updated', `Order ${data.production_order_number} has been updated successfully.`);
+      } catch (error) {
+        showToast('error', 'Update Failed', 'Failed to update production order. Please try again.');
+      }
+    }
+  };
+
+  const handleDelete = async (order: ProductionOrder) => {
+    if (window.confirm('Are you sure you want to delete this production order?')) {
+      try {
+        await remove(order.id);
+        showToast('success', 'Production Order Deleted', `Order ${order.production_order_number} has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete production order. Please try again.');
+      }
     }
   };
 

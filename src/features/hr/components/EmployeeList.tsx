@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useHr } from '../hooks/useHr';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { EmployeeForm } from './EmployeeForm';
 
 export function EmployeeList() {
   const { employees, loading, create, update, remove, refresh, metrics } = useHr();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'on_leave' | 'inactive'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -207,7 +209,7 @@ export function EmployeeList() {
           </button>
           <button
             type="button"
-            onClick={() => remove(row.id)}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-500 hover:text-red-600"
           >
             Delete
@@ -218,13 +220,32 @@ export function EmployeeList() {
   ];
 
   const handleFormSubmit = async (data: Omit<Employee, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingEmployee) {
-      await update(editingEmployee.id, data);
-    } else {
-      await create(data);
+    const employeeName = data.full_name || `${data.first_name} ${data.last_name}`.trim();
+    try {
+      if (editingEmployee) {
+        await update(editingEmployee.id, data);
+        showToast('success', 'Employee Updated', `Employee "${employeeName}" has been updated successfully.`);
+      } else {
+        await create(data);
+        showToast('success', 'Employee Created', `Employee "${employeeName}" has been created successfully.`);
+      }
+      setModalOpen(false);
+      setEditingEmployee(null);
+    } catch (error) {
+      showToast('error', 'Operation Failed', 'Failed to save employee. Please try again.');
     }
-    setModalOpen(false);
-    setEditingEmployee(null);
+  };
+
+  const handleDelete = async (employee: Employee) => {
+    const employeeName = employee.full_name || `${employee.first_name} ${employee.last_name}`.trim();
+    if (window.confirm('Are you sure you want to delete this employee?')) {
+      try {
+        await remove(employee.id);
+        showToast('success', 'Employee Deleted', `Employee "${employeeName}" has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete employee. Please try again.');
+      }
+    }
   };
 
   return (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useInventory } from '../hooks/useInventory';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -83,6 +84,7 @@ const mockCategoriesData: CategoryFormData[] = [
 
 export function InventoryList() {
   const { items, loading, create, update, remove, refresh, metrics } = useInventory();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'inventory' | 'assigned' | 'vendors' | 'categories'>('inventory');
   const [modalOpen, setModalOpen] = useState(false);
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
@@ -337,7 +339,7 @@ export function InventoryList() {
           </button>
           <button
             type="button"
-            onClick={() => remove(row.id)}
+            onClick={() => handleDeleteItem(row)}
             className="text-[11px] text-red-500 hover:text-red-600"
           >
             Delete
@@ -373,13 +375,30 @@ export function InventoryList() {
   ];
 
   const handleFormSubmit = async (data: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingItem) {
-      await update(editingItem.id, data);
-    } else {
-      await create(data);
+    try {
+      if (editingItem) {
+        await update(editingItem.id, data);
+        showToast('success', 'Inventory Item Updated', `Item "${data.name}" has been updated successfully.`);
+      } else {
+        await create(data);
+        showToast('success', 'Inventory Item Created', `Item "${data.name}" has been created successfully.`);
+      }
+      setModalOpen(false);
+      setEditingItem(null);
+    } catch (error) {
+      showToast('error', 'Operation Failed', 'Failed to save inventory item. Please try again.');
     }
-    setModalOpen(false);
-    setEditingItem(null);
+  };
+
+  const handleDeleteItem = async (item: InventoryItem) => {
+    if (window.confirm('Are you sure you want to delete this inventory item?')) {
+      try {
+        await remove(item.id);
+        showToast('success', 'Inventory Item Deleted', `Item "${item.name}" has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete inventory item. Please try again.');
+      }
+    }
   };
 
   const handleVendorSubmit = async (data: VendorFormData) => {
@@ -389,6 +408,7 @@ export function InventoryList() {
         prev.map((v) => (v.id === editingVendor.id ? { ...data, id: editingVendor.id } : v))
       );
       setEditingVendor(null);
+      showToast('success', 'Vendor Updated', `Vendor "${data.vendor_name}" has been updated successfully.`);
     } else {
       // Create vendor
       const newVendor: VendorFormData = {
@@ -396,6 +416,7 @@ export function InventoryList() {
         id: vendors.length > 0 ? Math.max(...vendors.map((v) => v.id || 0)) + 1 : 1,
       };
       setVendors((prev) => [newVendor, ...prev]);
+      showToast('success', 'Vendor Created', `Vendor "${data.vendor_name}" has been created successfully.`);
     }
     setVendorModalOpen(false);
   };
@@ -411,6 +432,7 @@ export function InventoryList() {
         )
       );
       setEditingCategory(null);
+      showToast('success', 'Category Updated', `Category "${data.category_name}" has been updated successfully.`);
     } else {
       // Create category
       const newCategory: CategoryFormData = {
@@ -421,19 +443,26 @@ export function InventoryList() {
             : 1,
       };
       setCategories((prev) => [newCategory, ...prev]);
+      showToast('success', 'Category Created', `Category "${data.category_name}" has been created successfully.`);
     }
     setCategoryModalOpen(false);
   };
 
-  const handleDeleteVendor = (id: number | undefined) => {
-    if (id) {
-      setVendors((prev) => prev.filter((v) => v.id !== id));
+  const handleDeleteVendor = (vendor: VendorFormData) => {
+    if (window.confirm('Are you sure you want to delete this vendor?')) {
+      if (vendor.id) {
+        setVendors((prev) => prev.filter((v) => v.id !== vendor.id));
+        showToast('success', 'Vendor Deleted', `Vendor "${vendor.vendor_name}" has been deleted successfully.`);
+      }
     }
   };
 
-  const handleDeleteCategory = (categoryId: number | undefined) => {
-    if (categoryId) {
-      setCategories((prev) => prev.filter((c) => c.category_id !== categoryId));
+  const handleDeleteCategory = (category: CategoryFormData) => {
+    if (window.confirm('Are you sure you want to delete this category?')) {
+      if (category.category_id) {
+        setCategories((prev) => prev.filter((c) => c.category_id !== category.category_id));
+        showToast('success', 'Category Deleted', `Category "${category.category_name}" has been deleted successfully.`);
+      }
     }
   };
 
@@ -736,7 +765,7 @@ export function InventoryList() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteVendor(row.id)}
+                              onClick={() => handleDeleteVendor(row)}
                               className="text-[11px] text-red-500 hover:text-red-600"
                             >
                               Delete
@@ -840,7 +869,7 @@ export function InventoryList() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleDeleteCategory(row.category_id)}
+                              onClick={() => handleDeleteCategory(row)}
                               className="text-[11px] text-red-500 hover:text-red-600"
                             >
                               Delete

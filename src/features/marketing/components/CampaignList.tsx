@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMarketing } from '../hooks/useMarketing';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { CampaignForm } from './CampaignForm';
 
 export function CampaignList() {
   const { campaigns, loading, create, update, remove, refresh, metrics } = useMarketing();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'paused' | 'completed'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
@@ -219,7 +221,7 @@ export function CampaignList() {
           </button>
           <button
             type="button"
-            onClick={() => remove(row.id)}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-500 hover:text-red-600"
           >
             Delete
@@ -230,13 +232,30 @@ export function CampaignList() {
   ];
 
   const handleFormSubmit = async (data: Omit<Campaign, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingCampaign) {
-      await update(editingCampaign.id, data);
-    } else {
-      await create(data);
+    try {
+      if (editingCampaign) {
+        await update(editingCampaign.id, data);
+        showToast('success', 'Campaign Updated', `Campaign "${data.name}" has been updated successfully.`);
+      } else {
+        await create(data);
+        showToast('success', 'Campaign Created', `Campaign "${data.name}" has been created successfully.`);
+      }
+      setModalOpen(false);
+      setEditingCampaign(null);
+    } catch (error) {
+      showToast('error', 'Operation Failed', 'Failed to save campaign. Please try again.');
     }
-    setModalOpen(false);
-    setEditingCampaign(null);
+  };
+
+  const handleDelete = async (campaign: Campaign) => {
+    if (window.confirm('Are you sure you want to delete this campaign?')) {
+      try {
+        await remove(campaign.id);
+        showToast('success', 'Campaign Deleted', `Campaign "${campaign.name}" has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete campaign. Please try again.');
+      }
+    }
   };
 
   return (

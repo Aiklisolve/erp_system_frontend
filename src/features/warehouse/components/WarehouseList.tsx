@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useWarehouse } from '../hooks/useWarehouse';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { WarehouseForm } from './WarehouseForm';
 
 export function WarehouseList() {
   const { movements, loading, create, update, remove, refresh, metrics } = useWarehouse();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'transfers' | 'receipts' | 'shipments' | 'adjustments'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<StockMovement | null>(null);
@@ -182,7 +184,7 @@ export function WarehouseList() {
           </button>
           <button
             type="button"
-            onClick={() => remove(row.id)}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-500 hover:text-red-600"
           >
             Delete
@@ -193,13 +195,30 @@ export function WarehouseList() {
   ];
 
   const handleFormSubmit = async (data: Omit<StockMovement, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingMovement) {
-      await update(editingMovement.id, data);
-    } else {
-      await create(data);
+    try {
+      if (editingMovement) {
+        await update(editingMovement.id, data);
+        showToast('success', 'Stock Movement Updated', `Movement ${data.movement_number || 'record'} has been updated successfully.`);
+      } else {
+        await create(data);
+        showToast('success', 'Stock Movement Created', `Movement ${data.movement_number || 'record'} has been created successfully.`);
+      }
+      setModalOpen(false);
+      setEditingMovement(null);
+    } catch (error) {
+      showToast('error', 'Operation Failed', 'Failed to save stock movement. Please try again.');
     }
-    setModalOpen(false);
-    setEditingMovement(null);
+  };
+
+  const handleDelete = async (movement: StockMovement) => {
+    if (window.confirm('Are you sure you want to delete this stock movement?')) {
+      try {
+        await remove(movement.id);
+        showToast('success', 'Stock Movement Deleted', `Movement ${movement.movement_number || 'record'} has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete stock movement. Please try again.');
+      }
+    }
   };
 
   return (

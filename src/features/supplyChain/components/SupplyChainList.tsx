@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSupplyChain } from '../hooks/useSupplyChain';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { SupplierForm } from './SupplierForm';
 
 export function SupplyChainList() {
   const { suppliers, loading, create, update, remove, refresh, metrics } = useSupplyChain();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'inactive' | 'suspended'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -189,7 +191,7 @@ export function SupplyChainList() {
           </button>
           <button
             type="button"
-            onClick={() => remove(row.id)}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-500 hover:text-red-600"
           >
             Delete
@@ -200,13 +202,30 @@ export function SupplyChainList() {
   ];
 
   const handleFormSubmit = async (data: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingSupplier) {
-      await update(editingSupplier.id, data);
-    } else {
-      await create(data);
+    try {
+      if (editingSupplier) {
+        await update(editingSupplier.id, data);
+        showToast('success', 'Supplier Updated', `Supplier "${data.name}" has been updated successfully.`);
+      } else {
+        await create(data);
+        showToast('success', 'Supplier Created', `Supplier "${data.name}" has been created successfully.`);
+      }
+      setModalOpen(false);
+      setEditingSupplier(null);
+    } catch (error) {
+      showToast('error', 'Operation Failed', 'Failed to save supplier. Please try again.');
     }
-    setModalOpen(false);
-    setEditingSupplier(null);
+  };
+
+  const handleDelete = async (supplier: Supplier) => {
+    if (window.confirm('Are you sure you want to delete this supplier?')) {
+      try {
+        await remove(supplier.id);
+        showToast('success', 'Supplier Deleted', `Supplier "${supplier.name}" has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete supplier. Please try again.');
+      }
+    }
   };
 
   return (

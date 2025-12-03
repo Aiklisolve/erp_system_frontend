@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useFinance } from '../hooks/useFinance';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -21,6 +22,7 @@ import { TransferApprovals } from './TransferApprovals';
 
 export function FinanceList() {
   const { transactions, loading, create, update, remove } = useFinance();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'transactions' | 'accounts' | 'payments' | 'history' | 'approvals'>('transactions');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<FinanceTransaction | null>(null);
@@ -203,11 +205,7 @@ export function FinanceList() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm('Are you sure you want to delete this transaction?')) {
-                remove(row.id);
-              }
-            }}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-600 hover:text-red-700 font-medium"
           >
             Delete
@@ -218,16 +216,37 @@ export function FinanceList() {
   ];
 
   const handleCreate = async (data: Omit<FinanceTransaction, 'id' | 'created_at' | 'updated_at'>) => {
-    await create(data);
-    setModalOpen(false);
-    setEditingTransaction(null);
+    try {
+      await create(data);
+      setModalOpen(false);
+      setEditingTransaction(null);
+      showToast('success', 'Transaction Created', `Transaction ${data.transaction_number} has been created successfully.`);
+    } catch (error) {
+      showToast('error', 'Creation Failed', 'Failed to create transaction. Please try again.');
+    }
   };
 
   const handleUpdate = async (data: Omit<FinanceTransaction, 'id' | 'created_at' | 'updated_at'>) => {
     if (editingTransaction) {
-      await update(editingTransaction.id, data);
-      setModalOpen(false);
-      setEditingTransaction(null);
+      try {
+        await update(editingTransaction.id, data);
+        setModalOpen(false);
+        setEditingTransaction(null);
+        showToast('success', 'Transaction Updated', `Transaction ${data.transaction_number} has been updated successfully.`);
+      } catch (error) {
+        showToast('error', 'Update Failed', 'Failed to update transaction. Please try again.');
+      }
+    }
+  };
+
+  const handleDelete = async (transaction: FinanceTransaction) => {
+    if (window.confirm('Are you sure you want to delete this transaction?')) {
+      try {
+        await remove(transaction.id);
+        showToast('success', 'Transaction Deleted', `Transaction ${transaction.transaction_number} has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete transaction. Please try again.');
+      }
     }
   };
 

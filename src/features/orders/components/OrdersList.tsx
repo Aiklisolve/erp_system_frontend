@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useOrders } from '../hooks/useOrders';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { OrderForm } from './OrderForm';
 
 export function OrdersList() {
   const { orders, loading, create, update, remove, refresh, metrics } = useOrders();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'shipped'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
@@ -159,7 +161,7 @@ export function OrdersList() {
           </button>
           <button
             type="button"
-            onClick={() => remove(row.id)}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-500 hover:text-red-600"
           >
             Delete
@@ -170,13 +172,30 @@ export function OrdersList() {
   ];
 
   const handleFormSubmit = async (data: Omit<SalesOrder, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingOrder) {
-      await update(editingOrder.id, data);
-    } else {
-      await create(data);
+    try {
+      if (editingOrder) {
+        await update(editingOrder.id, data);
+        showToast('success', 'Order Updated', `Order for "${data.customer}" has been updated successfully.`);
+      } else {
+        await create(data);
+        showToast('success', 'Order Created', `Order for "${data.customer}" has been created successfully.`);
+      }
+      setModalOpen(false);
+      setEditingOrder(null);
+    } catch (error) {
+      showToast('error', 'Operation Failed', 'Failed to save order. Please try again.');
     }
-    setModalOpen(false);
-    setEditingOrder(null);
+  };
+
+  const handleDelete = async (order: SalesOrder) => {
+    if (window.confirm('Are you sure you want to delete this order?')) {
+      try {
+        await remove(order.id);
+        showToast('success', 'Order Deleted', `Order for "${order.customer}" has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete order. Please try again.');
+      }
+    }
   };
 
   return (

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useProjects } from '../hooks/useProjects';
+import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
@@ -17,6 +18,7 @@ import { ProjectForm } from './ProjectForm';
 
 export function ProjectList() {
   const { projects, loading, create, update, remove, refresh, metrics } = useProjects();
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'all' | 'in_progress' | 'completed' | 'on_hold'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -241,7 +243,7 @@ export function ProjectList() {
           </button>
           <button
             type="button"
-            onClick={() => remove(row.id)}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-500 hover:text-red-600"
           >
             Delete
@@ -252,13 +254,30 @@ export function ProjectList() {
   ];
 
   const handleFormSubmit = async (data: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingProject) {
-      await update(editingProject.id, data);
-    } else {
-      await create(data);
+    try {
+      if (editingProject) {
+        await update(editingProject.id, data);
+        showToast('success', 'Project Updated', `Project "${data.name}" has been updated successfully.`);
+      } else {
+        await create(data);
+        showToast('success', 'Project Created', `Project "${data.name}" has been created successfully.`);
+      }
+      setModalOpen(false);
+      setEditingProject(null);
+    } catch (error) {
+      showToast('error', 'Operation Failed', 'Failed to save project. Please try again.');
     }
-    setModalOpen(false);
-    setEditingProject(null);
+  };
+
+  const handleDelete = async (project: Project) => {
+    if (window.confirm('Are you sure you want to delete this project?')) {
+      try {
+        await remove(project.id);
+        showToast('success', 'Project Deleted', `Project "${project.name}" has been deleted successfully.`);
+      } catch (error) {
+        showToast('error', 'Deletion Failed', 'Failed to delete project. Please try again.');
+      }
+    }
   };
 
   return (
