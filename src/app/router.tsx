@@ -2,6 +2,9 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { RootLayout } from './layout/RootLayout';
 import { AuthLayout } from './layout/AuthLayout';
 import { LandingPage } from '../pages/marketing/LandingPage';
+import { PrivacyPage } from '../pages/marketing/PrivacyPage';
+import { TermsPage } from '../pages/marketing/TermsPage';
+import { SupportPage } from '../pages/marketing/SupportPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
 import { OverviewPage } from '../pages/dashboard/OverviewPage';
@@ -20,6 +23,7 @@ import { WorkforceList } from '../features/workforce/components/WorkforceList';
 import { EmployeeList } from '../features/hr/components/EmployeeList';
 import { EcommerceProductsList } from '../features/ecommerce/components/EcommerceProductsList';
 import { CampaignList } from '../features/marketing/components/CampaignList';
+import { InternalTasksPage } from '../pages/InternalTasksPage';
 import { ProtectedRoute } from './protectedRoute';
 import { ModuleProtectedRoute } from './moduleProtectedRoute';
 
@@ -28,6 +32,18 @@ export const router = createBrowserRouter(
     {
       path: '/',
       element: <LandingPage />
+    },
+    {
+      path: '/privacy',
+      element: <PrivacyPage />
+    },
+    {
+      path: '/terms',
+      element: <TermsPage />
+    },
+    {
+      path: '/support',
+      element: <SupportPage />
     },
     {
       path: '/login',
@@ -161,14 +177,17 @@ export const router = createBrowserRouter(
               <CampaignList />
             </ModuleProtectedRoute>
           )
+        },
+        {
+          path: '/internal-tasks',
+          element: (
+            <ModuleProtectedRoute>
+              <InternalTasksPage />
+            </ModuleProtectedRoute>
+          )
         }
       ]
     }
-  ],
-  {
-    future: {
-      v7_startTransition: true
-    }
-  }
+  ]
 );
 

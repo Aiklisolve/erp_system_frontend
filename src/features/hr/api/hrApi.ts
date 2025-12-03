@@ -1,6 +1,6 @@
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import { handleApiError } from '../../../lib/errorHandler';
-import type { Employee } from '../types';
+import type { Employee, LeaveRequest } from '../types';
 
 let useStatic = !hasSupabaseConfig;
 
@@ -147,6 +147,10 @@ function nextId() {
   return `emp-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function nextLeaveId() {
+  return `leave-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export async function listEmployees(): Promise<Employee[]> {
   if (useStatic) return mockEmployees;
 
@@ -233,5 +237,147 @@ export async function deleteEmployee(id: string): Promise<void> {
   }
 }
 
+// ============================================
+// LEAVE MANAGEMENT API
+// ============================================
 
+const mockLeaves: LeaveRequest[] = [
+  {
+    id: 'leave-001',
+    leave_number: 'LV-2025-001',
+    employee_id: 'emp-1',
+    employee_name: 'Priya Sharma',
+    leave_type: 'ANNUAL',
+    start_date: '2025-02-10',
+    end_date: '2025-02-14',
+    total_days: 5,
+    status: 'APPROVED',
+    reason: 'Family vacation',
+    applied_date: '2025-01-15',
+    approved_by: 'Mike Wilson',
+    approved_date: '2025-01-16',
+    notes: 'All pending work completed before leave',
+    created_at: '2025-01-15'
+  },
+  {
+    id: 'leave-002',
+    leave_number: 'LV-2025-002',
+    employee_id: 'emp-2',
+    employee_name: 'Tom Müller',
+    leave_type: 'SICK',
+    start_date: '2025-01-20',
+    end_date: '2025-01-25',
+    total_days: 6,
+    status: 'APPROVED',
+    reason: 'Medical treatment',
+    medical_certificate_required: true,
+    medical_certificate_provided: true,
+    applied_date: '2025-01-19',
+    approved_by: 'Mike Wilson',
+    approved_date: '2025-01-19',
+    notes: 'Medical certificate attached',
+    created_at: '2025-01-19'
+  },
+  {
+    id: 'leave-003',
+    leave_number: 'LV-2025-003',
+    employee_id: 'emp-3',
+    employee_name: 'Sarah Johnson',
+    leave_type: 'ANNUAL',
+    start_date: '2025-03-01',
+    end_date: '2025-03-05',
+    total_days: 5,
+    status: 'PENDING',
+    reason: 'Personal work',
+    applied_date: '2025-01-25',
+    notes: 'Awaiting manager approval',
+    created_at: '2025-01-25'
+  }
+];
+
+export async function listLeaves(): Promise<LeaveRequest[]> {
+  if (useStatic) return mockLeaves;
+
+  try {
+    const { data, error } = await supabase.from('leave_requests').select('*');
+    if (error) throw error;
+    return (data as LeaveRequest[]) ?? [];
+  } catch (error) {
+    handleApiError('hr.listLeaves', error);
+    useStatic = true;
+    return mockLeaves;
+  }
+}
+
+export async function createLeave(
+  payload: Omit<LeaveRequest, 'id' | 'created_at' | 'updated_at'>
+): Promise<LeaveRequest> {
+  if (useStatic) {
+    const leave: LeaveRequest = {
+      ...payload,
+      id: nextLeaveId(),
+      created_at: new Date().toISOString()
+    };
+    mockLeaves.unshift(leave);
+    return leave;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('leave_requests')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as LeaveRequest;
+  } catch (error) {
+    handleApiError('hr.createLeave', error);
+    useStatic = true;
+    return createLeave(payload);
+  }
+}
+
+export async function updateLeave(
+  id: string,
+  changes: Partial<LeaveRequest>
+): Promise<LeaveRequest | null> {
+  if (useStatic) {
+    const index = mockLeaves.findIndex((l) => l.id === id);
+    if (index === -1) return null;
+    mockLeaves[index] = { ...mockLeaves[index], ...changes };
+    return mockLeaves[index];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('leave_requests')
+      .update(changes)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as LeaveRequest;
+  } catch (error) {
+    handleApiError('hr.updateLeave', error);
+    useStatic = true;
+    return updateLeave(id, changes);
+  }
+}
+
+export async function deleteLeave(id: string): Promise<void> {
+  if (useStatic) {
+    const index = mockLeaves.findIndex((l) => l.id === id);
+    if (index !== -1) mockLeaves.splice(index, 1);
+    return;
+  }
+
+  try {
+    const { error } = await supabase.from('leave_requests').delete().eq('id', id);
+    if (error) throw error;
+  } catch (error) {
+    handleApiError('hr.deleteLeave', error);
+    useStatic = true;
+    await deleteLeave(id);
+  }
+}
 

@@ -1,7 +1,7 @@
 export const appConfig = {
-  brandName: 'OrbitERP',
+  brandName: 'Aiklisolve',
   tagline: 'Modern ERP demo across 13 connected modules',
-  shortTagline: '13-module ERP demo',
+  shortTagline: 'ERP Demo System',
   authTagline: 'Secure access to your demo tenant',
   theme: {
     primary: 'brand',

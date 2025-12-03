@@ -17,7 +17,8 @@ const menuIcons: Record<string, string> = {
   'CRM': '🧑‍💼',
   'Ecommerce': '🛒',
   'Marketing': '📣',
-  'Projects': '📋'
+  'Projects': '📋',
+  'Internal Tasks': '✅'
 };
 
 const allGroups = [
@@ -51,6 +52,12 @@ const allGroups = [
       { to: '/ecommerce', label: 'Ecommerce' },
       { to: '/marketing', label: 'Marketing' },
       { to: '/projects', label: 'Projects' }
+    ]
+  },
+  {
+    label: 'Internal Management',
+    items: [
+      { to: '/internal-tasks', label: 'Internal Tasks' }
     ]
   }
 ];
