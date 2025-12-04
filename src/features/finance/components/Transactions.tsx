@@ -12,6 +12,7 @@ import { StatCard } from '../../../components/ui/StatCard';
 import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
 import type { TransactionHistory, TransactionDirection, ReconciliationStatus, PaymentMethod, Currency } from '../types';
+import { apiRequest } from '../../../config/api';
 
 // Mock data for transactions
 const mockTransactions: TransactionHistory[] = [
@@ -98,6 +99,44 @@ const mockTransactions: TransactionHistory[] = [
   }
 ];
 
+// Map backend transaction to TransactionHistory format
+function mapBackendToHistory(backendTx: any): TransactionHistory {
+  const txId = backendTx.id?.toString();
+  
+  // Determine direction based on transaction_type
+  let direction: TransactionDirection = 'OUT';
+  if (backendTx.transaction_type === 'INCOME') direction = 'IN';
+  else if (backendTx.transaction_type === 'TRANSFER') direction = 'TRANSFER';
+  else if (backendTx.transaction_type === 'EXPENSE') direction = 'OUT';
+  
+  return {
+    id: txId,
+    transaction_number: backendTx.transaction_number || '',
+    category_name: backendTx.category || 'General',
+    transaction_direction: direction,
+    transaction_type: backendTx.transaction_type || 'EXPENSE',
+    transaction_title: `${backendTx.transaction_type} - ${backendTx.category || 'General'}`,
+    transaction_description: backendTx.description || '',
+    transaction_amount: parseFloat(backendTx.amount) || 0,
+    transaction_date: backendTx.transaction_date ? new Date(backendTx.transaction_date).toISOString().split('T')[0] : '',
+    transaction_status: backendTx.status || 'POSTED',
+    payment_method: backendTx.payment_method?.toUpperCase().replace(/\s+/g, '_') as any,
+    reference_number: backendTx.reference_number || '',
+    source_account_name: backendTx.source_account_name || backendTx.account_name || 'General Account',
+    counterparty_name: backendTx.counterparty_name || backendTx.vendor_name || backendTx.customer_name || '',
+    approval_required: backendTx.approval_required ?? true,
+    approved_by_name: backendTx.approved_by_name || backendTx.approved_by || '',
+    approval_datetime: backendTx.approval_datetime || backendTx.approved_at || '',
+    approval_comments: backendTx.approval_comments || '',
+    reconciliation_status: (backendTx.reconciliation_status || (backendTx.status === 'COMPLETED' ? 'RECONCILED' : 'PENDING')) as ReconciliationStatus,
+    reconciled_by_name: backendTx.reconciled_by_name || backendTx.reconciled_by || '',
+    reconciliation_date: backendTx.reconciliation_date || backendTx.reconciled_at || '',
+    tags: backendTx.tags || [],
+    currency: (backendTx.currency || 'INR') as any,
+    created_at: backendTx.created_at || '',
+  };
+}
+
 export function Transactions() {
   const [transactions, setTransactions] = useState<TransactionHistory[]>(mockTransactions);
   const [loading, setLoading] = useState(false);
@@ -109,6 +148,50 @@ export function Transactions() {
   const [itemsPerPage] = useState(10);
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionHistory | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState('2025-01-01');
+  const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Load transactions from backend
+  useEffect(() => {
+    loadTransactions();
+  }, [directionFilter, statusFilter, dateFrom, dateTo]);
+  
+  const loadTransactions = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        include_details: 'true',
+        page: '1',
+        limit: '100',
+        from_date: dateFrom,
+        to_date: dateTo,
+        status: statusFilter,
+        direction: directionFilter
+      });
+      
+      console.log('Loading transaction history with params:', params.toString());
+      
+      const response = await apiRequest<{ success: boolean; data: { transactions: any[] } }>(
+        `/finance/transactions?${params.toString()}`
+      );
+      
+      console.log('Transaction history response:', response);
+      
+      if (response.success && response.data?.transactions) {
+        const mapped = response.data.transactions.map(mapBackendToHistory);
+        console.log('Mapped transaction history:', mapped.length);
+        setTransactions(mapped);
+      } else {
+        console.log('No transactions in response, using mock data');
+        setTransactions(mockTransactions);
+      }
+    } catch (error) {
+      console.error('Failed to load transaction history:', error);
+      setTransactions(mockTransactions);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Apply search and filters
   const filteredTransactions = transactions.filter((txn) => {

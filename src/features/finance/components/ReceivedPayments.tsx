@@ -13,6 +13,8 @@ import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
 import type { ReceivedPayment, PaymentMethod, Currency } from '../types';
 import * as paymentsApi from '../api/financeApi';
+import { SimpleReceivedPaymentForm } from './SimpleReceivedPaymentForm';
+import { toast } from '../../../lib/toast';
 
 type ReceivedPaymentFormProps = {
   initial?: Partial<ReceivedPayment>;
@@ -474,12 +476,7 @@ export function ReceivedPayments() {
           </button>
           <button
             type="button"
-            onClick={async () => {
-              if (window.confirm('Are you sure you want to delete this payment?')) {
-                await paymentsApi.deleteReceivedPayment(row.id);
-                loadPayments();
-              }
-            }}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-600 hover:text-red-700 font-medium"
           >
             Delete
@@ -490,18 +487,40 @@ export function ReceivedPayments() {
   ];
 
   const handleCreate = async (data: Omit<ReceivedPayment, 'id' | 'created_at' | 'updated_at'>) => {
-    await paymentsApi.createReceivedPayment(data);
-    setModalOpen(false);
-    setEditingPayment(null);
-    loadPayments();
+    try {
+      await paymentsApi.createReceivedPayment(data);
+      toast.success('Payment recorded successfully!');
+      setModalOpen(false);
+      setEditingPayment(null);
+      loadPayments();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to record payment');
+    }
   };
 
   const handleUpdate = async (data: Omit<ReceivedPayment, 'id' | 'created_at' | 'updated_at'>) => {
     if (editingPayment) {
-      await paymentsApi.updateReceivedPayment(editingPayment.id, data);
-      setModalOpen(false);
-      setEditingPayment(null);
-      loadPayments();
+      try {
+        await paymentsApi.updateReceivedPayment(editingPayment.id, data);
+        toast.success('Payment updated successfully!');
+        setModalOpen(false);
+        setEditingPayment(null);
+        loadPayments();
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to update payment');
+      }
+    }
+  };
+
+  const handleDelete = async (payment: ReceivedPayment) => {
+    if (window.confirm(`Are you sure you want to delete payment "${payment.payment_number}"?`)) {
+      try {
+        await paymentsApi.deleteReceivedPayment(payment.id);
+        toast.success('Payment deleted successfully!');
+        loadPayments();
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to delete payment');
+      }
     }
   };
 
@@ -643,7 +662,7 @@ export function ReceivedPayments() {
         }}
         title={editingPayment ? 'Edit Payment' : 'Record Payment'}
       >
-        <ReceivedPaymentForm
+        <SimpleReceivedPaymentForm
           initial={editingPayment || undefined}
           onSubmit={editingPayment ? handleUpdate : handleCreate}
           onCancel={() => {

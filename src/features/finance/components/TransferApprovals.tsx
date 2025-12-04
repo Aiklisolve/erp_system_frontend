@@ -10,6 +10,8 @@ import { StatCard } from '../../../components/ui/StatCard';
 import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
 import type { TransferApproval, TransferApprovalStatus } from '../types';
+import { apiRequest } from '../../../config/api';
+import { toast } from '../../../lib/toast';
 
 // Mock data for transfer approvals
 const mockTransferApprovals: TransferApproval[] = [
@@ -81,6 +83,53 @@ const mockTransferApprovals: TransferApproval[] = [
   }
 ];
 
+// Map backend transfer approval to frontend format
+function mapBackendTransferApproval(backendTransfer: any): TransferApproval {
+  // IMPORTANT: Use backend's numeric ID as string (not mock ID like "ta-001")
+  const transferId = backendTransfer.id?.toString() || backendTransfer.transfer_id?.toString();
+  
+  // Calculate days pending
+  const requestedDate = new Date(backendTransfer.requested_date);
+  const today = new Date();
+  const daysPending = Math.floor((today.getTime() - requestedDate.getTime()) / (1000 * 60 * 60 * 24));
+  
+  console.log('Mapping transfer approval:', {
+    backend_id: backendTransfer.id,
+    mapped_id: transferId,
+    transfer_number: backendTransfer.transfer_number
+  });
+  
+  return {
+    id: transferId, // Use backend numeric ID (e.g., "1", "2", "3")
+    transfer_number: backendTransfer.transfer_number || '',
+    from_employee_id: backendTransfer.from_employee_id,
+    from_employee_name: backendTransfer.from_employee_name || '',
+    to_employee_id: backendTransfer.to_employee_id,
+    to_employee_name: backendTransfer.to_employee_name || '',
+    from_account_id: backendTransfer.from_account_id,
+    from_account_name: backendTransfer.from_account_name || '',
+    to_account_id: backendTransfer.to_account_id,
+    to_account_name: backendTransfer.to_account_name || '',
+    amount: parseFloat(backendTransfer.amount) || 0,
+    currency: backendTransfer.currency || 'INR',
+    purpose: backendTransfer.purpose || '',
+    requested_date: backendTransfer.requested_date ? new Date(backendTransfer.requested_date).toISOString().split('T')[0] : '',
+    expected_date: backendTransfer.expected_date ? new Date(backendTransfer.expected_date).toISOString().split('T')[0] : undefined,
+    days_pending: daysPending,
+    status: backendTransfer.status as TransferApprovalStatus || 'PENDING',
+    comments: backendTransfer.comments || '',
+    approved_by_emp_id: backendTransfer.approved_by_emp_id,
+    approved_by_name: backendTransfer.approved_by_name,
+    approval_datetime: backendTransfer.approval_datetime,
+    approval_comments: backendTransfer.approval_comments,
+    rejected_by_emp_id: backendTransfer.rejected_by_emp_id,
+    rejected_by_name: backendTransfer.rejected_by_name,
+    rejection_datetime: backendTransfer.rejection_datetime,
+    rejection_reason: backendTransfer.rejection_reason,
+    created_at: backendTransfer.created_at,
+  };
+}
+
 export function TransferApprovals() {
   const [transfers, setTransfers] = useState<TransferApproval[]>(mockTransferApprovals);
   const [loading, setLoading] = useState(false);
@@ -91,6 +140,44 @@ export function TransferApprovals() {
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
   const [actionComments, setActionComments] = useState('');
+  
+  // Load transfers from backend
+  useEffect(() => {
+    loadTransfers();
+  }, [statusFilter]);
+  
+  const loadTransfers = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        status: statusFilter,
+        page: '1',
+        limit: '100'
+      });
+      
+      console.log('Loading transfer approvals with params:', params.toString());
+      
+      const response = await apiRequest<{ success: boolean; data: { transfer_approvals: any[] } }>(
+        `/finance/transfer-approvals?${params.toString()}`
+      );
+      
+      console.log('Transfer approvals response:', response);
+      
+      if (response.success && response.data?.transfer_approvals) {
+        const mapped = response.data.transfer_approvals.map(mapBackendTransferApproval);
+        console.log('Mapped transfer approvals:', mapped.length);
+        setTransfers(mapped);
+      } else {
+        console.log('No transfers in response, using mock data');
+        setTransfers(mockTransferApprovals);
+      }
+    } catch (error) {
+      console.error('Failed to load transfer approvals:', error);
+      setTransfers(mockTransferApprovals);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Apply filters
   const filteredTransfers = transfers.filter((transfer) => {
@@ -110,48 +197,84 @@ export function TransferApprovals() {
     .filter((t) => t.status === 'PENDING')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!selectedTransfer) return;
     
-    // Update the transfer status
-    setTransfers(transfers.map(t => 
-      t.id === selectedTransfer.id
-        ? {
-            ...t,
-            status: 'APPROVED' as TransferApprovalStatus,
-            approved_by_emp_id: 1,
-            approved_by_name: 'Current User',
-            approval_datetime: new Date().toISOString(),
-            approval_comments: actionComments
-          }
-        : t
-    ));
-    
-    setActionModalOpen(false);
-    setSelectedTransfer(null);
-    setActionComments('');
+    setLoading(true);
+    try {
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = userData.id || userData.user_id || '1';
+      
+      console.log('Approving transfer:', selectedTransfer.id);
+      
+      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
+        `/finance/transfer-approvals/${selectedTransfer.id}/approve`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            approval_comments: actionComments,
+            approved_by_emp_id: parseInt(userId)
+          }),
+        }
+      );
+      
+      console.log('Approve response:', response);
+      
+      if (response.success) {
+        toast.success('Transfer approved successfully!');
+        setActionModalOpen(false);
+        setSelectedTransfer(null);
+        setActionComments('');
+        loadTransfers(); // Refresh list
+      } else {
+        toast.error(response.message || 'Failed to approve transfer');
+      }
+    } catch (error: any) {
+      console.error('Approve error:', error);
+      toast.error(error.message || 'Failed to approve transfer');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!selectedTransfer) return;
     
-    // Update the transfer status
-    setTransfers(transfers.map(t => 
-      t.id === selectedTransfer.id
-        ? {
-            ...t,
-            status: 'REJECTED' as TransferApprovalStatus,
-            rejected_by_emp_id: 1,
-            rejected_by_name: 'Current User',
-            rejection_datetime: new Date().toISOString(),
-            rejection_reason: actionComments
-          }
-        : t
-    ));
-    
-    setActionModalOpen(false);
-    setSelectedTransfer(null);
-    setActionComments('');
+    setLoading(true);
+    try {
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      const userId = userData.id || userData.user_id || '1';
+      
+      console.log('Rejecting transfer:', selectedTransfer.id);
+      
+      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
+        `/finance/transfer-approvals/${selectedTransfer.id}/reject`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            rejection_reason: actionComments,
+            rejected_by_emp_id: parseInt(userId)
+          }),
+        }
+      );
+      
+      console.log('Reject response:', response);
+      
+      if (response.success) {
+        toast.success('Transfer rejected successfully!');
+        setActionModalOpen(false);
+        setSelectedTransfer(null);
+        setActionComments('');
+        loadTransfers(); // Refresh list
+      } else {
+        toast.error(response.message || 'Failed to reject transfer');
+      }
+    } catch (error: any) {
+      console.error('Reject error:', error);
+      toast.error(error.message || 'Failed to reject transfer');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const columns: TableColumn<TransferApproval>[] = [

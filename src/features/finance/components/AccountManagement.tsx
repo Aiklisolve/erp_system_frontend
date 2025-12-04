@@ -14,6 +14,8 @@ import { Pagination } from '../../../components/ui/Pagination';
 import type { Account, AccountType, Currency } from '../types';
 import * as accountsApi from '../api/financeApi';
 import { FormEvent, useEffect } from 'react';
+import { SimpleAccountForm } from './SimpleAccountForm';
+import { toast } from '../../../lib/toast';
 
 type AccountFormProps = {
   initial?: Partial<Account>;
@@ -66,7 +68,7 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
     onSubmit(payload);
   };
 
-  return (
+    return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Basic Information */}
       <div>
@@ -84,7 +86,7 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               placeholder="ACC-1001"
               required
             />
-          </div>
+      </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Account Name <span className="text-red-500">*</span>
@@ -95,7 +97,7 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               placeholder="Bank Account - Main"
               required
             />
-          </div>
+        </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Account Type <span className="text-red-500">*</span>
@@ -110,7 +112,7 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               <option value="REVENUE">Revenue</option>
               <option value="EXPENSE">Expense</option>
             </Select>
-          </div>
+      </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Parent Account
@@ -120,7 +122,7 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               onChange={(e) => setParentAccount(e.target.value)}
               placeholder="Parent account name"
             />
-          </div>
+                            </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Currency <span className="text-red-500">*</span>
@@ -135,12 +137,12 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               <option value="AUD">AUD - Australian Dollar</option>
               <option value="CAD">CAD - Canadian Dollar</option>
             </Select>
-          </div>
+                            </div>
         </div>
       </div>
 
       {/* Balance Information */}
-      <div>
+              <div>
         <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
           Balance Information
         </h3>
@@ -149,16 +151,16 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Opening Balance <span className="text-red-500">*</span>
             </label>
-            <Input
+                <Input
               type="number"
               step="0.01"
               value={openingBalance}
               onChange={(e) => setOpeningBalance(e.target.value)}
               placeholder="0.00"
               required
-            />
-          </div>
-          <div>
+                />
+              </div>
+              <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Current Balance <span className="text-red-500">*</span>
             </label>
@@ -169,8 +171,8 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               onChange={(e) => setCurrentBalance(e.target.value)}
               placeholder="0.00"
               required
-            />
-          </div>
+                />
+              </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Available Balance
@@ -182,13 +184,13 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               onChange={(e) => setAvailableBalance(e.target.value)}
               placeholder="0.00"
             />
-          </div>
-        </div>
-      </div>
+              </div>
+              </div>
+            </div>
 
       {/* Bank Details */}
       {(accountType === 'BANK' || accountType === 'CREDIT_CARD') && (
-        <div>
+              <div>
           <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
             Bank Details
           </h3>
@@ -202,28 +204,28 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
                 onChange={(e) => setBankName(e.target.value)}
                 placeholder="First National Bank"
               />
-            </div>
-            <div>
+              </div>
+              <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Branch Name
               </label>
-              <Input
+                <Input
                 value={branchName}
                 onChange={(e) => setBranchName(e.target.value)}
                 placeholder="Downtown Branch"
               />
-            </div>
-            <div>
+              </div>
+              <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 IFSC Code
               </label>
-              <Input
+                <Input
                 value={ifscCode}
                 onChange={(e) => setIfscCode(e.target.value)}
                 placeholder="FNBK0001234"
-              />
-            </div>
-            <div>
+                />
+              </div>
+              <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 SWIFT Code
               </label>
@@ -232,7 +234,7 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
                 onChange={(e) => setSwiftCode(e.target.value)}
                 placeholder="FNBKUS33XXX"
               />
-            </div>
+              </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Account Holder Name
@@ -242,13 +244,13 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
                 onChange={(e) => setAccountHolderName(e.target.value)}
                 placeholder="OrbitERP Manufacturing Inc"
               />
+              </div>
             </div>
-          </div>
         </div>
       )}
 
       {/* Status & Settings */}
-      <div>
+                <div>
         <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
           Status & Settings
         </h3>
@@ -264,7 +266,7 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
             <label htmlFor="isActive" className="text-xs font-medium text-slate-700">
               Active Account
             </label>
-          </div>
+              </div>
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -276,17 +278,17 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
             <label htmlFor="isDefault" className="text-xs font-medium text-slate-700">
               Set as Default Account
             </label>
-          </div>
-        </div>
-      </div>
+              </div>
+              </div>
+            </div>
 
       {/* Additional Details */}
       <div>
         <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
           Additional Details
         </h3>
-        <div className="space-y-4">
-          <div>
+            <div className="space-y-4">
+              <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Description
             </label>
@@ -295,9 +297,9 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief description of the account"
               rows={2}
-            />
-          </div>
-          <div>
+                />
+              </div>
+              <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Notes
             </label>
@@ -306,9 +308,9 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Additional notes"
               rows={2}
-            />
-          </div>
-        </div>
+                />
+              </div>
+              </div>
       </div>
 
       {/* Form Actions */}
@@ -321,13 +323,13 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
             onClick={onCancel}
             className="w-full sm:w-auto"
           >
-            Cancel
-          </Button>
+                  Cancel
+                </Button>
         )}
         <Button type="submit" variant="primary" size="md" className="w-full sm:w-auto">
           {initial ? 'Update Account' : 'Create Account'}
-        </Button>
-      </div>
+                </Button>
+              </div>
     </form>
   );
 }
@@ -395,7 +397,7 @@ export function AccountManagement() {
           {row.is_default && (
             <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Default</span>
           )}
-        </div>
+            </div>
       )
     },
     {
@@ -469,12 +471,7 @@ export function AccountManagement() {
           </button>
           <button
             type="button"
-            onClick={async () => {
-              if (window.confirm('Are you sure you want to delete this account?')) {
-                await accountsApi.deleteAccount(row.id);
-                loadAccounts();
-              }
-            }}
+            onClick={() => handleDelete(row)}
             className="text-[11px] text-red-600 hover:text-red-700 font-medium"
           >
             Delete
@@ -485,18 +482,40 @@ export function AccountManagement() {
   ];
 
   const handleCreate = async (data: Omit<Account, 'id' | 'created_at' | 'updated_at'>) => {
-    await accountsApi.createAccount(data);
-    setModalOpen(false);
-    setEditingAccount(null);
-    loadAccounts();
+    try {
+      await accountsApi.createAccount(data);
+      toast.success('Account created successfully!');
+      setModalOpen(false);
+      setEditingAccount(null);
+      loadAccounts();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create account');
+    }
   };
 
   const handleUpdate = async (data: Omit<Account, 'id' | 'created_at' | 'updated_at'>) => {
     if (editingAccount) {
-      await accountsApi.updateAccount(editingAccount.id, data);
-      setModalOpen(false);
-      setEditingAccount(null);
-      loadAccounts();
+      try {
+        await accountsApi.updateAccount(editingAccount.id, data);
+        toast.success('Account updated successfully!');
+        setModalOpen(false);
+        setEditingAccount(null);
+        loadAccounts();
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to update account');
+      }
+    }
+  };
+
+  const handleDelete = async (account: Account) => {
+    if (window.confirm(`Are you sure you want to delete account "${account.account_name}"?`)) {
+      try {
+        await accountsApi.deleteAccount(account.id);
+        toast.success('Account deleted successfully!');
+        loadAccounts();
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to delete account');
+      }
     }
   };
 
@@ -508,12 +527,12 @@ export function AccountManagement() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+              <div>
           <h1 className="text-xl md:text-2xl font-semibold text-slate-900">Account Management</h1>
           <p className="text-xs text-slate-600 max-w-2xl mt-1">
             Manage bank accounts, cash accounts, and other financial accounts
           </p>
-        </div>
+              </div>
         <Button
           variant="primary"
           size="md"
@@ -550,20 +569,20 @@ export function AccountManagement() {
       <Card>
         <div className="p-4 border-b border-slate-200">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
+              <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Search
               </label>
-              <Input
+                <Input
                 placeholder="Search by account #, name, bank..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-              />
-            </div>
-            <div>
+                />
+              </div>
+              <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Account Type
               </label>
@@ -583,9 +602,9 @@ export function AccountManagement() {
                 <option value="EQUITY">Equity</option>
                 <option value="REVENUE">Revenue</option>
                 <option value="EXPENSE">Expense</option>
-              </Select>
-            </div>
-            <div>
+                </Select>
+              </div>
+              <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Status
               </label>
@@ -600,9 +619,9 @@ export function AccountManagement() {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </Select>
+              </div>
+              </div>
             </div>
-          </div>
-        </div>
 
         {/* Table */}
         {paginatedAccounts.length === 0 ? (
@@ -622,8 +641,8 @@ export function AccountManagement() {
               >
                 + New Account
               </Button>
-            </div>
-          </div>
+                </div>
+                </div>
         ) : (
           <>
             <Table
@@ -656,7 +675,7 @@ export function AccountManagement() {
         }}
         title={editingAccount ? 'Edit Account' : 'New Account'}
       >
-        <AccountForm
+        <SimpleAccountForm
           initial={editingAccount || undefined}
           onSubmit={editingAccount ? handleUpdate : handleCreate}
           onCancel={() => {

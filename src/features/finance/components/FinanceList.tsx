@@ -14,7 +14,7 @@ import { Tabs } from '../../../components/ui/Tabs';
 import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
 import type { FinanceTransaction } from '../types';
-import { FinanceForm } from './FinanceForm';
+import { SimpleTransactionForm } from './SimpleTransactionForm';
 import { AccountManagement } from './AccountManagement';
 import { ReceivedPayments } from './ReceivedPayments';
 import { Transactions } from './Transactions';
@@ -464,7 +464,7 @@ export function FinanceList() {
           title={editingTransaction ? 'Edit Transaction' : 'New Transaction'}
           hideCloseButton
         >
-          <FinanceForm
+          <SimpleTransactionForm
             initial={editingTransaction || undefined}
             onSubmit={editingTransaction ? handleUpdate : handleCreate}
             onCancel={() => {

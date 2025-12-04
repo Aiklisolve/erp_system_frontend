@@ -415,6 +415,49 @@ export async function listTransactions(): Promise<FinanceTransaction[]> {
 export async function createTransaction(
   payload: Omit<FinanceTransaction, 'id' | 'created_at' | 'updated_at'>
 ): Promise<FinanceTransaction> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Creating transaction via backend API:', payload);
+      
+      // Map frontend format to backend format
+      const backendPayload = {
+        transaction_type: payload.type,
+        category: payload.category || 'General',
+        amount: payload.amount,
+        currency: payload.currency || 'INR',
+        transaction_date: payload.date,
+        payment_method: payload.payment_method?.replace(/_/g, ' '),
+        reference_number: payload.reference_number || '',
+        description: payload.description || '',
+        status: payload.status || 'COMPLETED',
+        tax_amount: payload.tax_amount || 0,
+      };
+      
+      console.log('Backend payload:', backendPayload);
+      
+      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
+        '/finance/transactions',
+        {
+          method: 'POST',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+      
+      console.log('Create response:', response);
+      
+      if (response.success && response.data) {
+        const created = mapBackendTransaction(response.data);
+        console.log('Transaction created successfully:', created);
+        return created;
+      }
+      
+      throw new Error(response.message || 'Failed to create transaction');
+    } catch (error: any) {
+      console.error('Backend create error:', error);
+      throw new Error(error.message || 'Failed to create transaction');
+    }
+  }
+  
   if (useStatic) {
     const tx: FinanceTransaction = {
       ...payload,
@@ -444,6 +487,49 @@ export async function updateTransaction(
   id: string,
   changes: Partial<FinanceTransaction>
 ): Promise<FinanceTransaction | null> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Updating transaction via backend API:', { id, changes });
+      
+      // Map frontend format to backend format
+      const backendPayload: any = {};
+      
+      if (changes.type) backendPayload.transaction_type = changes.type;
+      if (changes.category) backendPayload.category = changes.category;
+      if (changes.amount !== undefined) backendPayload.amount = changes.amount;
+      if (changes.currency) backendPayload.currency = changes.currency;
+      if (changes.date) backendPayload.transaction_date = changes.date;
+      if (changes.payment_method) backendPayload.payment_method = changes.payment_method.replace(/_/g, ' ');
+      if (changes.reference_number !== undefined) backendPayload.reference_number = changes.reference_number;
+      if (changes.description !== undefined) backendPayload.description = changes.description;
+      if (changes.status) backendPayload.status = changes.status;
+      if (changes.tax_amount !== undefined) backendPayload.tax_amount = changes.tax_amount;
+      
+      console.log('Backend update payload:', backendPayload);
+      
+      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
+        `/finance/transactions/${id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+      
+      console.log('Update response:', response);
+      
+      if (response.success && response.data) {
+        const updated = mapBackendTransaction(response.data);
+        console.log('Transaction updated successfully:', updated);
+        return updated;
+      }
+      
+      throw new Error(response.message || 'Failed to update transaction');
+    } catch (error: any) {
+      console.error('Backend update error:', error);
+      throw new Error(error.message || 'Failed to update transaction');
+    }
+  }
+  
   if (useStatic) {
     const index = mockTransactions.findIndex((t) => t.id === id);
     if (index === -1) return null;
@@ -468,6 +554,31 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Deleting transaction via backend API:', id);
+      
+      const response = await apiRequest<{ success: boolean; message?: string }>(
+        `/finance/transactions/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      
+      console.log('Delete response:', response);
+      
+      if (response.success) {
+        console.log('Transaction deleted successfully');
+        return;
+      }
+      
+      throw new Error(response.message || 'Failed to delete transaction');
+    } catch (error: any) {
+      console.error('Backend delete error:', error);
+      throw new Error(error.message || 'Failed to delete transaction');
+    }
+  }
+  
   if (useStatic) {
     const index = mockTransactions.findIndex((t) => t.id === id);
     if (index !== -1) mockTransactions.splice(index, 1);
@@ -488,7 +599,47 @@ export async function deleteTransaction(id: string): Promise<void> {
 // ACCOUNTS API
 // ============================================
 
+// Map backend account to frontend format
+function mapBackendAccount(backendAcc: any): Account {
+  // IMPORTANT: Use backend's numeric ID directly as string for consistency
+  const accountId = backendAcc.id?.toString() || backendAcc.account_id?.toString();
+  
+  return {
+    id: accountId, // Convert to string for frontend consistency
+    account_number: backendAcc.account_code || '',
+    account_name: backendAcc.account_name || '',
+    account_type: backendAcc.account_type || 'BANK',
+    currency: backendAcc.currency || 'INR',
+    opening_balance: parseFloat(backendAcc.opening_balance) || 0,
+    current_balance: parseFloat(backendAcc.current_balance) || parseFloat(backendAcc.opening_balance) || 0,
+    is_active: backendAcc.is_active !== false,
+    created_at: backendAcc.created_at,
+  };
+}
+
 export async function listAccounts(): Promise<Account[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Fetching accounts from backend API...');
+      const response = await apiRequest<{ success: boolean; data: { accounts: any[] } }>(
+        '/finance/accounts'
+      );
+      
+      console.log('Backend accounts response:', response);
+      
+      if (response.success && response.data?.accounts) {
+        const mapped = response.data.accounts.map(mapBackendAccount);
+        console.log('Mapped accounts:', mapped.length);
+        return mapped;
+      }
+      
+      return mockAccounts;
+    } catch (error) {
+      console.error('Backend API error, falling back to mock data:', error);
+      return mockAccounts;
+    }
+  }
+  
   if (useStatic) return mockAccounts;
 
   try {
@@ -505,6 +656,43 @@ export async function listAccounts(): Promise<Account[]> {
 export async function createAccount(
   payload: Omit<Account, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Account> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Creating account via backend API:', payload);
+      
+      // Map frontend format to backend format
+      const backendPayload = {
+        account_code: payload.account_number,
+        account_name: payload.account_name,
+        account_type: payload.account_type,
+        opening_balance: payload.opening_balance
+      };
+      
+      console.log('Backend account payload:', backendPayload);
+      
+      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
+        '/finance/accounts',
+        {
+          method: 'POST',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+      
+      console.log('Create account response:', response);
+      
+      if (response.success && response.data) {
+        const created = mapBackendAccount(response.data);
+        console.log('Account created successfully:', created);
+        return created;
+      }
+      
+      throw new Error(response.message || 'Failed to create account');
+    } catch (error: any) {
+      console.error('Backend create account error:', error);
+      throw new Error(error.message || 'Failed to create account');
+    }
+  }
+  
   if (useStatic) {
     const account: Account = {
       ...payload,
@@ -534,6 +722,44 @@ export async function updateAccount(
   id: string,
   changes: Partial<Account>
 ): Promise<Account | null> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Updating account via backend API:', { id, changes });
+      
+      // Map frontend format to backend format
+      const backendPayload: any = {};
+      
+      if (changes.account_number) backendPayload.account_code = changes.account_number;
+      if (changes.account_name) backendPayload.account_name = changes.account_name;
+      if (changes.account_type) backendPayload.account_type = changes.account_type;
+      if (changes.opening_balance !== undefined) backendPayload.opening_balance = changes.opening_balance;
+      if (changes.current_balance !== undefined) backendPayload.current_balance = changes.current_balance;
+      
+      console.log('Backend update account payload:', backendPayload);
+      
+      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
+        `/finance/accounts/${id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+      
+      console.log('Update account response:', response);
+      
+      if (response.success && response.data) {
+        const updated = mapBackendAccount(response.data);
+        console.log('Account updated successfully:', updated);
+        return updated;
+      }
+      
+      throw new Error(response.message || 'Failed to update account');
+    } catch (error: any) {
+      console.error('Backend update account error:', error);
+      throw new Error(error.message || 'Failed to update account');
+    }
+  }
+  
   if (useStatic) {
     const index = mockAccounts.findIndex((a) => a.id === id);
     if (index === -1) return null;
@@ -558,6 +784,31 @@ export async function updateAccount(
 }
 
 export async function deleteAccount(id: string): Promise<void> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Deleting account via backend API:', id);
+      
+      const response = await apiRequest<{ success: boolean; message?: string }>(
+        `/finance/accounts/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      
+      console.log('Delete account response:', response);
+      
+      if (response.success) {
+        console.log('Account deleted successfully');
+        return;
+      }
+      
+      throw new Error(response.message || 'Failed to delete account');
+    } catch (error: any) {
+      console.error('Backend delete account error:', error);
+      throw new Error(error.message || 'Failed to delete account');
+    }
+  }
+  
   if (useStatic) {
     const index = mockAccounts.findIndex((a) => a.id === id);
     if (index !== -1) mockAccounts.splice(index, 1);
@@ -578,7 +829,60 @@ export async function deleteAccount(id: string): Promise<void> {
 // RECEIVED PAYMENTS API
 // ============================================
 
+// Map backend received payment to frontend format
+function mapBackendReceivedPayment(backendPayment: any): ReceivedPayment {
+  const paymentId = backendPayment.id?.toString() || backendPayment.payment_id?.toString();
+  
+  return {
+    id: paymentId,
+    payment_number: backendPayment.payment_number || `PAY-${paymentId}`,
+    customer_id: backendPayment.customer_id?.toString() || '',
+    customer_name: backendPayment.customer_name || `Customer ${backendPayment.customer_id}`,
+    payment_date: backendPayment.payment_date ? new Date(backendPayment.payment_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    amount: parseFloat(backendPayment.amount) || 0,
+    currency: (backendPayment.currency || 'INR') as any,
+    payment_method: (backendPayment.payment_method?.toUpperCase().replace(/\s+/g, '_') || 'CASH') as any,
+    reference_number: backendPayment.reference_number || '',
+    notes: backendPayment.notes || '',
+    status: 'RECEIVED',
+    account: 'Default Account', // Required by type
+    created_at: backendPayment.created_at,
+  };
+}
+
 export async function listReceivedPayments(): Promise<ReceivedPayment[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Fetching received payments from backend API...');
+      const response = await apiRequest<{ success: boolean; data: { received_payments: any[] } | any[] }>(
+        '/finance/received-payments'
+      );
+      
+      console.log('Backend received payments response:', response);
+      
+      // Handle different response formats
+      let payments = [];
+      if (response.success && response.data) {
+        if (Array.isArray(response.data)) {
+          payments = response.data;
+        } else if (response.data.received_payments) {
+          payments = response.data.received_payments;
+        }
+      }
+      
+      if (payments.length > 0) {
+        const mapped = payments.map(mapBackendReceivedPayment);
+        console.log('Mapped received payments:', mapped.length);
+        return mapped;
+      }
+      
+      return mockReceivedPayments;
+    } catch (error) {
+      console.error('Backend API error, falling back to mock data:', error);
+      return mockReceivedPayments;
+    }
+  }
+  
   if (useStatic) return mockReceivedPayments;
 
   try {
@@ -595,6 +899,46 @@ export async function listReceivedPayments(): Promise<ReceivedPayment[]> {
 export async function createReceivedPayment(
   payload: Omit<ReceivedPayment, 'id' | 'created_at' | 'updated_at'>
 ): Promise<ReceivedPayment> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Creating received payment via backend API:', payload);
+      
+      // Map frontend format to backend format
+      const backendPayload = {
+        customer_id: parseInt(payload.customer_id || '1'),
+        payment_date: payload.payment_date,
+        amount: payload.amount,
+        currency: payload.currency || 'INR',
+        payment_method: payload.payment_method?.replace(/_/g, ' ') || 'CASH',
+        reference_number: payload.reference_number || '',
+        notes: payload.notes || ''
+      };
+      
+      console.log('Backend payment payload:', backendPayload);
+      
+      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
+        '/finance/received-payments',
+        {
+          method: 'POST',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+      
+      console.log('Create payment response:', response);
+      
+      if (response.success && response.data) {
+        const created = mapBackendReceivedPayment(response.data);
+        console.log('Payment created successfully:', created);
+        return created;
+      }
+      
+      throw new Error(response.message || 'Failed to create payment');
+    } catch (error: any) {
+      console.error('Backend create payment error:', error);
+      throw new Error(error.message || 'Failed to create payment');
+    }
+  }
+  
   if (useStatic) {
     const payment: ReceivedPayment = {
       ...payload,
@@ -624,6 +968,46 @@ export async function updateReceivedPayment(
   id: string,
   changes: Partial<ReceivedPayment>
 ): Promise<ReceivedPayment | null> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Updating received payment via backend API:', { id, changes });
+      
+      // Map frontend format to backend format
+      const backendPayload: any = {};
+      
+      if (changes.customer_id) backendPayload.customer_id = parseInt(changes.customer_id) || 1;
+      if (changes.payment_date) backendPayload.payment_date = changes.payment_date;
+      if (changes.amount !== undefined) backendPayload.amount = changes.amount;
+      if (changes.currency) backendPayload.currency = changes.currency;
+      if (changes.payment_method) backendPayload.payment_method = changes.payment_method.replace(/_/g, ' ');
+      if (changes.reference_number !== undefined) backendPayload.reference_number = changes.reference_number;
+      if (changes.notes !== undefined) backendPayload.notes = changes.notes;
+      
+      console.log('Backend update payment payload:', backendPayload);
+      
+      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
+        `/finance/received-payments/${id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+      
+      console.log('Update payment response:', response);
+      
+      if (response.success && response.data) {
+        const updated = mapBackendReceivedPayment(response.data);
+        console.log('Payment updated successfully:', updated);
+        return updated;
+      }
+      
+      throw new Error(response.message || 'Failed to update payment');
+    } catch (error: any) {
+      console.error('Backend update payment error:', error);
+      throw new Error(error.message || 'Failed to update payment');
+    }
+  }
+  
   if (useStatic) {
     const index = mockReceivedPayments.findIndex((p) => p.id === id);
     if (index === -1) return null;
@@ -648,6 +1032,31 @@ export async function updateReceivedPayment(
 }
 
 export async function deleteReceivedPayment(id: string): Promise<void> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Deleting received payment via backend API:', id);
+      
+      const response = await apiRequest<{ success: boolean; message?: string }>(
+        `/finance/received-payments/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      
+      console.log('Delete payment response:', response);
+      
+      if (response.success) {
+        console.log('Payment deleted successfully');
+        return;
+      }
+      
+      throw new Error(response.message || 'Failed to delete payment');
+    } catch (error: any) {
+      console.error('Backend delete payment error:', error);
+      throw new Error(error.message || 'Failed to delete payment');
+    }
+  }
+  
   if (useStatic) {
     const index = mockReceivedPayments.findIndex((p) => p.id === id);
     if (index !== -1) mockReceivedPayments.splice(index, 1);
