@@ -152,13 +152,28 @@ export function LoginPage() {
       console.log('OTP Verify Response:', data);
 
       if (response.ok && data.success && data.data) {
-        const { user: backendUser, token, session_id } = data.data;
+        const { user: backendUser, token, session_id, refresh_token, expires_in } = data.data;
+        
+        // Calculate token expiry
+        const expiresIn = expires_in ? expires_in * 1000 : 60 * 60 * 1000;
+        const expiresAt = Date.now() + expiresIn;
         
         // Store all authentication data
         localStorage.setItem('token', token);
         localStorage.setItem('session_id', session_id?.toString() || '');
         localStorage.setItem('user', JSON.stringify(backendUser));
-        localStorage.setItem('expires_at', (Date.now() + 60 * 60 * 1000).toString());
+        localStorage.setItem('expires_at', expiresAt.toString());
+        
+        // Store refresh token if provided
+        if (refresh_token) {
+          localStorage.setItem('refresh_token', refresh_token);
+        }
+        
+        console.log('OTP Login successful, stored:', {
+          token: token.substring(0, 30) + '...',
+          session_id,
+          has_refresh_token: !!refresh_token
+        });
         
         toast.success('Login successful!');
         await refreshUser();

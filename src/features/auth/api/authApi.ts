@@ -66,20 +66,31 @@ export async function login(email: string, password: string): Promise<User | nul
     const data = await response.json();
     console.log('Backend login response:', data);
 
-    if (response.ok && data.success && data.data) {
-      const { user: backendUser, token, session_id } = data.data;
-      
-      // Store all authentication data in localStorage
-      localStorage.setItem('token', token);
-      localStorage.setItem('session_id', session_id?.toString() || '');
-      localStorage.setItem('user', JSON.stringify(backendUser));
-      localStorage.setItem('expires_at', (Date.now() + 60 * 60 * 1000).toString()); // 1 hour
-      
-      console.log('Stored in localStorage:', {
-        token: token.substring(0, 30) + '...',
-        session_id,
-        user: backendUser.email,
-      });
+      if (response.ok && data.success && data.data) {
+        const { user: backendUser, token, session_id, refresh_token, expires_in } = data.data;
+        
+        // Calculate token expiry (use expires_in from backend or default to 1 hour)
+        const expiresIn = expires_in ? expires_in * 1000 : 60 * 60 * 1000; // Convert seconds to ms
+        const expiresAt = Date.now() + expiresIn;
+        
+        // Store all authentication data in localStorage
+        localStorage.setItem('token', token);
+        localStorage.setItem('session_id', session_id?.toString() || '');
+        localStorage.setItem('user', JSON.stringify(backendUser));
+        localStorage.setItem('expires_at', expiresAt.toString());
+        
+        // Store refresh token if provided
+        if (refresh_token) {
+          localStorage.setItem('refresh_token', refresh_token);
+        }
+        
+        console.log('Stored in localStorage:', {
+          token: token.substring(0, 30) + '...',
+          session_id,
+          user: backendUser.email,
+          has_refresh_token: !!refresh_token,
+          expires_at: new Date(expiresAt).toISOString()
+        });
       
       // Create a StaticUser object for session management
       const staticUser: StaticUser = {
@@ -219,25 +230,31 @@ export async function logout(): Promise<void> {
       return null;
     })();
 
-  // Call backend logout API if session_id exists and API is configured
-  if (sessionId && import.meta.env.VITE_API_BASE_URL) {
-    try {
-      const token = getToken();
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/sessions/logout`, {
+  // Call backend logout API
+  try {
+    const token = getToken() || localStorage.getItem('token');
+    if (token && import.meta.env.VITE_API_BASE_URL) {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+      console.log('Calling backend logout API...');
+      
+      const response = await fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          session_id: sessionId
-        })
       });
-      console.log('Backend logout successful');
-    } catch (error) {
-      // Even if backend logout fails, continue with local logout
-      console.error('Backend logout error:', error);
+
+      const data = await response.json();
+      console.log('Backend logout response:', data);
+      
+      if (response.ok && data.success) {
+        console.log('Backend logout successful');
+      }
     }
+  } catch (error) {
+    // Even if backend logout fails, continue with local logout
+    console.error('Backend logout error (continuing with local cleanup):', error);
   }
 
   // Clear session and all localStorage data
@@ -253,6 +270,7 @@ export async function logout(): Promise<void> {
         key.includes('session') ||
         key.includes('auth') ||
         key.includes('token') ||
+        key.includes('refresh_token') ||
         key.includes('user') ||
         key.includes('login') ||
         key === 'otp' ||
@@ -376,7 +394,81 @@ export async function verifyOTPAndLogin(
   return createMockUserFromStatic(user);
 }
 
+// Refresh access token using refresh token
+export async function refreshAccessToken(): Promise<boolean> {
+  try {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) {
+      console.log('No refresh token available');
+      return false;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+    console.log('Refreshing access token...');
+    
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        refresh_token: refreshToken
+      }),
+    });
+
+    const data = await response.json();
+    console.log('Refresh token response:', data);
+
+    if (response.ok && data.success && data.data) {
+      const { token, expires_in } = data.data;
+      
+      // Update token and expiry
+      const expiresIn = expires_in ? expires_in * 1000 : 60 * 60 * 1000;
+      const expiresAt = Date.now() + expiresIn;
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('expires_at', expiresAt.toString());
+      
+      console.log('Token refreshed successfully:', {
+        token: token.substring(0, 30) + '...',
+        expires_at: new Date(expiresAt).toISOString()
+      });
+      
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    return false;
+  }
+}
+
 export async function getCurrentUser(): Promise<User | null> {
+  // Check if token is expired or about to expire (within 5 minutes)
+  const expiresAt = localStorage.getItem('expires_at');
+  if (expiresAt) {
+    const expiryTime = parseInt(expiresAt, 10);
+    const timeUntilExpiry = expiryTime - Date.now();
+    
+    // If token expires in less than 5 minutes, try to refresh
+    if (timeUntilExpiry < 5 * 60 * 1000 && timeUntilExpiry > 0) {
+      console.log('Token expiring soon, attempting refresh...');
+      const refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        console.log('Token refresh failed');
+      }
+    } else if (timeUntilExpiry <= 0) {
+      console.log('Token expired, attempting refresh...');
+      const refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        console.log('Token expired and refresh failed, logging out');
+        clearSession();
+        return null;
+      }
+    }
+  }
+  
   // Check session first (preferred method)
   const session = getSession();
   if (session && session.user) {
@@ -417,12 +509,12 @@ export async function getCurrentUser(): Promise<User | null> {
       }
       
       // Migrate to session if not already in session
-      const expiresAt = localStorage.getItem('expires_at');
+      const expiresAtStr = localStorage.getItem('expires_at');
       createSession(
         user,
         storedToken,
         storedSessionId || undefined,
-        expiresAt ? parseInt(expiresAt, 10) : undefined
+        expiresAtStr ? parseInt(expiresAtStr, 10) : undefined
       );
       return createMockUserFromStatic(user);
     } catch {

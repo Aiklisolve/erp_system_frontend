@@ -86,6 +86,7 @@ function OTPPasswordChange({ userData, onClose }: { userData: any; onClose: () =
   const [contactValue, setContactValue] = useState('');
   const [otp, setOtp] = useState('');
   const [generatedOTP, setGeneratedOTP] = useState('');
+  const [otpId, setOtpId] = useState<string>('');
   const [otpExpiryTime, setOtpExpiryTime] = useState<number>(0);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [newPassword, setNewPassword] = useState('');
@@ -112,7 +113,7 @@ function OTPPasswordChange({ userData, onClose }: { userData: any; onClose: () =
     }
   }, [step, otpExpiryTime]);
   
-  const handleSendOTP = (e: FormEvent) => {
+  const handleSendOTP = async (e: FormEvent) => {
     e.preventDefault();
     
     const newErrors: Record<string, string> = {};
@@ -130,18 +131,50 @@ function OTPPasswordChange({ userData, onClose }: { userData: any; onClose: () =
     
     setLoading(true);
     
-    // Simulate OTP sending
-    setTimeout(() => {
-      const otp = generateOTP();
-      const expiryTime = Date.now() + (10 * 60 * 1000); // 10 minutes from now
-      setGeneratedOTP(otp);
-      setOtpExpiryTime(expiryTime);
-      console.log('Generated OTP:', otp); // In production, this would be sent via email/SMS
-      console.log('OTP expires at:', new Date(expiryTime).toLocaleTimeString());
-      toast.success(`OTP sent to ${contactValue} and the OTP is ${otp}`);
-      setStep('verify');
+    try {
+      const token = localStorage.getItem('token');
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+      
+      const requestBody = method === 'email'
+        ? { method: 'EMAIL', email: contactValue }
+        : { method: 'SMS', phone: contactValue };
+      
+      console.log('Sending password change OTP:', requestBody);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/password/otp/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+      console.log('OTP Send Response:', data);
+
+      if (response.ok && data.success && data.data) {
+        const backendOtp = data.data.otp || data.otp;
+        const backendOtpId = data.data.otp_id || data.otp_id;
+        const expiresIn = data.data.expires_in || 600; // Default 10 minutes
+        
+        const expiryTime = Date.now() + (expiresIn * 1000);
+        setGeneratedOTP(backendOtp);
+        setOtpId(backendOtpId?.toString() || '');
+        setOtpExpiryTime(expiryTime);
+        
+        console.log('OTP received:', backendOtp, 'OTP ID:', backendOtpId);
+        toast.success(`OTP sent to ${contactValue}! OTP: ${backendOtp}`);
+        setStep('verify');
+      } else {
+        toast.error(data.message || 'Failed to send OTP');
+      }
+    } catch (error) {
+      console.error('Send OTP error:', error);
+      toast.error('Failed to send OTP. Please try again.');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
   
   const handleVerifyAndChange = async (e: FormEvent) => {
@@ -158,7 +191,6 @@ function OTPPasswordChange({ userData, onClose }: { userData: any; onClose: () =
     }
     
     if (!otp) newErrors.otp = 'OTP is required';
-    else if (otp !== generatedOTP) newErrors.otp = 'Invalid OTP';
     
     if (!newPassword) newErrors.newPassword = 'New password is required';
     else if (newPassword.length < 6) newErrors.newPassword = 'Password must be at least 6 characters';
@@ -172,37 +204,46 @@ function OTPPasswordChange({ userData, onClose }: { userData: any; onClose: () =
     setLoading(true);
     
     try {
-      if (!userData) {
-        throw new Error('User data not found');
+      const token = localStorage.getItem('token');
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+      
+      console.log('Verifying OTP and changing password:', {
+        otp_id: otpId,
+        otp_code: otp,
+        has_new_password: !!newPassword
+      });
+      
+      const response = await fetch(`${API_BASE_URL}/auth/password/otp/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          otp_id: otpId,
+          otp_code: otp,
+          new_password: newPassword
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Password change response:', data);
+
+      if (response.ok && data.success) {
+        toast.success('Password changed successfully via OTP!');
+        
+        setTimeout(() => {
+          onClose();
+          // Reset form
+          setStep('select');
+          setOtp('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setContactValue('');
+        }, 1500);
+      } else {
+        toast.error(data.message || 'Failed to change password');
       }
-      
-      // Hash new password
-      const hashedNewPassword = hashPassword(newPassword);
-      
-      // Update password in localStorage
-      const updatedUserData = {
-        ...userData,
-        password: hashedNewPassword
-      };
-      localStorage.setItem('erp_user', JSON.stringify(updatedUserData));
-      
-      // Also update in static users if it exists
-      const staticUsers = localStorage.getItem('static_users');
-      if (staticUsers) {
-        const users = JSON.parse(staticUsers);
-        const userIndex = users.findIndex((u: any) => u.email === userData.email);
-        if (userIndex !== -1) {
-          users[userIndex].password = hashedNewPassword;
-          localStorage.setItem('static_users', JSON.stringify(users));
-        }
-      }
-      
-      toast.success('Password changed successfully via OTP!');
-      
-      setTimeout(() => {
-        onClose();
-      }, 1500);
-      
     } catch (error) {
       console.error('Password change error:', error);
       toast.error('Failed to change password');
@@ -453,51 +494,43 @@ function CurrentPasswordChange({ userData, onClose }: { userData: any; onClose: 
     setLoading(true);
     
     try {
-      if (!userData) {
-        throw new Error('User data not found');
-      }
+      const token = localStorage.getItem('token');
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
       
-      // Verify current password
-      const hashedCurrentPassword = hashPassword(currentPassword);
-      if (userData.password !== hashedCurrentPassword) {
-        setErrors({ currentPassword: 'Current password is incorrect' });
-        toast.error('Current password is incorrect');
-        setLoading(false);
-        return;
-      }
+      console.log('Changing password via current password');
       
-      // Hash new password
-      const hashedNewPassword = hashPassword(newPassword);
-      
-      // Update password in localStorage
-      const updatedUserData = {
-        ...userData,
-        password: hashedNewPassword
-      };
-      localStorage.setItem('erp_user', JSON.stringify(updatedUserData));
-      
-      // Also update in static users if it exists
-      const staticUsers = localStorage.getItem('static_users');
-      if (staticUsers) {
-        const users = JSON.parse(staticUsers);
-        const userIndex = users.findIndex((u: any) => u.email === userData.email);
-        if (userIndex !== -1) {
-          users[userIndex].password = hashedNewPassword;
-          localStorage.setItem('static_users', JSON.stringify(users));
+      const response = await fetch(`${API_BASE_URL}/auth/password/change`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword
+        }),
+      });
+
+      const data = await response.json();
+      console.log('Password change response:', data);
+
+      if (response.ok && data.success) {
+        toast.success('Password changed successfully!');
+        
+        // Clear form
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else {
+        if (data.message?.includes('current password')) {
+          setErrors({ currentPassword: 'Current password is incorrect' });
         }
+        toast.error(data.message || 'Failed to change password');
       }
-      
-      toast.success('Password changed successfully!');
-      
-      // Clear form
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      
-      setTimeout(() => {
-        onClose();
-      }, 1500);
-      
     } catch (error) {
       console.error('Password change error:', error);
       toast.error('Failed to change password');
