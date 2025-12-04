@@ -1,0 +1,83 @@
+// API Configuration
+export const API_CONFIG = {
+  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1',
+  TIMEOUT: 30000, // 30 seconds
+};
+
+// Get auth token from localStorage
+export const getAuthToken = (): string | null => {
+  try {
+    // Try to get token directly
+    const token = localStorage.getItem('token');
+    // const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMSIsImVtYWlsIjoiYWRtaW5AYWlrbGlzb2x2ZS5jb20iLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NjQ4MzE4MTcsImV4cCI6MTc2NDgzNTQxN30.T-6swaApgbfLIA_GjdI2xdmdCPT2nEeLwEfYaHqPmek';
+    if (token && token !== 'undefined' && token !== null) {
+      return token;
+    }
+    
+    // Try to get from user data
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      if (user.token) {
+        return user.token;
+      }
+    }
+    
+    // Fallback to static users
+    const staticUser = localStorage.getItem('static_user');
+    if (staticUser) {
+      const user = JSON.parse(staticUser);
+      return user.token || null;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+};
+
+// API request helper
+export async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getAuthToken();
+  
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  
+  console.log('API Request:', {
+    method: options.method || 'GET',
+    url,
+    hasToken: !!token,
+    token: token ? token.substring(0, 30) + '...' : 'none'
+  });
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || `API Error: ${response.status}`);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('API Request Error:', error);
+    throw error;
+  }
+}
+

@@ -7,6 +7,8 @@ export interface StaticUser {
   fullName: string;
   role: ErpRole;
   department?: string;
+  token?: string;
+  session_id?: string | number;
 }
 
 export const staticUsers: StaticUser[] = [

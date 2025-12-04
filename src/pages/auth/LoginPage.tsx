@@ -4,14 +4,18 @@ import { useAuth } from '../../features/auth/hooks/useAuth';
 import { appConfig } from '../../config/appConfig';
 import { staticUsers, type ErpRole, roleDescriptions } from '../../features/auth/data/staticUsers';
 import { getAuthMode, sendOTP, verifyOTPAndLogin } from '../../features/auth/api/authApi';
+import { toast } from '../../lib/toast';
 
 export function LoginPage() {
-  const { error, refreshUser } = useAuth();
+  const { login: authLogin, error, refreshUser } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2>(1); // 1: credentials, 2: OTP
+  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: select method, 2: enter contact, 3: enter OTP
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
+  const [otpId, setOtpId] = useState<string | null>(null);
+  const [otpMethod, setOtpMethod] = useState<'EMAIL' | 'PHONE'>('EMAIL');
   const [selectedRole, setSelectedRole] = useState<ErpRole | ''>('');
   const [showPassword, setShowPassword] = useState(false);
   const [showRoleHelp, setShowRoleHelp] = useState(false);
@@ -20,10 +24,12 @@ export function LoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [receivedOtp, setReceivedOtp] = useState<string | null>(null);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [loginMode, setLoginMode] = useState<'otp' | 'direct'>('direct'); // 'otp' or 'direct'
 
   const authMode = getAuthMode();
 
-  const handleStep1Submit = async (e: FormEvent) => {
+  // Direct login handler (for backend API)
+  const handleDirectLogin = async (e: FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
 
@@ -31,45 +37,146 @@ export function LoginPage() {
     setLocalError(null);
 
     try {
-      const result = await sendOTP(email, password);
-      if (result.success && result.otp) {
-        setReceivedOtp(result.otp);
-        setOtpSent(true);
-        setShowSuccessPopup(true);
-        setStep(2);
-        setTimeout(() => {
-          setShowSuccessPopup(false);
-        }, 3000);
-      } else {
-        setLocalError(result.error || 'Failed to send OTP');
-      }
+      await authLogin(email, password);
+      toast.success('Login successful!');
+      await refreshUser();
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
-      setLocalError(err?.message || 'Failed to send OTP. Please try again.');
+      setLocalError(err?.message || 'Login failed. Please check your credentials.');
+      toast.error(err?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStep2Submit = async (e: FormEvent) => {
+  // Step 1: Select Email or Phone
+  const handleSelectMethod = (method: 'EMAIL' | 'PHONE') => {
+    setOtpMethod(method);
+    setStep(2);
+    setLocalError(null);
+  };
+
+  // Step 2: Send OTP
+  const handleSendOTP = async (e: FormEvent) => {
     e.preventDefault();
-    if (!otp || otp.length !== 4) return;
+    
+    if (otpMethod === 'EMAIL' && !email) {
+      setLocalError('Email is required');
+      return;
+    }
+    if (otpMethod === 'PHONE' && !phone) {
+      setLocalError('Phone number is required');
+      return;
+    }
 
     setLoading(true);
     setLocalError(null);
 
     try {
-      const user = await verifyOTPAndLogin(email, otp);
-      if (user) {
-        await refreshUser();
-        navigate('/dashboard', { replace: true });
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+      
+      const requestBody = otpMethod === 'EMAIL' 
+        ? { email, method: 'EMAIL' }
+        : { phone, method: 'PHONE' };
+      
+      console.log('Sending OTP:', requestBody);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/otp/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+      console.log('OTP Send Response:', data);
+
+      if (response.ok && data.success && data.data) {
+        const backendOtp = data.data.otp || data.otp;
+        const backendOtpId = data.data.otp_id || data.otp_id;
+        
+        setReceivedOtp(backendOtp);
+        setOtpId(backendOtpId?.toString() || null);
+        setOtpSent(true);
+        setShowSuccessPopup(true);
+        setStep(3);
+        
+        toast.success(`OTP sent to your ${otpMethod === 'EMAIL' ? 'email' : 'phone'}!`);
+        
+        setTimeout(() => {
+          setShowSuccessPopup(false);
+        }, 3000);
+      } else {
+        setLocalError(data.message || 'Failed to send OTP');
+        toast.error(data.message || 'Failed to send OTP');
       }
     } catch (err: any) {
-      setLocalError(err?.message || 'Invalid OTP. Please try again.');
+      console.error('Send OTP error:', err);
+      setLocalError(err?.message || 'Failed to send OTP. Please try again.');
+      toast.error('Failed to send OTP. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmit = step === 1 ? handleStep1Submit : handleStep2Submit;
+  // Step 3: Verify OTP
+  const handleVerifyOTP = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!otp || otp.length !== 6) {
+      setLocalError('Please enter a valid 6-digit OTP');
+      return;
+    }
+
+    setLoading(true);
+    setLocalError(null);
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+      
+      const requestBody = otpMethod === 'EMAIL'
+        ? { email, otp_code: otp, otp_id: otpId }
+        : { phone, otp_code: otp, otp_id: otpId };
+      
+      console.log('Verifying OTP:', requestBody);
+      
+      const response = await fetch(`${API_BASE_URL}/auth/otp/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+      console.log('OTP Verify Response:', data);
+
+      if (response.ok && data.success && data.data) {
+        const { user: backendUser, token, session_id } = data.data;
+        
+        // Store all authentication data
+        localStorage.setItem('token', token);
+        localStorage.setItem('session_id', session_id?.toString() || '');
+        localStorage.setItem('user', JSON.stringify(backendUser));
+        localStorage.setItem('expires_at', (Date.now() + 60 * 60 * 1000).toString());
+        
+        toast.success('Login successful!');
+        await refreshUser();
+        navigate('/dashboard', { replace: true });
+      } else {
+        setLocalError(data.message || 'Invalid OTP. Please try again.');
+        toast.error(data.message || 'Invalid OTP');
+      }
+    } catch (err: any) {
+      console.error('Verify OTP error:', err);
+      setLocalError(err?.message || 'Failed to verify OTP. Please try again.');
+      toast.error('Failed to verify OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = loginMode === 'direct' ? handleDirectLogin : (step === 2 ? handleSendOTP : handleVerifyOTP);
 
   const handleRoleSelect = (role: ErpRole) => {
     setSelectedRole(role);
@@ -151,8 +258,35 @@ export function LoginPage() {
         </div>
       )}
 
+      {/* Login Mode Toggle */}
+      <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+        <button
+          type="button"
+          onClick={() => setLoginMode('direct')}
+          className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+            loginMode === 'direct'
+              ? 'bg-white text-primary shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          🔑 Password Login
+        </button>
+        <button
+          type="button"
+          onClick={() => setLoginMode('otp')}
+          className={`flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+            loginMode === 'otp'
+              ? 'bg-white text-primary shadow-sm'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          📧 OTP Login
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-5">
-        {step === 1 ? (
+        {/* Password Login Mode */}
+        {loginMode === 'direct' && (
           <>
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -164,7 +298,7 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 placeholder:text-slate-400 transition-all"
-                placeholder="your.email@erp.local"
+                placeholder="your.email@aiklisolve.com"
                 required
                 autoComplete="email"
                 disabled={loading}
@@ -208,64 +342,189 @@ export function LoginPage() {
               </div>
             </div>
           </>
-        ) : (
+        )}
+        
+        {/* OTP Login Mode */}
+        {loginMode === 'otp' && (
           <>
-            <div className="rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 p-5 mb-2">
-              <div className="flex items-center gap-4">
-                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold shadow-lg">
-                  ✓
+            {/* Step 1: Select Method */}
+            {step === 1 && (
+              <div className="space-y-4">
+                <div className="text-center mb-4">
+                  <p className="text-sm font-bold text-slate-900 mb-2">Choose OTP Delivery Method</p>
+                  <p className="text-xs text-slate-600">Select how you want to receive your verification code</p>
                 </div>
-                <div>
-                  <p className="text-emerald-700 font-bold text-base m-0">OTP Sent Successfully!</p>
-                  <p className="text-emerald-600 text-sm m-0 mt-1">
-                    📧 Sent to {email}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="otp" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
-                <span>🔐</span> Enter Verification Code (OTP)
-              </label>
-              <input
-                id="otp"
-                type="text"
-                value={otp}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 4);
-                  setOtp(value);
-                }}
-                className="w-full px-4 py-4 text-2xl border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 font-bold text-center tracking-widest transition-all"
-                placeholder="0000"
-                maxLength={4}
-                autoComplete="one-time-code"
-                autoFocus
-                disabled={loading}
-                style={{ letterSpacing: '0.5em' }}
-              />
-            </div>
-
-            {receivedOtp && (
-              <div className="rounded-2xl bg-gradient-to-r from-primary/10 to-teal-600/10 border-2 border-primary/30 p-4 text-center">
-                <p className="text-primary text-sm font-semibold m-0">
-                  🎯 Your OTP: <span className="font-bold text-2xl tracking-wider ml-2">{receivedOtp}</span>
-                </p>
+                
+                <button
+                  type="button"
+                  onClick={() => handleSelectMethod('EMAIL')}
+                  className="w-full p-4 border-2 border-slate-200 rounded-xl hover:border-primary hover:bg-primary/5 transition-all flex items-center gap-4 group"
+                >
+                  <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                    📧
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-bold text-slate-900 text-sm">Email OTP</p>
+                    <p className="text-xs text-slate-600">Send verification code to your email</p>
+                  </div>
+                  <svg className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => handleSelectMethod('PHONE')}
+                  className="w-full p-4 border-2 border-slate-200 rounded-xl hover:border-primary hover:bg-primary/5 transition-all flex items-center gap-4 group"
+                >
+                  <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                    📱
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-bold text-slate-900 text-sm">Phone OTP</p>
+                    <p className="text-xs text-slate-600">Send verification code to your phone</p>
+                  </div>
+                  <svg className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
             )}
+            
+            {/* Step 2: Enter Email or Phone */}
+            {step === 2 && (
+              <>
+                <div className="rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 p-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full w-10 h-10 flex items-center justify-center text-lg">
+                      {otpMethod === 'EMAIL' ? '📧' : '📱'}
+                    </div>
+                    <div>
+                      <p className="text-blue-800 font-bold text-sm m-0">
+                        OTP via {otpMethod === 'EMAIL' ? 'Email' : 'Phone'}
+                      </p>
+                      <p className="text-blue-600 text-xs m-0 mt-1">
+                        Enter your {otpMethod === 'EMAIL' ? 'email address' : 'phone number'} to receive OTP
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {otpMethod === 'EMAIL' ? (
+                  <div className="space-y-2">
+                    <label htmlFor="email-otp" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <span>📧</span> Email Address
+                    </label>
+                    <input
+                      id="email-otp"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-4 py-3 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 placeholder:text-slate-400 transition-all"
+                      placeholder="your.email@aiklisolve.com"
+                      required
+                      autoComplete="email"
+                      autoFocus
+                      disabled={loading}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label htmlFor="phone" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <span>📱</span> Phone Number
+                    </label>
+                    <input
+                      id="phone"
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full px-4 py-3 text-sm border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 placeholder:text-slate-400 transition-all"
+                      placeholder="1234567890"
+                      required
+                      autoComplete="tel"
+                      autoFocus
+                      disabled={loading}
+                    />
+                  </div>
+                )}
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep(1);
+                    setLocalError(null);
+                  }}
+                  className="text-primary hover:text-teal-700 text-sm font-bold transition-colors flex items-center gap-2"
+                >
+                  <span>←</span> Change method
+                </button>
+              </>
+            )}
+            
+            {/* Step 3: Enter OTP */}
+            {step === 3 && (
+              <>
+                <div className="rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 p-5 mb-2">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold shadow-lg">
+                      ✓
+                    </div>
+                    <div>
+                      <p className="text-emerald-700 font-bold text-base m-0">OTP Sent Successfully!</p>
+                      <p className="text-emerald-600 text-sm m-0 mt-1">
+                        {otpMethod === 'EMAIL' ? `📧 Sent to ${email}` : `📱 Sent to ${phone}`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setStep(1);
-                setOtp('');
-                setLocalError(null);
-                setOtpSent(false);
-              }}
-              className="text-primary hover:text-teal-700 text-sm font-bold transition-colors flex items-center gap-2"
-            >
-              <span>←</span> Back to credentials
-            </button>
+                <div className="space-y-2">
+                  <label htmlFor="otp" className="block text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span>🔐</span> Enter Verification Code (OTP)
+                  </label>
+                  <input
+                    id="otp"
+                    type="text"
+                    value={otp}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setOtp(value);
+                    }}
+                    className="w-full px-4 py-4 text-2xl border-2 border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary bg-white text-slate-900 font-bold text-center tracking-widest transition-all"
+                    placeholder="000000"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    autoFocus
+                    disabled={loading}
+                    style={{ letterSpacing: '0.5em' }}
+                  />
+                </div>
+
+                {receivedOtp && (
+                  <div className="rounded-2xl bg-gradient-to-r from-primary/10 to-teal-600/10 border-2 border-primary/30 p-4 text-center">
+                    <p className="text-primary text-sm font-semibold m-0">
+                      🎯 Your OTP: <span className="font-bold text-2xl tracking-wider ml-2">{receivedOtp}</span>
+                    </p>
+                    <p className="text-xs text-slate-600 mt-2 m-0">
+                      OTP ID: <span className="font-mono font-semibold">{otpId}</span>
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep(2);
+                    setOtp('');
+                    setLocalError(null);
+                    setReceivedOtp(null);
+                  }}
+                  className="text-primary hover:text-teal-700 text-sm font-bold transition-colors flex items-center gap-2"
+                >
+                  <span>←</span> Change {otpMethod === 'EMAIL' ? 'email' : 'phone'}
+                </button>
+              </>
+            )}
           </>
         )}
 
@@ -276,25 +535,39 @@ export function LoginPage() {
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={loading || (step === 1 ? (!email || !password) : !otp || otp.length !== 4)}
-          className="w-full bg-gradient-to-r from-primary to-teal-600 text-white py-4 rounded-xl font-bold text-base transition-all hover:shadow-2xl hover:shadow-primary/40 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <>
-              <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin" />
-              {step === 1 ? 'Sending OTP...' : 'Verifying...'}
-            </>
-          ) : (
-            <>
-              {step === 1 ? '📨 Send OTP' : '🔓 Verify & Login'}
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </>
-          )}
-        </button>
+        {/* Submit Button */}
+        {(loginMode === 'direct' || step === 2 || step === 3) && (
+          <button
+            type="submit"
+            disabled={
+              loading || 
+              (loginMode === 'direct' && (!email || !password)) || 
+              (loginMode === 'otp' && step === 2 && otpMethod === 'EMAIL' && !email) || 
+              (loginMode === 'otp' && step === 2 && otpMethod === 'PHONE' && !phone) || 
+              (loginMode === 'otp' && step === 3 && otp.length !== 6)
+            }
+            className="w-full bg-gradient-to-r from-primary to-teal-600 text-white py-3.5 px-4 rounded-xl font-bold text-base hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-200 flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin h-5 h-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>
+                  {loginMode === 'direct' ? 'Logging in...' : (step === 2 ? 'Sending OTP...' : 'Verifying...')}
+                </span>
+              </>
+            ) : (
+              <>
+                <span>
+                  {loginMode === 'direct' ? 'Login' : (step === 2 ? 'Send OTP' : 'Verify & Login')}
+                </span>
+                <span className="text-lg">→</span>
+              </>
+            )}
+          </button>
+        )}
       </form>
 
       <div className="text-center space-y-3">

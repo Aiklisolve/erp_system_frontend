@@ -47,6 +47,81 @@ function createMockUserFromStatic(staticUser: StaticUser): User {
 }
 
 export async function login(email: string, password: string): Promise<User | null> {
+  // Try backend API first
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+    console.log('Attempting backend login:', { email, API_BASE_URL });
+    
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password
+      }),
+    });
+
+    const data = await response.json();
+    console.log('Backend login response:', data);
+
+    if (response.ok && data.success && data.data) {
+      const { user: backendUser, token, session_id } = data.data;
+      
+      // Store all authentication data in localStorage
+      localStorage.setItem('token', token);
+      localStorage.setItem('session_id', session_id?.toString() || '');
+      localStorage.setItem('user', JSON.stringify(backendUser));
+      localStorage.setItem('expires_at', (Date.now() + 60 * 60 * 1000).toString()); // 1 hour
+      
+      console.log('Stored in localStorage:', {
+        token: token.substring(0, 30) + '...',
+        session_id,
+        user: backendUser.email,
+      });
+      
+      // Create a StaticUser object for session management
+      const staticUser: StaticUser = {
+        id: backendUser.id?.toString() || backendUser.user_id?.toString() || '1',
+        email: backendUser.email,
+        password: '', // Don't store password
+        fullName: backendUser.full_name || backendUser.name || backendUser.email,
+        role: (backendUser.role || 'ADMIN') as ErpRole,
+        department: backendUser.department || 'General'
+      };
+      
+      // Add token and session_id separately
+      staticUser.token = token;
+      staticUser.session_id = session_id;
+      
+      // Create session with backend token and session_id
+      createSession(staticUser, token, session_id?.toString());
+      
+      // Return User object for auth context
+      return {
+        id: backendUser.id?.toString() || backendUser.user_id?.toString() || '1',
+        email: backendUser.email,
+        app_metadata: {},
+        aud: 'authenticated',
+        created_at: backendUser.created_at || new Date().toISOString(),
+        user_metadata: {
+          full_name: backendUser.full_name || backendUser.name || backendUser.email,
+          role: backendUser.role || 'ADMIN',
+          department: backendUser.department || 'General'
+        }
+      } as User;
+    }
+    
+    // If backend login failed, throw error with message
+    throw new Error(data.message || 'Login failed');
+  } catch (backendError: any) {
+    console.error('Backend login error:', backendError);
+    
+    // Fallback to static mode
+    console.log('Falling back to static user authentication');
+  }
+  
   // Static mode: check against static users
   if (authMode === 'static') {
     const user = findStaticUser(email, password);

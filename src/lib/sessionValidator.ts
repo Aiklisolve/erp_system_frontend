@@ -44,10 +44,13 @@ export async function validateSession(
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
+        // 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMSIsImVtYWlsIjoiYWRtaW5AYWlrbGlzb2x2ZS5jb20iLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NjQ4MzE4MTcsImV4cCI6MTc2NDgzNTQxN30.T-6swaApgbfLIA_GjdI2xdmdCPT2nEeLwEfYaHqPmek`
       },
       body: JSON.stringify({
         session_id: sessionId,
+        // session_id: 16,
         token: token
+        // token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMSIsImVtYWlsIjoiYWRtaW5AYWlrbGlzb2x2ZS5jb20iLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NjQ4MzE4MTcsImV4cCI6MTc2NDgzNTQxN30.T-6swaApgbfLIA_GjdI2xdmdCPT2nEeLwEfYaHqPmek'
       })
     });
 

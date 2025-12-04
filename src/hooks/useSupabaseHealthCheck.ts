@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase, hasSupabaseConfig, supabaseUrl, supabaseKey } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 
 type HealthStatus = 'static-demo' | 'connected';
 
@@ -11,41 +11,23 @@ export function useSupabaseHealthCheck() {
 
     const checkHealth = async () => {
       try {
-        // First, check if Supabase config exists
-        if (!hasSupabaseConfig || !supabaseUrl || !supabaseKey) {
-          console.log('Supabase config missing');
-          if (isMounted) setStatus('static-demo');
-          return;
-        }
-
-        // Check if supabase client is properly instantiated
+        // If supabase client is not properly instantiated, this will throw
+        // or simply not have the "from" method.
         if (!('from' in supabase)) {
-          console.log('Supabase client not initialized');
           if (isMounted) setStatus('static-demo');
           return;
         }
 
-        console.log('Testing Supabase connection...', { url: supabaseUrl });
-
-        // Try to query the auth users (this should work if connection is valid)
-        // We use auth.getSession() which doesn't require any tables to exist
-        const { data, error } = await supabase.auth.getSession();
+        const { error } = await supabase.from('health_check').select('*').limit(1);
 
         if (!isMounted) return;
 
-        // If we can call the API without network errors, we're connected
-        // Even if there's no session, it means the connection works
-        if (error && error.message?.includes('fetch')) {
-          // Network error - not connected
-          console.log('Network error:', error);
+        if (error) {
           setStatus('static-demo');
         } else {
-          // API responded - we're connected!
-          console.log('Supabase connection successful!', { hasSession: !!data?.session });
           setStatus('connected');
         }
-      } catch (err) {
-        console.error('Supabase health check error:', err);
+      } catch {
         if (isMounted) setStatus('static-demo');
       }
     };

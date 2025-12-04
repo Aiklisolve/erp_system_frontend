@@ -1,8 +1,12 @@
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import { handleApiError } from '../../../lib/errorHandler';
+import { apiRequest } from '../../../config/api';
 import type { FinanceTransaction, Account, ReceivedPayment } from '../types';
 
 let useStatic = !hasSupabaseConfig;
+
+// Backend API flag - set to true to use backend API
+const USE_BACKEND_API = true;
 
 const mockTransactions: FinanceTransaction[] = [
   {
@@ -344,7 +348,57 @@ function nextPaymentId() {
   return `pay-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Map backend transaction to frontend format
+function mapBackendTransaction(backendTx: any): FinanceTransaction {
+  return {
+    id: backendTx.id?.toString() || backendTx.transaction_number,
+    transaction_number: backendTx.transaction_number,
+    reference_number: backendTx.reference_number,
+    date: backendTx.transaction_date ? new Date(backendTx.transaction_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    type: backendTx.transaction_type?.toUpperCase() as any || 'EXPENSE',
+    status: (backendTx.status?.toUpperCase() || 'POSTED') as any,
+    account: backendTx.account_id?.toString() || 'General Account',
+    account_type: 'BANK',
+    amount: parseFloat(backendTx.amount) || 0,
+    currency: (backendTx.currency || 'INR') as any,
+    tax_amount: parseFloat(backendTx.tax_amount) || 0,
+    net_amount: parseFloat(backendTx.amount) - parseFloat(backendTx.tax_amount || '0'),
+    payment_method: (backendTx.payment_method?.toUpperCase().replace(/\s+/g, '_') || 'BANK_TRANSFER') as any,
+    payment_date: backendTx.transaction_date ? new Date(backendTx.transaction_date).toISOString().split('T')[0] : undefined,
+    party_name: backendTx.vendor_customer_id?.toString() || undefined,
+    category: backendTx.category || 'General',
+    description: backendTx.description,
+    notes: backendTx.notes,
+    created_by: backendTx.created_by?.toString(),
+    created_at: backendTx.created_at,
+    is_reconciled: backendTx.status === 'COMPLETED',
+  };
+}
+
 export async function listTransactions(): Promise<FinanceTransaction[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('Fetching transactions from backend API...');
+      const response = await apiRequest<{ success: boolean; data: { transactions: any[] } }>(
+        '/finance/transactions?page=1&limit=100'
+      );
+      
+      console.log('Backend API response:', response);
+      
+      if (response.success && response.data?.transactions) {
+        const mapped = response.data.transactions.map(mapBackendTransaction);
+        console.log('Mapped transactions:', mapped.length);
+        return mapped;
+      }
+      
+      console.log('No transactions in response, using mock data');
+      return mockTransactions;
+    } catch (error) {
+      console.error('Backend API error, falling back to mock data:', error);
+      return mockTransactions;
+    }
+  }
+  
   if (useStatic) return mockTransactions;
 
   try {
