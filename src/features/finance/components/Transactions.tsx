@@ -157,7 +157,7 @@ export function Transactions() {
   }, [directionFilter, statusFilter, dateFrom, dateTo]);
   
   const loadTransactions = async () => {
-    setLoading(true);
+      setLoading(true);
     try {
       const params = new URLSearchParams({
         include_details: 'true',
@@ -462,7 +462,7 @@ export function Transactions() {
                 <option value="DISCREPANCY">Discrepancy</option>
                 <option value="NOT_REQUIRED">Not Required</option>
               </Select>
-            </div>
+                          </div>
           </div>
         </div>
 
@@ -482,9 +482,9 @@ export function Transactions() {
               getRowKey={(row, index) => `${row.id}-${index}`}
             />
 
-            {/* Pagination */}
+          {/* Pagination */}
             <div className="p-4 border-t border-slate-200">
-              <Pagination
+          <Pagination
                 page={currentPage}
                 totalPages={totalPages}
                 onChange={setCurrentPage}
@@ -495,7 +495,7 @@ export function Transactions() {
             </div>
           </>
         )}
-      </Card>
+                </Card>
 
       {/* Transaction Details Modal */}
       <Modal
@@ -509,63 +509,63 @@ export function Transactions() {
         {selectedTransaction && (
           <div className="space-y-6">
             {/* Basic Information */}
-            <div>
+              <div>
               <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
                 Basic Information
               </h3>
               <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
+            <div>
                   <span className="text-slate-500">Transaction #:</span>
                   <div className="font-medium text-slate-900">{selectedTransaction.transaction_number}</div>
-                </div>
-                <div>
+            </div>
+            <div>
                   <span className="text-slate-500">Date:</span>
                   <div className="font-medium text-slate-900">{new Date(selectedTransaction.transaction_date).toLocaleDateString()}</div>
-                </div>
-                <div>
+            </div>
+            <div>
                   <span className="text-slate-500">Direction:</span>
                   <div><Badge tone={selectedTransaction.transaction_direction === 'IN' ? 'success' : selectedTransaction.transaction_direction === 'OUT' ? 'danger' : 'brand'}>{selectedTransaction.transaction_direction}</Badge></div>
-                </div>
-                <div>
+            </div>
+              <div>
                   <span className="text-slate-500">Amount:</span>
                   <div className="font-semibold text-slate-900">{selectedTransaction.currency} {selectedTransaction.transaction_amount.toLocaleString()}</div>
-                </div>
+              </div>
                 <div className="col-span-2">
                   <span className="text-slate-500">Title:</span>
                   <div className="font-medium text-slate-900">{selectedTransaction.transaction_title}</div>
-                </div>
+              </div>
                 {selectedTransaction.transaction_description && (
                   <div className="col-span-2">
                     <span className="text-slate-500">Description:</span>
                     <div className="text-slate-900">{selectedTransaction.transaction_description}</div>
-                  </div>
-                )}
               </div>
-            </div>
+                )}
+                    </div>
+                          </div>
 
             {/* Account Information */}
-            <div>
+              <div>
               <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
                 Account Information
               </h3>
               <div className="grid grid-cols-2 gap-4 text-xs">
                 {selectedTransaction.source_account_name && (
-                  <div>
+              <div>
                     <span className="text-slate-500">Source Account:</span>
                     <div className="font-medium text-slate-900">{selectedTransaction.source_account_name}</div>
-                  </div>
+              </div>
                 )}
                 {selectedTransaction.destination_account_name && (
-                  <div>
+                <div>
                     <span className="text-slate-500">Destination Account:</span>
                     <div className="font-medium text-slate-900">{selectedTransaction.destination_account_name}</div>
-                  </div>
-                )}
+                </div>
+              )}
                 {selectedTransaction.counterparty_name && (
                   <div className="col-span-2">
                     <span className="text-slate-500">Counterparty:</span>
                     <div className="font-medium text-slate-900">{selectedTransaction.counterparty_name}</div>
-                  </div>
+              </div>
                 )}
               </div>
             </div>
@@ -579,50 +579,50 @@ export function Transactions() {
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   {selectedTransaction.approved_by_name && (
                     <>
-                      <div>
+              <div>
                         <span className="text-slate-500">Approved By:</span>
                         <div className="font-medium text-slate-900">{selectedTransaction.approved_by_name}</div>
-                      </div>
-                      <div>
+              </div>
+              <div>
                         <span className="text-slate-500">Approval Date:</span>
                         <div className="font-medium text-slate-900">{selectedTransaction.approval_datetime ? new Date(selectedTransaction.approval_datetime).toLocaleString() : '—'}</div>
-                      </div>
+              </div>
                       {selectedTransaction.approval_comments && (
                         <div className="col-span-2">
                           <span className="text-slate-500">Comments:</span>
                           <div className="text-slate-900">{selectedTransaction.approval_comments}</div>
-                        </div>
+              </div>
                       )}
                     </>
                   )}
-                </div>
+              </div>
               </div>
             )}
 
             {/* Reconciliation Information */}
-            <div>
+              <div>
               <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
                 Reconciliation
               </h3>
               <div className="grid grid-cols-2 gap-4 text-xs">
-                <div>
+              <div>
                   <span className="text-slate-500">Status:</span>
                   <div><Badge tone={selectedTransaction.reconciliation_status === 'RECONCILED' ? 'success' : 'warning'}>{selectedTransaction.reconciliation_status}</Badge></div>
-                </div>
+              </div>
                 {selectedTransaction.reconciled_by_name && (
                   <>
-                    <div>
+              <div>
                       <span className="text-slate-500">Reconciled By:</span>
                       <div className="font-medium text-slate-900">{selectedTransaction.reconciled_by_name}</div>
-                    </div>
+              </div>
                     <div className="col-span-2">
                       <span className="text-slate-500">Reconciliation Date:</span>
                       <div className="font-medium text-slate-900">{selectedTransaction.reconciliation_date ? new Date(selectedTransaction.reconciliation_date).toLocaleDateString() : '—'}</div>
-                    </div>
+                </div>
                   </>
-                )}
-              </div>
-            </div>
+              )}
+                </div>
+                </div>
 
             <div className="flex justify-end">
               <Button
@@ -634,10 +634,10 @@ export function Transactions() {
                 }}
               >
                 Close
-              </Button>
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+      )}
       </Modal>
     </div>
   );

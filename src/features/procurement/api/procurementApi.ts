@@ -1,8 +1,12 @@
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import { handleApiError } from '../../../lib/errorHandler';
+import { apiRequest } from '../../../config/api';
 import type { PurchaseOrder } from '../types';
 
 let useStatic = !hasSupabaseConfig;
+
+// Backend API flag - set to true to use backend API
+const USE_BACKEND_API = true;
 
 const mockPurchaseOrders: PurchaseOrder[] = [
   {
@@ -235,7 +239,153 @@ function nextId() {
   return `po-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Map backend purchase order to frontend format
+function mapBackendPurchaseOrder(backendPO: any): PurchaseOrder {
+  const poId = backendPO.id?.toString() || backendPO.po_id?.toString();
+  
+  console.log('Mapping purchase order:', {
+    backend_id: backendPO.id,
+    backend_po_id: backendPO.po_id,
+    mapped_id: poId,
+    po_number: backendPO.po_number
+  });
+  
+  return {
+    id: poId,
+    po_number: backendPO.po_number || '',
+    reference_number: backendPO.reference_number,
+    requisition_number: backendPO.requisition_number,
+    
+    // Supplier Information
+    supplier: backendPO.supplier_name || backendPO.supplier || '',
+    supplier_id: backendPO.supplier_id?.toString(),
+    supplier_contact_person: backendPO.supplier_contact_person,
+    supplier_email: backendPO.supplier_email,
+    supplier_phone: backendPO.supplier_phone,
+    
+    // Dates
+    date: backendPO.po_date || backendPO.order_date || backendPO.date 
+      ? new Date(backendPO.po_date || backendPO.order_date || backendPO.date).toISOString().split('T')[0] 
+      : new Date().toISOString().split('T')[0],
+    expected_delivery_date: backendPO.expected_delivery_date 
+      ? new Date(backendPO.expected_delivery_date).toISOString().split('T')[0] 
+      : undefined,
+    actual_delivery_date: backendPO.actual_delivery_date 
+      ? new Date(backendPO.actual_delivery_date).toISOString().split('T')[0] 
+      : undefined,
+    due_date: backendPO.due_date 
+      ? new Date(backendPO.due_date).toISOString().split('T')[0] 
+      : undefined,
+    
+    // Status & Priority
+    status: (backendPO.status?.toUpperCase() || 'DRAFT') as any,
+    priority: (backendPO.priority?.toUpperCase() || 'MEDIUM') as any,
+    
+    // Financial Details
+    subtotal: parseFloat(backendPO.subtotal) || 0,
+    tax_amount: parseFloat(backendPO.tax_amount) || 0,
+    shipping_cost: parseFloat(backendPO.shipping_cost) || 0,
+    discount_amount: parseFloat(backendPO.discount_amount) || 0,
+    total_amount: parseFloat(backendPO.total_amount) || parseFloat(backendPO.subtotal) || 0,
+    currency: (backendPO.currency || 'INR') as any,
+    exchange_rate: parseFloat(backendPO.exchange_rate) || undefined,
+    
+    // Payment Information
+    payment_terms: (backendPO.payment_terms || 'NET_30') as any,
+    payment_terms_days: parseInt(backendPO.payment_terms_days) || undefined,
+    advance_payment_required: backendPO.advance_payment_required || false,
+    advance_payment_amount: parseFloat(backendPO.advance_payment_amount) || undefined,
+    advance_payment_percentage: parseFloat(backendPO.advance_payment_percentage) || undefined,
+    
+    // Delivery Information
+    delivery_address: backendPO.delivery_address,
+    delivery_city: backendPO.delivery_city,
+    delivery_state: backendPO.delivery_state,
+    delivery_postal_code: backendPO.delivery_postal_code,
+    delivery_country: backendPO.delivery_country,
+    delivery_method: backendPO.delivery_method as any,
+    tracking_number: backendPO.tracking_number,
+    
+    // Items Information
+    items_count: parseInt(backendPO.items_count) || 0,
+    total_quantity: parseInt(backendPO.total_quantity) || 0,
+    
+    // Approval & Workflow
+    requested_by: backendPO.requested_by_name || backendPO.requested_by,
+    requested_by_id: backendPO.requested_by_id?.toString() || backendPO.created_by?.toString(),
+    approved_by: backendPO.approved_by_name || backendPO.approved_by,
+    approved_by_id: backendPO.approved_by_id?.toString(),
+    approval_date: backendPO.approval_date || backendPO.approved_date,
+    
+    // Department & Project
+    department: backendPO.department,
+    project_id: backendPO.project_id?.toString(),
+    cost_center: backendPO.cost_center,
+    
+    // Additional Details
+    description: backendPO.description,
+    notes: backendPO.notes,
+    internal_notes: backendPO.internal_notes,
+    terms_and_conditions: backendPO.terms_and_conditions,
+    
+    // Receiving Information
+    received_quantity: parseInt(backendPO.received_quantity) || 0,
+    pending_quantity: parseInt(backendPO.pending_quantity) || 0,
+    quality_check_required: backendPO.quality_check_required || false,
+    quality_check_passed: backendPO.quality_check_passed,
+    inspected_by: backendPO.inspected_by,
+    inspection_date: backendPO.inspection_date,
+    
+    // Attachments & Tags
+    attachments: backendPO.attachments || [],
+    tags: backendPO.tags || [],
+    
+    created_at: backendPO.created_at,
+  };
+}
+
 export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching purchase orders from backend API...');
+      const response = await apiRequest<{ success: boolean; data: { purchase_orders: any[] } } | { purchase_orders: any[] }>(
+        '/procurement/purchase-orders?page=1&limit=100'
+      );
+      
+      console.log('📦 Backend purchase orders response:', response);
+      
+      // Handle different response formats
+      let purchaseOrders = null;
+      
+      if (response && typeof response === 'object') {
+        // If wrapped in success/data
+        if ('success' in response && response.success && 'data' in response && response.data.purchase_orders) {
+          purchaseOrders = response.data.purchase_orders;
+        }
+        // If direct purchase_orders array
+        else if ('purchase_orders' in response) {
+          purchaseOrders = response.purchase_orders;
+        }
+        // If direct array
+        else if (Array.isArray(response)) {
+          purchaseOrders = response;
+        }
+      }
+      
+      if (purchaseOrders && Array.isArray(purchaseOrders) && purchaseOrders.length > 0) {
+        const mapped = purchaseOrders.map(mapBackendPurchaseOrder);
+        console.log('✅ Mapped purchase orders:', mapped.length);
+        return mapped;
+      }
+      
+      console.log('⚠️ No purchase orders in response, using mock data');
+      return mockPurchaseOrders;
+    } catch (error) {
+      console.error('❌ Backend API error, falling back to mock data:', error);
+      return mockPurchaseOrders;
+    }
+  }
+  
   if (useStatic) return mockPurchaseOrders;
 
   try {
@@ -252,6 +402,70 @@ export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
 export async function createPurchaseOrder(
   payload: Omit<PurchaseOrder, 'id' | 'created_at' | 'updated_at'>
 ): Promise<PurchaseOrder> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Creating purchase order via backend API...');
+      
+      // Map frontend payload to backend format
+      const backendPayload = {
+        po_number: payload.po_number,
+        reference_number: payload.reference_number,
+        requisition_number: payload.requisition_number,
+        supplier_id: payload.supplier_id ? parseInt(payload.supplier_id) : undefined,
+        supplier_name: payload.supplier,
+        supplier_contact_person: payload.supplier_contact_person,
+        supplier_email: payload.supplier_email,
+        supplier_phone: payload.supplier_phone,
+        po_date: payload.date,
+        expected_delivery_date: payload.expected_delivery_date,
+        status: payload.status,
+        priority: payload.priority,
+        subtotal: payload.subtotal,
+        tax_amount: payload.tax_amount,
+        shipping_cost: payload.shipping_cost,
+        discount_amount: payload.discount_amount,
+        total_amount: payload.total_amount,
+        currency: payload.currency,
+        payment_terms: payload.payment_terms,
+        payment_terms_days: payload.payment_terms_days,
+        advance_payment_required: payload.advance_payment_required,
+        advance_payment_amount: payload.advance_payment_amount,
+        delivery_address: payload.delivery_address,
+        delivery_city: payload.delivery_city,
+        delivery_state: payload.delivery_state,
+        delivery_postal_code: payload.delivery_postal_code,
+        delivery_country: payload.delivery_country,
+        delivery_method: payload.delivery_method,
+        department: payload.department,
+        description: payload.description,
+        notes: payload.notes,
+        quality_check_required: payload.quality_check_required,
+      };
+      
+      console.log('📤 Backend payload:', backendPayload);
+      
+      const response = await apiRequest<{ success: boolean; data: any }>(
+        '/procurement/purchase-orders',
+        {
+          method: 'POST',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+      
+      console.log('✅ Created purchase order response:', response);
+      
+      if (response.success && response.data) {
+        return mapBackendPurchaseOrder(response.data);
+      }
+      
+      throw new Error('Failed to create purchase order');
+    } catch (error) {
+      console.error('❌ Error creating purchase order:', error);
+      handleApiError('procurement.createPurchaseOrder', error);
+      throw error;
+    }
+  }
+  
   if (useStatic) {
     const po: PurchaseOrder = {
       ...payload,
@@ -281,6 +495,56 @@ export async function updatePurchaseOrder(
   id: string,
   changes: Partial<PurchaseOrder>
 ): Promise<PurchaseOrder | null> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Updating purchase order via backend API:', id);
+      
+      // Map frontend changes to backend format
+      const backendChanges: any = {};
+      if (changes.po_number) backendChanges.po_number = changes.po_number;
+      if (changes.reference_number) backendChanges.reference_number = changes.reference_number;
+      if (changes.supplier) backendChanges.supplier_name = changes.supplier;
+      if (changes.supplier_id) backendChanges.supplier_id = parseInt(changes.supplier_id);
+      if (changes.supplier_contact_person) backendChanges.supplier_contact_person = changes.supplier_contact_person;
+      if (changes.supplier_email) backendChanges.supplier_email = changes.supplier_email;
+      if (changes.date) backendChanges.po_date = changes.date;
+      if (changes.expected_delivery_date) backendChanges.expected_delivery_date = changes.expected_delivery_date;
+      if (changes.status) backendChanges.status = changes.status;
+      if (changes.priority) backendChanges.priority = changes.priority;
+      if (changes.subtotal !== undefined) backendChanges.subtotal = changes.subtotal;
+      if (changes.tax_amount !== undefined) backendChanges.tax_amount = changes.tax_amount;
+      if (changes.shipping_cost !== undefined) backendChanges.shipping_cost = changes.shipping_cost;
+      if (changes.total_amount !== undefined) backendChanges.total_amount = changes.total_amount;
+      if (changes.currency) backendChanges.currency = changes.currency;
+      if (changes.payment_terms) backendChanges.payment_terms = changes.payment_terms;
+      if (changes.delivery_address) backendChanges.delivery_address = changes.delivery_address;
+      if (changes.description) backendChanges.description = changes.description;
+      if (changes.notes) backendChanges.notes = changes.notes;
+      
+      console.log('📤 Update payload:', backendChanges);
+      
+      const response = await apiRequest<{ success: boolean; data: any }>(
+        `/procurement/purchase-orders/${id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(backendChanges),
+        }
+      );
+      
+      console.log('✅ Updated purchase order response:', response);
+      
+      if (response.success && response.data) {
+        return mapBackendPurchaseOrder(response.data);
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ Error updating purchase order:', error);
+      handleApiError('procurement.updatePurchaseOrder', error);
+      return null;
+    }
+  }
+  
   if (useStatic) {
     const index = mockPurchaseOrders.findIndex((p) => p.id === id);
     if (index === -1) return null;
@@ -305,6 +569,30 @@ export async function updatePurchaseOrder(
 }
 
 export async function deletePurchaseOrder(id: string): Promise<void> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Deleting purchase order via backend API:', id);
+      
+      const response = await apiRequest<{ success: boolean; message?: string }>(
+        `/procurement/purchase-orders/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      
+      console.log('✅ Deleted purchase order response:', response);
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to delete purchase order');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting purchase order:', error);
+      handleApiError('procurement.deletePurchaseOrder', error);
+      throw error;
+    }
+    return;
+  }
+  
   if (useStatic) {
     const index = mockPurchaseOrders.findIndex((p) => p.id === id);
     if (index !== -1) mockPurchaseOrders.splice(index, 1);

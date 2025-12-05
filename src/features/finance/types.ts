@@ -174,6 +174,7 @@ export interface TransactionHistory extends BaseEntity {
 export type TransferApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
 export interface TransferApproval extends BaseEntity {
+  approval_id?: number; // Backend's approval_id for approve/reject APIs
   transfer_number: string;
   from_employee_id?: number;
   from_employee_name?: string;

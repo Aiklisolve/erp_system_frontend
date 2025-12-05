@@ -13,10 +13,13 @@ import type { TransferApproval, TransferApprovalStatus } from '../types';
 import { apiRequest } from '../../../config/api';
 import { toast } from '../../../lib/toast';
 
-// Mock data for transfer approvals
+// Mock data removed - now showing only API data
+// If you need mock data for testing, uncomment the section below
+/*
 const mockTransferApprovals: TransferApproval[] = [
   {
     id: 'ta-001',
+    approval_id: 1, // Backend's approval_id for API calls
     transfer_number: 'TRF-2025-001',
     from_employee_id: 1,
     from_employee_name: 'John Smith',
@@ -38,6 +41,7 @@ const mockTransferApprovals: TransferApproval[] = [
   },
   {
     id: 'ta-002',
+    approval_id: 2, // Backend's approval_id for API calls
     transfer_number: 'TRF-2025-002',
     from_employee_id: 3,
     from_employee_name: 'Mike Wilson',
@@ -59,6 +63,7 @@ const mockTransferApprovals: TransferApproval[] = [
   },
   {
     id: 'ta-003',
+    approval_id: 3, // Backend's approval_id for API calls
     transfer_number: 'TRF-2025-003',
     from_employee_id: 1,
     from_employee_name: 'John Smith',
@@ -82,58 +87,63 @@ const mockTransferApprovals: TransferApproval[] = [
     created_at: '2025-01-05'
   }
 ];
+*/
 
 // Map backend transfer approval to frontend format
-function mapBackendTransferApproval(backendTransfer: any): TransferApproval {
-  // IMPORTANT: Use backend's numeric ID as string (not mock ID like "ta-001")
-  const transferId = backendTransfer.id?.toString() || backendTransfer.transfer_id?.toString();
+// Backend response structure: { approvals: [...], pagination: {...} }
+function mapBackendTransferApproval(backendApproval: any): TransferApproval {
+  // Backend returns approval_id as string, use for approve/reject API calls
+  const approvalId = parseInt(backendApproval.approval_id) || 0;
+  const transactionId = backendApproval.transaction_id?.toString() || backendApproval.approval_id?.toString();
   
-  // Calculate days pending
-  const requestedDate = new Date(backendTransfer.requested_date);
-  const today = new Date();
-  const daysPending = Math.floor((today.getTime() - requestedDate.getTime()) / (1000 * 60 * 60 * 24));
+  // Backend returns days_pending as string, parse it
+  const daysPending = parseInt(backendApproval.days_pending) || 0;
   
   console.log('Mapping transfer approval:', {
-    backend_id: backendTransfer.id,
-    mapped_id: transferId,
-    transfer_number: backendTransfer.transfer_number
+    backend_approval_id: backendApproval.approval_id,
+    backend_transaction_id: backendApproval.transaction_id,
+    mapped_approval_id: approvalId,
+    transfer_number: backendApproval.transfer_number,
+    status: backendApproval.status,
+    days_pending: daysPending
   });
   
   return {
-    id: transferId, // Use backend numeric ID (e.g., "1", "2", "3")
-    transfer_number: backendTransfer.transfer_number || '',
-    from_employee_id: backendTransfer.from_employee_id,
-    from_employee_name: backendTransfer.from_employee_name || '',
-    to_employee_id: backendTransfer.to_employee_id,
-    to_employee_name: backendTransfer.to_employee_name || '',
-    from_account_id: backendTransfer.from_account_id,
-    from_account_name: backendTransfer.from_account_name || '',
-    to_account_id: backendTransfer.to_account_id,
-    to_account_name: backendTransfer.to_account_name || '',
-    amount: parseFloat(backendTransfer.amount) || 0,
-    currency: backendTransfer.currency || 'INR',
-    purpose: backendTransfer.purpose || '',
-    requested_date: backendTransfer.requested_date ? new Date(backendTransfer.requested_date).toISOString().split('T')[0] : '',
-    expected_date: backendTransfer.expected_date ? new Date(backendTransfer.expected_date).toISOString().split('T')[0] : undefined,
+    id: transactionId, // Display ID (transaction_id)
+    approval_id: approvalId, // Use this for approve/reject API calls
+    transfer_number: backendApproval.transfer_number || '',
+    from_employee_id: parseInt(backendApproval.requested_by) || undefined,
+    from_employee_name: backendApproval.requested_by_name || '',
+    to_employee_id: parseInt(backendApproval.approved_by) || undefined,
+    to_employee_name: backendApproval.approved_by_name || '',
+    from_account_id: parseInt(backendApproval.from_account_id) || 0,
+    from_account_name: backendApproval.from_account_name || backendApproval.from_account_code || 'N/A',
+    to_account_id: parseInt(backendApproval.to_account_id) || 0,
+    to_account_name: backendApproval.to_account_name || backendApproval.to_account_code || 'N/A',
+    amount: parseFloat(backendApproval.amount) || 0,
+    currency: backendApproval.currency || 'INR',
+    purpose: backendApproval.purpose || backendApproval.comments || '',
+    requested_date: backendApproval.requested_at ? new Date(backendApproval.requested_at).toISOString().split('T')[0] : '',
+    expected_date: backendApproval.expected_date ? new Date(backendApproval.expected_date).toISOString().split('T')[0] : undefined,
     days_pending: daysPending,
-    status: backendTransfer.status as TransferApprovalStatus || 'PENDING',
-    comments: backendTransfer.comments || '',
-    approved_by_emp_id: backendTransfer.approved_by_emp_id,
-    approved_by_name: backendTransfer.approved_by_name,
-    approval_datetime: backendTransfer.approval_datetime,
-    approval_comments: backendTransfer.approval_comments,
-    rejected_by_emp_id: backendTransfer.rejected_by_emp_id,
-    rejected_by_name: backendTransfer.rejected_by_name,
-    rejection_datetime: backendTransfer.rejection_datetime,
-    rejection_reason: backendTransfer.rejection_reason,
-    created_at: backendTransfer.created_at,
+    status: (backendApproval.status?.toUpperCase() || 'PENDING') as TransferApprovalStatus,
+    comments: backendApproval.comments || '',
+    approved_by_emp_id: parseInt(backendApproval.approved_by) || undefined,
+    approved_by_name: backendApproval.approved_by_name || '',
+    approval_datetime: backendApproval.decided_at || undefined,
+    approval_comments: backendApproval.comments || undefined,
+    rejected_by_emp_id: undefined,
+    rejected_by_name: undefined,
+    rejection_datetime: undefined,
+    rejection_reason: undefined,
+    created_at: backendApproval.requested_at,
   };
 }
 
 export function TransferApprovals() {
-  const [transfers, setTransfers] = useState<TransferApproval[]>(mockTransferApprovals);
+  const [transfers, setTransfers] = useState<TransferApproval[]>([]); // Initialize with empty array - only show API data
   const [loading, setLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('PENDING');
+  const [statusFilter, setStatusFilter] = useState<string>('all'); // Start with 'all' to see all transfers
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedTransfer, setSelectedTransfer] = useState<TransferApproval | null>(null);
@@ -155,25 +165,52 @@ export function TransferApprovals() {
         limit: '100'
       });
       
-      console.log('Loading transfer approvals with params:', params.toString());
+      console.log('🔄 Loading transfer approvals with params:', params.toString());
       
-      const response = await apiRequest<{ success: boolean; data: { transfer_approvals: any[] } }>(
+      // Backend returns: { approvals: [...], pagination: {...} }
+      const response = await apiRequest<any>(
         `/finance/transfer-approvals?${params.toString()}`
       );
       
-      console.log('Transfer approvals response:', response);
+      console.log('📦 Raw API response:', JSON.stringify(response, null, 2));
+      console.log('📦 Response type:', typeof response);
+      console.log('📦 Response keys:', response ? Object.keys(response) : 'null');
       
-      if (response.success && response.data?.transfer_approvals) {
-        const mapped = response.data.transfer_approvals.map(mapBackendTransferApproval);
-        console.log('Mapped transfer approvals:', mapped.length);
+      // Handle different response structures
+      let approvals = null;
+      
+      // Check if response has 'approvals' directly
+      if (response && response.approvals) {
+        approvals = response.approvals;
+        console.log('✅ Found approvals array directly:', approvals.length);
+      }
+      // Check if response has 'data.approvals' (wrapped by apiRequest)
+      else if (response && response.data && response.data.approvals) {
+        approvals = response.data.approvals;
+        console.log('✅ Found approvals in data wrapper:', approvals.length);
+      }
+      // Check if response itself is an array
+      else if (Array.isArray(response)) {
+        approvals = response;
+        console.log('✅ Response is direct array:', approvals.length);
+      }
+      
+      if (approvals && Array.isArray(approvals) && approvals.length > 0) {
+        console.log('🔄 Mapping', approvals.length, 'approvals...');
+        const mapped = approvals.map(mapBackendTransferApproval);
+        console.log('✅ Mapped transfer approvals:', mapped.length);
+        console.log('📋 First mapped item:', mapped[0]);
         setTransfers(mapped);
       } else {
-        console.log('No transfers in response, using mock data');
-        setTransfers(mockTransferApprovals);
+        console.log('⚠️ No transfers in response, showing empty table');
+        console.log('Response structure:', response);
+        setTransfers([]); // Show empty table if no data from API
       }
-    } catch (error) {
-      console.error('Failed to load transfer approvals:', error);
-      setTransfers(mockTransferApprovals);
+    } catch (error: any) {
+      console.error('❌ Failed to load transfer approvals:', error);
+      console.error('❌ Error details:', error.message, error.stack);
+      setTransfers([]); // Show empty table on error
+      toast.error('Failed to load transfer approvals. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -205,10 +242,15 @@ export function TransferApprovals() {
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       const userId = userData.id || userData.user_id || '1';
       
-      console.log('Approving transfer:', selectedTransfer.id);
+      // Use approval_id from backend for API call
+      const approvalId = selectedTransfer.approval_id || selectedTransfer.id;
+      console.log('Approving transfer:', {
+        approval_id: approvalId,
+        transfer_number: selectedTransfer.transfer_number
+      });
       
       const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
-        `/finance/transfer-approvals/${selectedTransfer.id}/approve`,
+        `/finance/transfer-approvals/${approvalId}/approve`,
         {
           method: 'POST',
           body: JSON.stringify({
@@ -245,10 +287,15 @@ export function TransferApprovals() {
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       const userId = userData.id || userData.user_id || '1';
       
-      console.log('Rejecting transfer:', selectedTransfer.id);
+      // Use approval_id from backend for API call
+      const approvalId = selectedTransfer.approval_id || selectedTransfer.id;
+      console.log('Rejecting transfer:', {
+        approval_id: approvalId,
+        transfer_number: selectedTransfer.transfer_number
+      });
       
       const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
-        `/finance/transfer-approvals/${selectedTransfer.id}/reject`,
+        `/finance/transfer-approvals/${approvalId}/reject`,
         {
           method: 'POST',
           body: JSON.stringify({

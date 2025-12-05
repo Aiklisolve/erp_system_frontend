@@ -1,8 +1,12 @@
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import { handleApiError } from '../../../lib/errorHandler';
+import { apiRequest } from '../../../config/api';
 import type { ProductionOrder } from '../types';
 
 let useStatic = !hasSupabaseConfig;
+
+// Backend API flag - set to true to use backend API
+const USE_BACKEND_API = true;
 
 const mockProductionOrders: ProductionOrder[] = [
   {
@@ -323,7 +327,205 @@ function nextId() {
   return `mo-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Map backend production order to frontend format
+function mapBackendProductionOrder(backendPO: any): ProductionOrder {
+  // Handle different ID field names from backend
+  const poId = backendPO.id?.toString() || 
+                backendPO.production_order_id?.toString() || 
+                backendPO.mo_id?.toString();
+  
+  console.log('🔄 Mapping production order:', {
+    backend_id: backendPO.id,
+    backend_fields: Object.keys(backendPO),
+    mapped_id: poId,
+    po_number: backendPO.po_number,
+    raw_data: backendPO
+  });
+  
+  // Calculate pending quantity if not provided
+  // Backend uses: quantity_to_produce, quantity_produced
+  const plannedQty = parseInt(backendPO.quantity_to_produce || backendPO.planned_qty || backendPO.planned_quantity) || 0;
+  const producedQty = parseInt(backendPO.quantity_produced || backendPO.produced_qty || backendPO.produced_quantity) || 0;
+  const pendingQty = backendPO.pending_qty ? parseInt(backendPO.pending_qty) : (plannedQty - producedQty);
+  
+  // Calculate progress percentage if not provided
+  const progressPercentage = backendPO.progress_percentage 
+    ? parseFloat(backendPO.progress_percentage)
+    : plannedQty > 0 ? (producedQty / plannedQty) * 100 : 0;
+  
+  return {
+    id: poId,
+    
+    // Production Order Identification - YOUR BACKEND USES: po_number
+    production_order_number: backendPO.po_number ||              // ← YOUR BACKEND FIELD
+                             backendPO.production_order_number || 
+                             backendPO.mo_number || 
+                             backendPO.order_number || 
+                             `MO-${poId}`,  // Fallback with ID
+    work_order_number: backendPO.work_order_number || backendPO.wo_number || backendPO.wo_id,
+    reference_number: backendPO.reference_number || backendPO.ref_number,
+    sales_order_number: backendPO.sales_order_number || backendPO.so_number,
+    
+    // Product Information - YOUR BACKEND ONLY HAS: product_id (no product_name)
+    // We need to show something meaningful, so use po_number + product_id
+    product: backendPO.product_name || 
+             backendPO.product || 
+             backendPO.item_name || 
+             (backendPO.product_id ? `Product ID: ${backendPO.product_id}` : 
+              backendPO.po_number || 'Unknown Product'),
+    product_code: backendPO.product_code || backendPO.item_code || backendPO.sku,
+    product_id: (backendPO.product_id || backendPO.item_id)?.toString(),
+    product_description: backendPO.product_description || backendPO.description || backendPO.notes,
+    bom_number: backendPO.bom_number || backendPO.bom_id,
+    bom_version: backendPO.bom_version,
+    
+    // Quantity & Units - YOUR BACKEND USES: quantity_to_produce, quantity_produced
+    planned_qty: plannedQty,
+    produced_qty: producedQty,
+    good_qty: parseInt(backendPO.good_qty || backendPO.accepted_qty || backendPO.quality_passed) || 0,
+    scrap_qty: parseInt(backendPO.scrap_qty || backendPO.rejected_qty || backendPO.quality_failed) || 0,
+    rework_qty: parseInt(backendPO.rework_qty) || 0,
+    pending_qty: pendingQty,
+    unit: backendPO.unit || backendPO.uom || 'Units',
+    
+    // Dates - YOUR BACKEND USES: start_date, expected_completion_date, actual_completion_date
+    start_date: backendPO.start_date || backendPO.planned_start_date
+      ? new Date(backendPO.start_date || backendPO.planned_start_date).toISOString().split('T')[0] 
+      : new Date().toISOString().split('T')[0],
+    end_date: backendPO.expected_completion_date || backendPO.end_date || backendPO.planned_end_date
+      ? new Date(backendPO.expected_completion_date || backendPO.end_date || backendPO.planned_end_date).toISOString().split('T')[0] 
+      : new Date().toISOString().split('T')[0],
+    planned_start_date: backendPO.start_date || backendPO.planned_start_date 
+      ? new Date(backendPO.start_date || backendPO.planned_start_date).toISOString().split('T')[0] 
+      : undefined,
+    planned_end_date: backendPO.expected_completion_date || backendPO.planned_end_date 
+      ? new Date(backendPO.expected_completion_date || backendPO.planned_end_date).toISOString().split('T')[0] 
+      : undefined,
+    actual_start_date: backendPO.actual_start_date || backendPO.start_date
+      ? new Date(backendPO.actual_start_date || backendPO.start_date).toISOString().split('T')[0] 
+      : undefined,
+    actual_end_date: backendPO.actual_completion_date || backendPO.actual_end_date || backendPO.completion_date
+      ? new Date(backendPO.actual_completion_date || backendPO.actual_end_date || backendPO.completion_date).toISOString().split('T')[0] 
+      : undefined,
+    
+    // Status & Priority - normalize to uppercase
+    status: (backendPO.status?.toUpperCase() || 'DRAFT') as any,
+    priority: (backendPO.priority?.toUpperCase() || 'MEDIUM') as any,
+    production_type: (backendPO.production_type?.toUpperCase() || 
+                     backendPO.type?.toUpperCase() || 
+                     'MAKE_TO_STOCK') as any,
+    
+    // Cost & Financial - handle multiple field names
+    estimated_cost: parseFloat(backendPO.estimated_cost || backendPO.planned_cost) || 0,
+    actual_cost: parseFloat(backendPO.actual_cost || backendPO.total_actual_cost) || 0,
+    material_cost: parseFloat(backendPO.material_cost || backendPO.materials_cost) || 0,
+    labor_cost: parseFloat(backendPO.labor_cost || backendPO.labour_cost) || 0,
+    overhead_cost: parseFloat(backendPO.overhead_cost || backendPO.overheads) || 0,
+    cost: parseFloat(backendPO.cost || backendPO.total_cost || backendPO.estimated_cost) || 0,
+    currency: (backendPO.currency || 'INR') as any,
+    
+    // Production Details - YOUR BACKEND HAS: production_line, shift
+    batch_number: backendPO.batch_number || backendPO.batch_no || backendPO.batch_id,
+    lot_number: backendPO.lot_number || backendPO.lot_no || backendPO.lot_id,
+    shift: backendPO.shift || backendPO.shift_name,  // YOUR BACKEND: shift (e.g., "DAY")
+    production_line: backendPO.production_line || backendPO.line || backendPO.line_name,  // YOUR BACKEND: production_line
+    work_center: backendPO.work_center || backendPO.workcenter || backendPO.work_station,
+    machine_id: backendPO.machine_id || backendPO.machine,
+    
+    // Progress & Efficiency
+    progress_percentage: progressPercentage,
+    completion_percentage: parseFloat(backendPO.completion_percentage || backendPO.completion) || progressPercentage,
+    efficiency_percentage: parseFloat(backendPO.efficiency_percentage || backendPO.efficiency) || undefined,
+    yield_percentage: parseFloat(backendPO.yield_percentage || backendPO.yield) || undefined,
+    
+    // Time Tracking
+    estimated_hours: parseFloat(backendPO.estimated_hours || backendPO.planned_hours) || undefined,
+    actual_hours: parseFloat(backendPO.actual_hours || backendPO.total_hours) || undefined,
+    setup_time_hours: parseFloat(backendPO.setup_time_hours || backendPO.setup_time) || undefined,
+    run_time_hours: parseFloat(backendPO.run_time_hours || backendPO.runtime) || undefined,
+    downtime_hours: parseFloat(backendPO.downtime_hours || backendPO.downtime) || undefined,
+    
+    // People & Team - YOUR BACKEND HAS: supervisor_id
+    supervisor: backendPO.supervisor_name || backendPO.supervisor || 
+                (backendPO.supervisor_id ? `Supervisor ID: ${backendPO.supervisor_id}` : undefined),
+    supervisor_id: backendPO.supervisor_id?.toString(),  // YOUR BACKEND: supervisor_id
+    assigned_team: Array.isArray(backendPO.assigned_team) ? backendPO.assigned_team : 
+                   backendPO.team ? [backendPO.team] : [],
+    operators: Array.isArray(backendPO.operators) ? backendPO.operators : 
+              backendPO.operator ? [backendPO.operator] : [],
+    
+    // Quality - YOUR BACKEND HAS: quality_status (e.g., "OK")
+    quality_check_required: backendPO.quality_check_required === true || 
+                           backendPO.qc_required === true || 
+                           backendPO.quality_status !== null,  // If quality_status exists, check is required
+    quality_status: (backendPO.quality_status || backendPO.qc_status) as any,  // YOUR BACKEND: quality_status
+    inspected_by: backendPO.inspected_by || backendPO.inspector || backendPO.qc_inspector,
+    inspection_date: backendPO.inspection_date || backendPO.qc_date,
+    inspection_notes: backendPO.inspection_notes || backendPO.qc_notes,
+    
+    // Materials & Resources
+    raw_materials_allocated: backendPO.raw_materials_allocated === true || 
+                            backendPO.materials_allocated === true || 
+                            false,
+    raw_materials_issued: backendPO.raw_materials_issued === true || 
+                         backendPO.materials_issued === true || 
+                         false,
+    tools_allocated: backendPO.tools_allocated === true || false,
+    
+    // Customer & Project
+    customer_name: backendPO.customer_name || backendPO.customer,
+    customer_id: (backendPO.customer_id || backendPO.client_id)?.toString(),
+    project_id: (backendPO.project_id || backendPO.proj_id)?.toString(),
+    department: backendPO.department || backendPO.dept,
+    
+    // Additional Details
+    description: backendPO.description || backendPO.desc || backendPO.notes,
+    notes: backendPO.notes || backendPO.remarks,
+    special_instructions: backendPO.special_instructions || backendPO.instructions,
+    tags: Array.isArray(backendPO.tags) ? backendPO.tags : [],
+    
+    // Timestamps
+    created_at: backendPO.created_at || backendPO.createdAt,
+  };
+}
+
 export async function listProductionOrders(): Promise<ProductionOrder[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching production orders from backend API...');
+      const response = await apiRequest<{ success: boolean; data: { production_orders: any[] } } | { production_orders: any[] } | any[]>(
+        '/manufacturing/production-orders?page=1&limit=100'
+      );
+      
+      console.log('📦 Backend production orders response:', response);
+      
+      // Handle different response formats
+      let productionOrders = null;
+      
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.production_orders) {
+          productionOrders = response.data.production_orders;
+        } else if ('production_orders' in response) {
+          productionOrders = response.production_orders;
+        } else if (Array.isArray(response)) {
+          productionOrders = response;
+        }
+      }
+      
+      if (productionOrders && Array.isArray(productionOrders) && productionOrders.length > 0) {
+        const mapped = productionOrders.map(mapBackendProductionOrder);
+        console.log('✅ Mapped production orders:', mapped.length);
+        return mapped;
+      }
+      
+      console.log('⚠️ No production orders in response, using mock data');
+      return mockProductionOrders;
+    } catch (error) {
+      console.error('❌ Backend API error, falling back to mock data:', error);
+      return mockProductionOrders;
+    }
+  }
+  
   if (useStatic) return mockProductionOrders;
 
   try {
@@ -340,6 +542,63 @@ export async function listProductionOrders(): Promise<ProductionOrder[]> {
 export async function createProductionOrder(
   payload: Omit<ProductionOrder, 'id' | 'created_at' | 'updated_at'>
 ): Promise<ProductionOrder> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Creating production order via backend API...');
+      
+      const backendPayload: any = {
+        production_order_number: payload.production_order_number,
+        work_order_number: payload.work_order_number || undefined,
+        reference_number: payload.reference_number || undefined,
+        product_name: payload.product,
+        product_code: payload.product_code || undefined,
+        planned_qty: payload.planned_qty,
+        unit: payload.unit,
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        status: payload.status,
+        priority: payload.priority,
+        production_type: payload.production_type,
+        estimated_cost: payload.estimated_cost,
+        cost: payload.cost || 0,
+        currency: payload.currency,
+        notes: payload.notes || undefined,
+      };
+      
+      // Only include product_id if it's provided and valid
+      if (payload.product_id && payload.product_id.trim() !== '') {
+        backendPayload.product_id = parseInt(payload.product_id);
+      }
+      
+      console.log('📤 Backend payload (product_id handling):', {
+        has_product_id: !!payload.product_id,
+        product_id_value: payload.product_id,
+        will_send_product_id: !!backendPayload.product_id,
+        final_payload: backendPayload
+      });
+      
+      const response = await apiRequest<{ success: boolean; data: any }>(
+        '/manufacturing/production-orders',
+        {
+          method: 'POST',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+      
+      console.log('✅ Created production order response:', response);
+      
+      if (response.success && response.data) {
+        return mapBackendProductionOrder(response.data);
+      }
+      
+      throw new Error('Failed to create production order');
+    } catch (error) {
+      console.error('❌ Error creating production order:', error);
+      handleApiError('manufacturing.createProductionOrder', error);
+      throw error;
+    }
+  }
+  
   if (useStatic) {
     const order: ProductionOrder = {
       ...payload,
@@ -369,6 +628,44 @@ export async function updateProductionOrder(
   id: string,
   changes: Partial<ProductionOrder>
 ): Promise<ProductionOrder | null> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Updating production order via backend API:', id);
+      
+      const backendChanges: any = {};
+      if (changes.production_order_number) backendChanges.production_order_number = changes.production_order_number;
+      if (changes.product) backendChanges.product_name = changes.product;
+      if (changes.status) backendChanges.status = changes.status;
+      if (changes.priority) backendChanges.priority = changes.priority;
+      if (changes.planned_qty !== undefined) backendChanges.planned_qty = changes.planned_qty;
+      if (changes.produced_qty !== undefined) backendChanges.produced_qty = changes.produced_qty;
+      if (changes.start_date) backendChanges.start_date = changes.start_date;
+      if (changes.end_date) backendChanges.end_date = changes.end_date;
+      if (changes.cost !== undefined) backendChanges.cost = changes.cost;
+      if (changes.notes) backendChanges.notes = changes.notes;
+      
+      const response = await apiRequest<{ success: boolean; data: any }>(
+        `/manufacturing/production-orders/${id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(backendChanges),
+        }
+      );
+      
+      console.log('✅ Updated production order response:', response);
+      
+      if (response.success && response.data) {
+        return mapBackendProductionOrder(response.data);
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ Error updating production order:', error);
+      handleApiError('manufacturing.updateProductionOrder', error);
+      return null;
+    }
+  }
+  
   if (useStatic) {
     const index = mockProductionOrders.findIndex((p) => p.id === id);
     if (index === -1) return null;
@@ -393,6 +690,30 @@ export async function updateProductionOrder(
 }
 
 export async function deleteProductionOrder(id: string): Promise<void> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Deleting production order via backend API:', id);
+      
+      const response = await apiRequest<{ success: boolean; message?: string }>(
+        `/manufacturing/production-orders/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      
+      console.log('✅ Deleted production order response:', response);
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to delete production order');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting production order:', error);
+      handleApiError('manufacturing.deleteProductionOrder', error);
+      throw error;
+    }
+    return;
+  }
+  
   if (useStatic) {
     const index = mockProductionOrders.findIndex((p) => p.id === id);
     if (index !== -1) mockProductionOrders.splice(index, 1);

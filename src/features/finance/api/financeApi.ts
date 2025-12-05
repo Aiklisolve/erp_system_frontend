@@ -8,6 +8,18 @@ let useStatic = !hasSupabaseConfig;
 // Backend API flag - set to true to use backend API
 const USE_BACKEND_API = true;
 
+// Finance Dashboard Statistics Interface
+export interface DashboardStats {
+  total_income: number;
+  total_expense: number;
+  net_balance: number;
+  pending_count: number;
+  reconciled_count: number;
+  pending_amount?: number;
+  month_income?: number;
+  month_expense?: number;
+}
+
 const mockTransactions: FinanceTransaction[] = [
   {
     id: 'tx-001',
@@ -373,6 +385,42 @@ function mapBackendTransaction(backendTx: any): FinanceTransaction {
     created_at: backendTx.created_at,
     is_reconciled: backendTx.status === 'COMPLETED',
   };
+}
+
+// Get Finance Dashboard Statistics
+export async function getDashboardStats(): Promise<DashboardStats | null> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching dashboard statistics from backend API...');
+      const response = await apiRequest<{ success: boolean; data: DashboardStats } | DashboardStats>(
+        '/finance/dashboard/stats'
+      );
+      
+      console.log('📊 Dashboard stats response:', response);
+      
+      // Handle different response formats
+      if (response && typeof response === 'object') {
+        // If wrapped in success/data
+        if ('success' in response && response.success && 'data' in response) {
+          console.log('✅ Dashboard stats loaded successfully');
+          return response.data;
+        }
+        // If direct stats object
+        if ('total_income' in response || 'total_expense' in response) {
+          console.log('✅ Dashboard stats loaded successfully (direct format)');
+          return response as DashboardStats;
+        }
+      }
+      
+      console.log('⚠️ No dashboard stats in response');
+      return null;
+    } catch (error) {
+      console.error('❌ Backend API error fetching dashboard stats:', error);
+      return null;
+    }
+  }
+  
+  return null;
 }
 
 export async function listTransactions(): Promise<FinanceTransaction[]> {

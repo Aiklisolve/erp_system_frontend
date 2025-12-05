@@ -21,7 +21,7 @@ import { Transactions } from './Transactions';
 import { TransferApprovals } from './TransferApprovals';
 
 export function FinanceList() {
-  const { transactions, loading, create, update, remove } = useFinance();
+  const { transactions, loading, statsLoading, dashboardStats, create, update, remove } = useFinance();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'transactions' | 'accounts' | 'payments' | 'history' | 'approvals'>('transactions');
   const [modalOpen, setModalOpen] = useState(false);
@@ -54,16 +54,25 @@ export function FinanceList() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
-  // Calculate metrics
-  const totalIncome = transactions
+  // Use dashboard stats from API if available, otherwise calculate from transactions
+  const totalIncome = dashboardStats?.total_income ?? transactions
     .filter((t) => t.type === 'INCOME' && t.status === 'POSTED')
     .reduce((sum, t) => sum + t.amount, 0);
-  const totalExpense = transactions
+  const totalExpense = dashboardStats?.total_expense ?? transactions
     .filter((t) => t.type === 'EXPENSE' && t.status === 'POSTED')
     .reduce((sum, t) => sum + t.amount, 0);
-  const netBalance = totalIncome - totalExpense;
-  const pendingTransactions = transactions.filter((t) => t.status === 'PENDING' || t.status === 'DRAFT').length;
-  const reconciledTransactions = transactions.filter((t) => t.is_reconciled).length;
+  const netBalance = dashboardStats?.net_balance ?? (totalIncome - totalExpense);
+  const pendingTransactions = dashboardStats?.pending_count ?? transactions.filter((t) => t.status === 'PENDING' || t.status === 'DRAFT').length;
+  const reconciledTransactions = dashboardStats?.reconciled_count ?? transactions.filter((t) => t.is_reconciled).length;
+
+  console.log('📊 Dashboard Stats:', { 
+    dashboardStats, 
+    totalIncome, 
+    totalExpense, 
+    netBalance, 
+    pendingTransactions, 
+    reconciledTransactions 
+  });
 
   const tabs = [
     { id: 'transactions', label: 'Transactions', count: transactions.length },

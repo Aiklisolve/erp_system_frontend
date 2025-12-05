@@ -14,7 +14,7 @@ import { Tabs } from '../../../components/ui/Tabs';
 import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
 import type { ProductionOrder } from '../types';
-import { ManufacturingForm } from './ManufacturingForm';
+import { SimpleProductionOrderForm } from './SimpleProductionOrderForm';
 
 export function ManufacturingList() {
   const { orders, loading, create, update, remove, metrics } = useManufacturing();
@@ -34,7 +34,15 @@ export function ManufacturingList() {
     if (activeTab === 'planned') return order.status === 'PLANNED' || order.status === 'SCHEDULED' || order.status === 'DRAFT';
     if (activeTab === 'in_progress') return order.status === 'IN_PROGRESS' || order.status === 'RELEASED';
     if (activeTab === 'completed') return order.status === 'COMPLETED' || order.status === 'CLOSED';
-    if (activeTab === 'on_hold') return order.status === 'ON_HOLD' || order.status === 'CANCELLED';
+    // On Hold tab shows both ON_HOLD and CANCELLED statuses
+    if (activeTab === 'on_hold') {
+      const status = order.status?.toUpperCase();
+      return status === 'ON_HOLD' || 
+             status === 'CANCELLED' || 
+             status === 'CANCELED' ||  // Handle both spellings
+             status === 'HOLD' ||
+             status === 'PAUSED';
+    }
     return true;
   });
 
@@ -61,18 +69,24 @@ export function ManufacturingList() {
   const paginatedOrders = filteredOrders.slice(startIndex, startIndex + itemsPerPage);
 
   // Calculate metrics
-  const totalProduction = orders.reduce((sum, order) => sum + order.planned_qty, 0);
+  const totalProduction = orders.reduce((sum, order) => sum + (order.planned_qty || 0), 0);
   const inProgressCount = orders.filter((o) => o.status === 'IN_PROGRESS' || o.status === 'RELEASED').length;
   const completedCount = orders.filter((o) => o.status === 'COMPLETED').length;
-  const totalCost = orders.reduce((sum, order) => sum + order.cost, 0);
+  const totalCost = orders.reduce((sum, order) => sum + (order.cost || 0), 0);
   const avgEfficiency = orders.filter(o => o.efficiency_percentage).reduce((sum, o) => sum + (o.efficiency_percentage || 0), 0) / orders.filter(o => o.efficiency_percentage).length || 0;
+
+  // Calculate on hold count (includes CANCELLED, ON_HOLD, HOLD, PAUSED)
+  const onHoldCount = orders.filter((o) => {
+    const status = o.status?.toUpperCase();
+    return status === 'ON_HOLD' || status === 'CANCELLED' || status === 'CANCELED' || status === 'HOLD' || status === 'PAUSED';
+  }).length;
 
   const tabs = [
     { id: 'all', label: 'All Orders', count: orders.length },
     { id: 'planned', label: 'Planned', count: orders.filter((o) => o.status === 'PLANNED' || o.status === 'SCHEDULED' || o.status === 'DRAFT').length },
     { id: 'in_progress', label: 'In Progress', count: inProgressCount },
     { id: 'completed', label: 'Completed', count: completedCount },
-    { id: 'on_hold', label: 'On Hold', count: orders.filter((o) => o.status === 'ON_HOLD' || o.status === 'CANCELLED').length }
+    { id: 'on_hold', label: 'On Hold / Cancelled', count: onHoldCount }
   ];
 
   const columns: TableColumn<ProductionOrder>[] = [
@@ -130,21 +144,28 @@ export function ManufacturingList() {
     {
       key: 'status',
       header: 'Status',
-      render: (row) => (
-        <Badge
-          tone={
-            row.status === 'COMPLETED' || row.status === 'CLOSED'
-              ? 'success'
-              : row.status === 'IN_PROGRESS' || row.status === 'RELEASED'
-              ? 'brand'
-              : row.status === 'PLANNED' || row.status === 'SCHEDULED'
-              ? 'warning'
-              : 'neutral'
-          }
-        >
-          {row.status.replace(/_/g, ' ')}
-        </Badge>
-      )
+      render: (row) => {
+        const status = row.status?.toUpperCase();
+        return (
+          <Badge
+            tone={
+              status === 'COMPLETED' || status === 'CLOSED'
+                ? 'success'
+                : status === 'IN_PROGRESS' || status === 'RELEASED'
+                ? 'brand'
+                : status === 'PLANNED' || status === 'SCHEDULED' || status === 'DRAFT'
+                ? 'warning'
+                : status === 'ON_HOLD' || status === 'HOLD' || status === 'PAUSED'
+                ? 'warning'
+                : status === 'CANCELLED' || status === 'CANCELED'
+                ? 'danger'
+                : 'neutral'
+            }
+          >
+            {row.status ? row.status.replace(/_/g, ' ') : 'DRAFT'}
+          </Badge>
+        );
+      }
     },
     {
       key: 'quantity',
@@ -168,11 +189,11 @@ export function ManufacturingList() {
       render: (row) => (
         <div className="text-right">
           <div className="text-xs font-semibold text-slate-900">
-            {row.currency} {row.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {row.currency || 'INR'} {(row.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           {row.actual_cost && row.actual_cost !== row.cost && (
             <div className="text-[10px] text-slate-500">
-              Actual: {row.currency} {row.actual_cost.toLocaleString()}
+              Actual: {row.currency || 'INR'} {row.actual_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           )}
         </div>
@@ -183,7 +204,7 @@ export function ManufacturingList() {
       header: 'Type',
       render: (row) => (
         <Badge tone="neutral">
-          {row.production_type.replace(/_/g, ' ')}
+          {row.production_type ? row.production_type.replace(/_/g, ' ') : 'STANDARD'}
         </Badge>
       )
     },
@@ -453,7 +474,7 @@ export function ManufacturingList() {
         title={editingOrder ? 'Edit Production Order' : 'New Production Order'}
         hideCloseButton
       >
-        <ManufacturingForm
+        <SimpleProductionOrderForm
           initial={editingOrder || undefined}
           onSubmit={editingOrder ? handleUpdate : handleCreate}
           onCancel={() => {
