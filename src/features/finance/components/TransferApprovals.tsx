@@ -466,7 +466,7 @@ export function TransferApprovals() {
         />
         <StatCard
           label="Pending Amount"
-          value={`$${totalPendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={`₹${totalPendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         />
         <StatCard
           label="Approved"

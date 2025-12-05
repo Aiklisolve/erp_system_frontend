@@ -122,11 +122,11 @@ export function EcommerceProductsList() {
         return (
           <div className="space-y-0.5">
             <div className={`font-medium ${hasSale ? 'text-red-600' : 'text-slate-900'}`}>
-              {displayPrice.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'USD' })}
+              {displayPrice.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'INR' })}
             </div>
             {hasSale && (
               <div className="text-[10px] text-slate-500 line-through">
-                {row.price.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'USD' })}
+                {row.price.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'INR' })}
               </div>
             )}
           </div>

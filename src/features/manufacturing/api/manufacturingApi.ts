@@ -546,36 +546,43 @@ export async function createProductionOrder(
     try {
       console.log('🔄 Creating production order via backend API...');
       
+      // Send ONLY fields that backend API accepts (matching curl example exactly)
       const backendPayload: any = {
         production_order_number: payload.production_order_number,
-        work_order_number: payload.work_order_number || undefined,
-        reference_number: payload.reference_number || undefined,
-        product_name: payload.product,
-        product_code: payload.product_code || undefined,
         planned_qty: payload.planned_qty,
-        unit: payload.unit,
         start_date: payload.start_date,
         end_date: payload.end_date,
         status: payload.status,
         priority: payload.priority,
-        production_type: payload.production_type,
-        estimated_cost: payload.estimated_cost,
-        cost: payload.cost || 0,
-        currency: payload.currency,
         notes: payload.notes || undefined,
       };
       
-      // Only include product_id if it's provided and valid
-      if (payload.product_id && payload.product_id.trim() !== '') {
-        backendPayload.product_id = parseInt(payload.product_id);
+      // Only include product_id if provided (convert to number)
+      if (payload.product_id && payload.product_id.toString().trim() !== '') {
+        backendPayload.product_id = parseInt(payload.product_id.toString());
       }
       
-      console.log('📤 Backend payload (product_id handling):', {
-        has_product_id: !!payload.product_id,
-        product_id_value: payload.product_id,
-        will_send_product_id: !!backendPayload.product_id,
-        final_payload: backendPayload
-      });
+      // Only include production_line if provided
+      if (payload.production_line && payload.production_line.trim() !== '') {
+        backendPayload.production_line = payload.production_line;
+      }
+      
+      // Only include shift if provided
+      if (payload.shift && payload.shift.trim() !== '') {
+        backendPayload.shift = payload.shift;
+      }
+      
+      // Only include supervisor_id if provided (convert to number)
+      if (payload.supervisor_id && payload.supervisor_id.toString().trim() !== '') {
+        backendPayload.supervisor_id = parseInt(payload.supervisor_id.toString());
+      }
+      
+      // Only include quality_status if provided
+      if (payload.quality_status) {
+        backendPayload.quality_status = payload.quality_status;
+      }
+      
+      console.log('📤 Backend payload (exact match to curl):', JSON.stringify(backendPayload, null, 2));
       
       const response = await apiRequest<{ success: boolean; data: any }>(
         '/manufacturing/production-orders',
@@ -728,5 +735,139 @@ export async function deleteProductionOrder(id: string): Promise<void> {
     useStatic = true;
     await deleteProductionOrder(id);
   }
+}
+
+// ============================================
+// PRODUCTS API (for Product ID dropdown)
+// ============================================
+
+export interface Product {
+  id: number;
+  product_id?: number;
+  product_name: string;
+  product_code?: string;
+  name?: string;
+  code?: string;
+}
+
+export async function listProducts(): Promise<Product[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching products from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { products: any[] } } | { products: any[] } | any[]>(
+        '/products?page=1&limit=1000'
+      );
+      
+      console.log('📦 Backend products response:', response);
+      
+      // Handle different response formats
+      let products = null;
+      
+      if (response && typeof response === 'object') {
+        // If wrapped in success/data
+        if ('success' in response && response.success && 'data' in response && response.data.products) {
+          products = response.data.products;
+        }
+        // If direct products array
+        else if ('products' in response) {
+          products = response.products;
+        }
+        // If direct array
+        else if (Array.isArray(response)) {
+          products = response;
+        }
+      }
+      
+      if (products && Array.isArray(products) && products.length > 0) {
+        const mapped = products.map((p: any) => ({
+          id: parseInt(p.id || p.product_id) || 0,
+          product_id: parseInt(p.id || p.product_id) || 0,
+          product_name: p.product_name || p.name || p.product || 'Unknown Product',
+          product_code: p.product_code || p.code || '',
+          name: p.product_name || p.name || p.product || 'Unknown Product',
+          code: p.product_code || p.code || '',
+        }));
+        console.log('✅ Mapped products:', mapped.length);
+        return mapped;
+      }
+      
+      console.log('⚠️ No products in response');
+      return [];
+    } catch (error) {
+      console.error('❌ Backend API error fetching products:', error);
+      return [];
+    }
+  }
+  
+  // Fallback to empty array if backend API is not available
+  return [];
+}
+
+// ============================================
+// USERS API (for Supervisor ID dropdown)
+// ============================================
+
+export interface User {
+  id: number;
+  user_id?: number;
+  name: string;
+  full_name?: string;
+  email?: string;
+  employee_id?: number;
+}
+
+export async function listUsers(): Promise<User[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching users from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { users: any[] } } | { users: any[] } | any[]>(
+        '/users?page=1&limit=1000'
+      );
+      
+      console.log('👥 Backend users response:', response);
+      
+      // Handle different response formats
+      let users = null;
+      
+      if (response && typeof response === 'object') {
+        // If wrapped in success/data
+        if ('success' in response && response.success && 'data' in response && response.data.users) {
+          users = response.data.users;
+        }
+        // If direct users array
+        else if ('users' in response) {
+          users = response.users;
+        }
+        // If direct array
+        else if (Array.isArray(response)) {
+          users = response;
+        }
+      }
+      
+      if (users && Array.isArray(users) && users.length > 0) {
+        const mapped = users.map((u: any) => ({
+          id: parseInt(u.id || u.user_id || u.employee_id) || 0,
+          user_id: parseInt(u.id || u.user_id || u.employee_id) || 0,
+          name: u.name || u.full_name || (u.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : '') || u.email || 'Unknown User',
+          full_name: u.name || u.full_name || (u.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : '') || u.email || 'Unknown User',
+          email: u.email || '',
+          employee_id: parseInt(u.id || u.user_id || u.employee_id) || 0,
+        }));
+        console.log('✅ Mapped users:', mapped.length);
+        return mapped;
+      }
+      
+      console.log('⚠️ No users in response');
+      return [];
+    } catch (error) {
+      console.error('❌ Backend API error fetching users:', error);
+      return [];
+    }
+  }
+  
+  // Fallback to empty array if backend API is not available
+  return [];
 }
 

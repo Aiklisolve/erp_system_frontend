@@ -90,7 +90,7 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
     
     const payload: Omit<Leave, 'id' | 'created_at' | 'updated_at'> = {
       leave_number: leaveNumber,
-      employee_id: employeeId,
+        employee_id: employeeId,
       employee_number: selectedEmployee?.employee_number,
       employee_name: selectedEmployee?.full_name || `${selectedEmployee?.first_name} ${selectedEmployee?.last_name}`,
       employee_email: selectedEmployee?.email,
@@ -113,7 +113,7 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Leave Information */}
-      <div>
+              <div>
         <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
           Leave Information
         </h3>
@@ -128,8 +128,8 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
               placeholder="LV-2025-0001"
               required
             />
-          </div>
-          <div>
+              </div>
+                <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Employee <span className="text-red-500">*</span>
             </label>
@@ -142,8 +142,8 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
               ))}
             </Select>
             {errors.employeeId && <p className="text-xs text-red-600 mt-1">{errors.employeeId}</p>}
-          </div>
-          <div>
+                </div>
+                <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Leave Type <span className="text-red-500">*</span>
             </label>
@@ -157,8 +157,8 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
               <option value="COMP_OFF">Comp Off</option>
               <option value="OTHER">Other</option>
             </Select>
-          </div>
-          <div>
+                </div>
+                <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Status <span className="text-red-500">*</span>
             </label>
@@ -168,12 +168,12 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
               <option value="REJECTED">Rejected</option>
               <option value="CANCELLED">Cancelled</option>
             </Select>
-          </div>
-        </div>
-      </div>
+                </div>
+                </div>
+              </div>
 
       {/* Leave Dates */}
-      <div>
+                <div>
         <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
           Leave Dates
         </h3>
@@ -189,7 +189,7 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
               required
             />
             {errors.startDate && <p className="text-xs text-red-600 mt-1">{errors.startDate}</p>}
-          </div>
+                </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               End Date <span className="text-red-500">*</span>
@@ -202,7 +202,7 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
             />
             {errors.endDate && <p className="text-xs text-red-600 mt-1">{errors.endDate}</p>}
           </div>
-          <div>
+              <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Total Days (Auto-calculated)
             </label>
@@ -212,17 +212,17 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
               readOnly
               className="bg-slate-50"
             />
-          </div>
-        </div>
-      </div>
+              </div>
+                </div>
+            </div>
 
       {/* Leave Details */}
-      <div>
+                          <div>
         <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
           Leave Details
-        </h3>
+                            </h3>
         <div className="space-y-4">
-          <div>
+                          <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Reason <span className="text-red-500">*</span>
             </label>
@@ -234,9 +234,9 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
               required
             />
             {errors.reason && <p className="text-xs text-red-600 mt-1">{errors.reason}</p>}
-          </div>
+                          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+                          <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Emergency Contact Name
               </label>
@@ -245,8 +245,8 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
                 onChange={(e) => setEmergencyContactName(e.target.value)}
                 placeholder="John Doe"
               />
-            </div>
-            <div>
+                          </div>
+                          <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Emergency Contact Phone
               </label>
@@ -257,8 +257,8 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
                 placeholder="+1-555-0101"
               />
             </div>
-          </div>
-          <div>
+                          </div>
+                          <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Additional Notes
             </label>
@@ -268,14 +268,14 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
               placeholder="Any additional information"
               rows={2}
             />
-          </div>
-        </div>
-      </div>
+                          </div>
+                        </div>
+                      </div>
 
       {/* Form Actions */}
       <div className="sticky bottom-0 bg-white border-t border-slate-200 pt-4 flex flex-col sm:flex-row gap-3 justify-end">
         {onCancel && (
-          <Button
+                        <Button
             type="button"
             variant="secondary"
             size="md"
@@ -283,12 +283,12 @@ function LeaveFormComponent({ initial, employees, onSubmit, onCancel }: LeaveFor
             className="w-full sm:w-auto"
           >
             Cancel
-          </Button>
+                        </Button>
         )}
         <Button type="submit" variant="primary" size="md" className="w-full sm:w-auto">
           {initial ? 'Update Leave' : 'Apply Leave'}
         </Button>
-      </div>
+                  </div>
     </form>
   );
 }
@@ -362,10 +362,10 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
       key: 'employee_name',
       header: 'Employee',
       render: (row) => (
-        <div>
+                    <div>
           <div className="text-xs font-medium text-slate-900">{row.employee_name}</div>
           <div className="text-[10px] text-slate-500">{row.employee_number} - {row.employee_role?.replace(/_/g, ' ')}</div>
-        </div>
+                    </div>
       )
     },
     {
@@ -381,19 +381,19 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
       key: 'dates',
       header: 'Dates',
       render: (row) => (
-        <div>
+                    <div>
           <div className="text-xs text-slate-900">
             {new Date(row.start_date).toLocaleDateString()} - {new Date(row.end_date).toLocaleDateString()}
-          </div>
+                    </div>
           <div className="text-[10px] text-slate-500">{row.total_days} days</div>
-        </div>
+                    </div>
       )
     },
     {
       key: 'status',
       header: 'Status',
       render: (row) => (
-        <Badge
+                      <Badge
           tone={
             row.status === 'APPROVED'
               ? 'success'
@@ -405,7 +405,7 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
           }
         >
           {row.status}
-        </Badge>
+                      </Badge>
       )
     },
     {
@@ -414,7 +414,7 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
       render: (row) => (
         <div className="text-xs text-slate-600 max-w-xs truncate" title={row.reason}>
           {row.reason}
-        </div>
+                    </div>
       )
     },
     {
@@ -449,7 +449,7 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
           >
             Delete
           </button>
-        </div>
+                  </div>
       )
     }
   ];
@@ -484,7 +484,7 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
     return <LoadingState label="Loading leaves..." />;
   }
 
-  return (
+                        return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -493,7 +493,7 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
           <p className="text-xs text-slate-600 mt-1">
             Manage employee leave requests and track leave balances
           </p>
-        </div>
+                            </div>
         <Button
           variant="primary"
           size="md"
@@ -504,7 +504,7 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
         >
           + Apply Leave
         </Button>
-      </div>
+              </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -523,30 +523,30 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
         <StatCard
           label="Rejected"
           value={rejectedLeaves.toString()}
-        />
-      </div>
+                />
+              </div>
 
       {/* Filters */}
       <Card>
         <div className="p-4 border-b border-slate-200">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Search
-              </label>
-              <Input
+                    </label>
+                    <Input
                 placeholder="Search by leave #, employee name, employee #..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-              />
-            </div>
+                    />
+                  </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Status
-              </label>
+                    </label>
               <Select
                 value={statusFilter}
                 onChange={(e) => {
@@ -560,9 +560,9 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
                 <option value="REJECTED">Rejected</option>
                 <option value="CANCELLED">Cancelled</option>
               </Select>
-            </div>
-          </div>
-        </div>
+                  </div>
+                </div>
+              </div>
 
         {/* Table */}
         {paginatedLeaves.length === 0 ? (
@@ -572,7 +572,7 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
               description="Apply your first leave or adjust your filters"
             />
             <div className="mt-4 text-center">
-              <Button
+                <Button
                 variant="primary"
                 size="md"
                 onClick={() => {
@@ -581,9 +581,9 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
                 }}
               >
                 + Apply Leave
-              </Button>
+                </Button>
+              </div>
             </div>
-          </div>
         ) : (
           <>
             <Table
@@ -601,7 +601,7 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
               />
               <div className="mt-2 text-center text-xs text-slate-600">
                 Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredLeaves.length)} of {filteredLeaves.length} leaves
-              </div>
+      </div>
             </div>
           </>
         )}

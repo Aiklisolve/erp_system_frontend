@@ -229,7 +229,7 @@ export function OverviewPage() {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-emerald-700 font-semibold">
-                    $12,500
+                    ₹12,500
                   </td>
                 </tr>
                 <tr className="hover:bg-slate-50">
@@ -241,7 +241,7 @@ export function OverviewPage() {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-amber-700 font-semibold">
-                    $2,100
+                    ₹2,100
                   </td>
                 </tr>
               </tbody>
