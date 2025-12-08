@@ -19,40 +19,19 @@ import { VendorForm, type VendorFormData } from './VendorForm';
 import { CategoryForm, type CategoryFormData } from './CategoryForm';
 import { AssignInventoryForm } from './AssignInventoryForm';
 
-// Mock assigned inventory data
+// Assigned inventory interface matching backend
 interface AssignedInventoryItem {
-  usage_id: string;
-  registration_number: string;
-  vehicle_model: string;
-  item_name: string;
-  part_number: string;
-  category: string;
+  id: number;
+  product_id: number;
+  product_name?: string;
+  product_code?: string;
+  purchase_order_id: number;
+  po_number?: string;
   quantity: number;
-  unit: string;
+  date_of_use: string;
+  reason_notes: string;
+  created_at?: string;
 }
-
-const mockAssignedInventory: AssignedInventoryItem[] = [
-  {
-    usage_id: '1',
-    registration_number: 'VH-001',
-    vehicle_model: 'Truck Model A',
-    item_name: 'Engine Oil Filter',
-    part_number: 'PN-001',
-    category: 'Vehicle Parts',
-    quantity: 5,
-    unit: 'pcs',
-  },
-  {
-    usage_id: '2',
-    registration_number: 'VH-002',
-    vehicle_model: 'Van Model B',
-    item_name: 'Brake Pads',
-    part_number: 'PN-002',
-    category: 'Vehicle Parts',
-    quantity: 2,
-    unit: 'pairs',
-  },
-];
 
 // Mock vendors and categories
 const mockVendorsData: VendorFormData[] = [
@@ -76,11 +55,6 @@ const mockVendorsData: VendorFormData[] = [
   },
 ];
 
-const mockCategoriesData: CategoryFormData[] = [
-  { category_id: 1, category_name: 'Electronics', vendor_id: 1 },
-  { category_id: 2, category_name: 'Tools', vendor_id: 1 },
-  { category_id: 3, category_name: 'Safety Equipment', vendor_id: 2 },
-];
 
 export function InventoryList() {
   const { items, loading, create, update, remove, refresh, metrics } = useInventory();
@@ -98,127 +72,101 @@ export function InventoryList() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Assigned inventory state
-  const [assignedInventory, setAssignedInventory] = useState<AssignedInventoryItem[]>(mockAssignedInventory);
+  const [assignedInventory, setAssignedInventory] = useState<AssignedInventoryItem[]>([]);
+  const [assignedLoading, setAssignedLoading] = useState(false);
   const [assignedSearchTerm, setAssignedSearchTerm] = useState('');
-  const [assignedCategoryFilter, setAssignedCategoryFilter] = useState('all');
   const [assignedPage, setAssignedPage] = useState(1);
   const [assignedItemsPerPage, setAssignedItemsPerPage] = useState(10);
-  const [editingAssignedQuantity, setEditingAssignedQuantity] = useState<{ id: string; quantity: number } | null>(null);
+  const [editingAssignedQuantity, setEditingAssignedQuantity] = useState<{ id: number; quantity: number } | null>(null);
+  const [updatingQuantity, setUpdatingQuantity] = useState(false);
 
   // Vendors state
-  const [vendors, setVendors] = useState<VendorFormData[]>(mockVendorsData);
+  const [vendors, setVendors] = useState<VendorFormData[]>([]);
+  const [vendorsLoading, setVendorsLoading] = useState(false);
   const [editingVendor, setEditingVendor] = useState<VendorFormData | null>(null);
   const [vendorSearchTerm, setVendorSearchTerm] = useState('');
   const [vendorPage, setVendorPage] = useState(1);
   const [vendorItemsPerPage, setVendorItemsPerPage] = useState(10);
 
   // Categories state
-  const [categories, setCategories] = useState<CategoryFormData[]>(mockCategoriesData);
+  const [categories, setCategories] = useState<CategoryFormData[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryFormData | null>(null);
   const [categorySearchTerm, setCategorySearchTerm] = useState('');
   const [categoryPage, setCategoryPage] = useState(1);
   const [categoryItemsPerPage, setCategoryItemsPerPage] = useState(10);
 
-  // Fetch assigned inventory (optional API call)
-  useEffect(() => {
-    const fetchAssignedInventory = async () => {
-      try {
-        const API_KEY = import.meta.env.VITE_SUPABASE_API_KEY || '';
-        if (API_KEY) {
-          const response = await fetch(
-            "https://n8n.srv799538.hstgr.cloud/webhook/assignedinventory",
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                apikey: API_KEY,
-                Authorization: `Bearer ${API_KEY}`,
-                "Content-Profile": "srtms",
-                jwt_token: "9082c5f9b14d12773ec0ead79742d239cec142c3",
-                session_id: "1",
-              },
-            }
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (Array.isArray(data) && data[0]?.data) {
-              setAssignedInventory(data[0].data);
-            }
-          }
-        }
-      } catch (error) {
-        console.log('Using mock assigned inventory:', error);
-      }
-    };
+  // Fetch assigned inventory from backend
+  const fetchAssignedInventory = async () => {
+    setAssignedLoading(true);
+    try {
+      const { listAssignments } = await import('../api/inventoryApi');
+      const assignments = await listAssignments();
+      setAssignedInventory(assignments);
+    } catch (error) {
+      console.error('Error fetching assigned inventory:', error);
+      showToast('error', 'Failed to Load', 'Failed to load assigned inventory. Please try again.');
+    } finally {
+      setAssignedLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (activeTab === 'assigned') {
       fetchAssignedInventory();
     }
   }, [activeTab]);
 
   // Fetch vendors from backend API
-  useEffect(() => {
-    const fetchVendors = async () => {
-      try {
-        const { listVendors } = await import('../api/inventoryApi');
-        const vendorList = await listVendors();
-        if (vendorList && vendorList.length > 0) {
-          setVendors(vendorList.map((v: any) => ({
-            id: v.id,
-            vendor_name: v.vendor_name || '',
-            phone_number: v.phone_number || '',
-            email: v.email || '',
-            contact_person_name: v.contact_person_name || '',
-            address: v.address || '',
-            materials_products: v.materials_products || '',
-          })));
-        }
-      } catch (error) {
-        console.log('Using mock vendors:', error);
-      }
-    };
+  const fetchVendors = async () => {
+    setVendorsLoading(true);
+    try {
+      const { listVendors } = await import('../api/inventoryApi');
+      const vendorList = await listVendors();
+      setVendors(vendorList.map((v: any) => ({
+        id: v.id,
+        vendor_name: v.vendor_name || '',
+        phone_number: v.phone_number || '',
+        email: v.email || '',
+        contact_person_name: v.contact_person_name || '',
+        address: v.address || '',
+        materials_products: v.materials_products || '',
+      })));
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+      showToast('error', 'Failed to Load', 'Failed to load vendors. Please try again.');
+    } finally {
+      setVendorsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (activeTab === 'vendors') {
       fetchVendors();
     }
   }, [activeTab]);
 
-  // Fetch categories (optional API call)
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const API_KEY = import.meta.env.VITE_SUPABASE_API_KEY || '';
-        if (API_KEY) {
-          const response = await fetch(
-            "https://n8n.srv799538.hstgr.cloud/webhook/578481f3-a817-434a-b301-c3c48f9addfc",
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-                apikey: API_KEY,
-                Authorization: `Bearer ${API_KEY}`,
-                "Content-Profile": "srtms",
-                jwt_token: "9082c5f9b14d12773ec0ead79742d239cec142c3",
-                session_id: "1",
-              },
-            }
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (Array.isArray(data) && data[0]?.data) {
-              setCategories(data[0].data.map((cat: any) => ({
-                category_id: cat.category_id,
-                category_name: cat.category_name,
-                vendor_id: cat.vendor_id || 1,
-              })));
-            }
-          }
-        }
-      } catch (error) {
-        console.log('Using mock categories:', error);
-      }
-    };
+  // Fetch categories from backend API
+  const fetchCategories = async () => {
+    setCategoriesLoading(true);
+    try {
+      const { listCategories } = await import('../api/inventoryApi');
+      const categoryList = await listCategories();
+      setCategories(categoryList.map((cat: any) => ({
+        id: cat.id,
+        category_name: cat.category_name || '',
+        vendor_id: cat.vendor_id || 0,
+        description: cat.description || '',
+      })));
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      showToast('error', 'Failed to Load', 'Failed to load categories. Please try again.');
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (activeTab === 'categories') {
       fetchCategories();
     }
@@ -241,11 +189,11 @@ export function InventoryList() {
   // Filter assigned inventory
   const filteredAssigned = assignedInventory.filter((item) => {
     const matchesSearch =
-      (item.registration_number || '').toLowerCase().includes(assignedSearchTerm.toLowerCase()) ||
-      (item.item_name || '').toLowerCase().includes(assignedSearchTerm.toLowerCase()) ||
-      (item.part_number || '').toLowerCase().includes(assignedSearchTerm.toLowerCase());
-    const matchesCategory = assignedCategoryFilter === 'all' || item.category === assignedCategoryFilter;
-    return matchesSearch && matchesCategory;
+      (item.product_name || '').toLowerCase().includes(assignedSearchTerm.toLowerCase()) ||
+      (item.product_code || '').toLowerCase().includes(assignedSearchTerm.toLowerCase()) ||
+      (item.po_number || '').toLowerCase().includes(assignedSearchTerm.toLowerCase()) ||
+      (item.reason_notes || '').toLowerCase().includes(assignedSearchTerm.toLowerCase());
+    return matchesSearch;
   });
 
   // Pagination
@@ -332,21 +280,32 @@ export function InventoryList() {
   ];
 
   const assignedColumns: TableColumn<AssignedInventoryItem>[] = [
-    { key: 'registration_number', header: 'Vehicle' },
-    { key: 'vehicle_model', header: 'Model' },
-    { key: 'item_name', header: 'Item' },
-    { key: 'part_number', header: 'Part #' },
-    { key: 'category', header: 'Category' },
-    { key: 'quantity', header: 'Quantity' },
-    { key: 'unit', header: 'Unit' },
+    { key: 'po_number', header: 'Purchase Order' },
+    { key: 'product_name', header: 'Product' },
+    { key: 'product_code', header: 'SKU' },
+    { 
+      key: 'quantity', 
+      header: 'Quantity',
+      render: (row) => (
+        <span className="font-medium">{row.quantity}</span>
+      )
+    },
+    { 
+      key: 'date_of_use', 
+      header: 'Date of Use',
+      render: (row) => (
+        <span>{new Date(row.date_of_use).toLocaleDateString()}</span>
+      )
+    },
+    { key: 'reason_notes', header: 'Notes' },
     {
-      key: 'usage_id',
+      key: 'id',
       header: 'Actions',
       render: (row) => (
         <button
           type="button"
           onClick={() => {
-            setEditingAssignedQuantity({ id: row.usage_id, quantity: row.quantity });
+            setEditingAssignedQuantity({ id: row.id, quantity: row.quantity });
           }}
           className="text-[11px] text-primary hover:text-primary-dark"
         >
@@ -393,76 +352,82 @@ export function InventoryList() {
   };
 
   const handleVendorSubmit = async (data: VendorFormData) => {
-    if (editingVendor) {
-      // Update vendor
-      setVendors((prev) =>
-        prev.map((v) => (v.id === editingVendor.id ? { ...data, id: editingVendor.id } : v))
-      );
-      setEditingVendor(null);
-      showToast('success', 'Vendor Updated', `Vendor "${data.vendor_name}" has been updated successfully.`);
-    } else {
-      // Create vendor
-      const newVendor: VendorFormData = {
-        ...data,
-        id: vendors.length > 0 ? Math.max(...vendors.map((v) => v.id || 0)) + 1 : 1,
-      };
-      setVendors((prev) => [newVendor, ...prev]);
-      showToast('success', 'Vendor Created', `Vendor "${data.vendor_name}" has been created successfully.`);
-    }
+    // VendorForm already handles the API call, we just need to refresh the list
     setVendorModalOpen(false);
+    setEditingVendor(null);
+    // Refresh vendors list to show updated data
+    await fetchVendors();
   };
 
   const handleCategorySubmit = async (data: CategoryFormData) => {
-    if (editingCategory) {
-      // Update category
-      setCategories((prev) =>
-        prev.map((c) =>
-          c.category_id === editingCategory.category_id
-            ? { ...data, category_id: editingCategory.category_id }
-            : c
-        )
-      );
-      setEditingCategory(null);
-      showToast('success', 'Category Updated', `Category "${data.category_name}" has been updated successfully.`);
-    } else {
-      // Create category
-      const newCategory: CategoryFormData = {
-        ...data,
-        category_id:
-          categories.length > 0
-            ? Math.max(...categories.map((c) => c.category_id || 0)) + 1
-            : 1,
-      };
-      setCategories((prev) => [newCategory, ...prev]);
-      showToast('success', 'Category Created', `Category "${data.category_name}" has been created successfully.`);
-    }
+    // CategoryForm already handles the API call, we just need to refresh the list
     setCategoryModalOpen(false);
+    setEditingCategory(null);
+    // Refresh categories list to show updated data
+    await fetchCategories();
   };
 
-  const handleDeleteVendor = (vendor: VendorFormData) => {
+  const handleDeleteVendor = async (vendor: VendorFormData) => {
     if (window.confirm('Are you sure you want to delete this vendor?')) {
       if (vendor.id) {
-        setVendors((prev) => prev.filter((v) => v.id !== vendor.id));
-        showToast('success', 'Vendor Deleted', `Vendor "${vendor.vendor_name || 'Unknown'}" has been deleted successfully.`);
+        try {
+          const { deleteVendor } = await import('../api/inventoryApi');
+          await deleteVendor(vendor.id);
+          showToast('success', 'Vendor Deleted', `Vendor "${vendor.vendor_name || 'Unknown'}" has been deleted successfully.`);
+          // Refresh vendors list
+          await fetchVendors();
+        } catch (error) {
+          showToast('error', 'Deletion Failed', 'Failed to delete vendor. Please try again.');
+        }
       }
     }
   };
 
-  const handleDeleteCategory = (category: CategoryFormData) => {
+  const handleDeleteCategory = async (category: CategoryFormData) => {
     if (window.confirm('Are you sure you want to delete this category?')) {
-      if (category.category_id) {
-        setCategories((prev) => prev.filter((c) => c.category_id !== category.category_id));
-        showToast('success', 'Category Deleted', `Category "${category.category_name}" has been deleted successfully.`);
+      if (category.id) {
+        try {
+          const { deleteCategory } = await import('../api/inventoryApi');
+          await deleteCategory(category.id);
+          showToast('success', 'Category Deleted', `Category "${category.category_name}" has been deleted successfully.`);
+          // Refresh categories list
+          await fetchCategories();
+        } catch (error) {
+          showToast('error', 'Deletion Failed', 'Failed to delete category. Please try again.');
+        }
       }
     }
   };
 
   const handleAssignSubmit = async (data: any) => {
-    console.log('Inventory assigned:', data);
-    setAssignModalOpen(false);
-    // Refresh assigned inventory
-    if (activeTab === 'assigned') {
-      // Refresh logic here
+    try {
+      setAssignModalOpen(false);
+      showToast('success', 'Inventory Assigned', 'Inventory has been assigned successfully.');
+      // Refresh assigned inventory if on assigned tab
+      if (activeTab === 'assigned') {
+        await fetchAssignedInventory();
+      }
+    } catch (error) {
+      showToast('error', 'Assignment Failed', 'Failed to assign inventory. Please try again.');
+    }
+  };
+
+  const handleUpdateQuantity = async () => {
+    if (!editingAssignedQuantity) return;
+
+    setUpdatingQuantity(true);
+    try {
+      const { updateAssignment } = await import('../api/inventoryApi');
+      await updateAssignment(editingAssignedQuantity.id, {
+        quantity: editingAssignedQuantity.quantity
+      });
+      showToast('success', 'Quantity Updated', 'Assignment quantity has been updated successfully.');
+      setEditingAssignedQuantity(null);
+      await fetchAssignedInventory();
+    } catch (error) {
+      showToast('error', 'Update Failed', 'Failed to update quantity. Please try again.');
+    } finally {
+      setUpdatingQuantity(false);
     }
   };
 
@@ -646,7 +611,7 @@ export function InventoryList() {
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1">
                 <Input
-                  placeholder="Search by vehicle, item, or part number..."
+                  placeholder="Search by product name, SKU, PO number, or notes..."
                   value={assignedSearchTerm}
                   onChange={(e) => {
                     setAssignedSearchTerm(e.target.value);
@@ -654,28 +619,15 @@ export function InventoryList() {
                   }}
                 />
               </div>
-              <Select
-                value={assignedCategoryFilter}
-                onChange={(e) => {
-                  setAssignedCategoryFilter(e.target.value);
-                  setAssignedPage(1);
-                }}
-                className="w-full sm:w-48"
-              >
-                <option value="all">All Categories</option>
-                {Array.from(new Set(filteredAssigned.map((item) => item.category))).map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </Select>
             </div>
 
             {/* Table */}
-            {filteredAssigned.length === 0 ? (
+            {assignedLoading ? (
+              <LoadingState label="Loading assigned inventory..." />
+            ) : filteredAssigned.length === 0 ? (
               <EmptyState
                 title="No assigned inventory found"
-                description="Assign inventory items to vehicles to see them here."
+                description="Assign inventory items to purchase orders to see them here."
               />
             ) : (
               <>
@@ -683,7 +635,7 @@ export function InventoryList() {
                   <Table
                     columns={assignedColumns}
                     data={assignedPaginatedItems}
-                    getRowKey={(row, index) => `${row.usage_id}-${index}`}
+                    getRowKey={(row, index) => `${row.id}-${index}`}
                   />
                 </div>
                 {/* Pagination */}
@@ -744,20 +696,12 @@ export function InventoryList() {
                   }}
                 />
               </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                  setEditingVendor(null);
-                  setVendorModalOpen(true);
-                }}
-              >
-                Add Vendor
-              </Button>
             </div>
 
             {/* Table */}
-            {filteredVendors.length === 0 ? (
+            {vendorsLoading ? (
+              <LoadingState label="Loading vendors..." />
+            ) : filteredVendors.length === 0 ? (
               <EmptyState
                 title="No vendors found"
                 description="Add your first vendor to get started."
@@ -859,20 +803,12 @@ export function InventoryList() {
                   }}
                 />
               </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                  setEditingCategory(null);
-                  setCategoryModalOpen(true);
-                }}
-              >
-                Add Category
-              </Button>
             </div>
 
             {/* Table */}
-            {filteredCategories.length === 0 ? (
+            {categoriesLoading ? (
+              <LoadingState label="Loading categories..." />
+            ) : filteredCategories.length === 0 ? (
               <EmptyState
                 title="No categories found"
                 description="Add your first category to get started."
@@ -892,7 +828,7 @@ export function InventoryList() {
                         },
                       },
                       {
-                        key: 'category_id',
+                        key: 'id',
                         header: 'Actions',
                         render: (row) => (
                           <div className="flex items-center gap-2">
@@ -918,7 +854,7 @@ export function InventoryList() {
                       },
                     ]}
                     data={categoryPaginatedItems}
-                    getRowKey={(row, index) => `category-${row.category_id}-${index}`}
+                    getRowKey={(row, index) => `category-${row.id}-${index}`}
                   />
                 </div>
                 {/* Pagination */}
@@ -1047,28 +983,37 @@ export function InventoryList() {
             <Input
               label="Quantity"
               type="number"
-              value={editingAssignedQuantity.quantity}
-              onChange={(e) =>
-                setEditingAssignedQuantity({
-                  ...editingAssignedQuantity,
-                  quantity: Number(e.target.value),
-                })
-              }
+              value={editingAssignedQuantity.quantity || ''}
+              onChange={(e) => {
+                const inputValue = e.target.value;
+                // Remove leading zeros and parse as integer
+                const numValue = inputValue === '' ? 0 : parseInt(inputValue.replace(/^0+/, '') || '0', 10);
+                if (!isNaN(numValue) && numValue >= 0) {
+                  setEditingAssignedQuantity({
+                    ...editingAssignedQuantity,
+                    quantity: numValue,
+                  });
+                }
+              }}
+              min={1}
+              required
             />
             <div className="flex justify-end gap-2 pt-3 border-t">
-              <Button variant="ghost" size="md" onClick={() => setEditingAssignedQuantity(null)}>
+              <Button 
+                variant="ghost" 
+                size="md" 
+                onClick={() => setEditingAssignedQuantity(null)}
+                disabled={updatingQuantity}
+              >
                 Cancel
               </Button>
               <Button
                 variant="primary"
                 size="md"
-                onClick={async () => {
-                  // Update logic here
-                  console.log('Update quantity:', editingAssignedQuantity);
-                  setEditingAssignedQuantity(null);
-                }}
+                onClick={handleUpdateQuantity}
+                disabled={updatingQuantity || editingAssignedQuantity.quantity < 1}
               >
-                Update
+                {updatingQuantity ? 'Updating...' : 'Update'}
               </Button>
             </div>
           </div>

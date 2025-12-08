@@ -435,6 +435,19 @@ export async function createAssignment(payload: AssignmentPayload): Promise<Inve
   }
 }
 
+export async function updateAssignment(id: number, payload: { quantity: number; date_of_use?: string; reason_notes?: string }): Promise<InventoryAssignment> {
+  try {
+    const response = await apiRequest<AssignmentResponse>(`/inventory/assignments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating assignment:', error);
+    throw error;
+  }
+}
+
 // -------------------- PURCHASE ORDERS API (for assignment form) --------------------
 
 export interface PurchaseOrder {
