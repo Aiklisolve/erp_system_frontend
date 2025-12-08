@@ -3,16 +3,21 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
+import {
+  createAssignment,
+  listPurchaseOrders,
+  listProducts,
+  type AssignmentPayload,
+  type PurchaseOrder,
+  type Product
+} from '../api/inventoryApi';
 
 export interface AssignInventoryFormData {
-  product_id: string;
-  vendor_id: string;
-  vehicle_id: string;
-  product_quantity: number;
-  created_by: string;
-  updated_by: string;
-  dateOfUse: string;
-  reasonNotes: string;
+  product_id: number;
+  purchase_order_id: number;
+  quantity: number;
+  date_of_use: string;
+  reason_notes: string;
 }
 
 type Props = {
@@ -21,252 +26,136 @@ type Props = {
   onCancel?: () => void;
 };
 
-// Static mock data for fallback
-const mockVehicles = [
-  { vehicle_id: 1, registration_number: 'VH-001', vehicle_model: 'Truck Model A' },
-  { vehicle_id: 2, registration_number: 'VH-002', vehicle_model: 'Van Model B' },
-  { vehicle_id: 3, registration_number: 'TRK-001', vehicle_model: 'Truck Model C' },
-];
-
-const mockProducts = [
-  { product_id: 1, product_name: 'Engine Oil Filter', part_number: 'PN-001', available_quantity: 50 },
-  { product_id: 2, product_name: 'Brake Pads', part_number: 'PN-002', available_quantity: 30 },
-  { product_id: 3, product_name: 'Air Filter', part_number: 'PN-003', available_quantity: 25 },
-];
-
 export function AssignInventoryForm({ initial, onSubmit, onCancel }: Props) {
-  const [productId, setProductId] = useState(initial?.product_id ?? '');
-  const [vendorId, setVendorId] = useState(initial?.vendor_id ?? '');
-  const [vehicleId, setVehicleId] = useState(initial?.vehicle_id ?? '');
-  const [productQuantity, setProductQuantity] = useState<number | ''>(initial?.product_quantity ?? '');
-  const [dateOfUse, setDateOfUse] = useState(initial?.dateOfUse ?? new Date().toISOString().slice(0, 10));
-  const [reasonNotes, setReasonNotes] = useState(initial?.reasonNotes ?? '');
+  const [productId, setProductId] = useState<number | ''>(initial?.product_id ?? '');
+  const [purchaseOrderId, setPurchaseOrderId] = useState<number | ''>(initial?.purchase_order_id ?? '');
+  const [quantity, setQuantity] = useState<number | ''>(initial?.quantity ?? '');
+  const [dateOfUse, setDateOfUse] = useState(initial?.date_of_use ?? new Date().toISOString().slice(0, 10));
+  const [reasonNotes, setReasonNotes] = useState(initial?.reason_notes ?? '');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [vehicles, setVehicles] = useState(mockVehicles);
-  const [products, setProducts] = useState(mockProducts);
-  const [selectedProductQuantity, setSelectedProductQuantity] = useState<number | null>(null);
-  const [quantityWarning, setQuantityWarning] = useState('');
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
-  // Fetch vehicles and products from API (optional)
+  // Fetch purchase orders and products from API
   useEffect(() => {
     const fetchData = async () => {
+      setDataLoading(true);
       try {
-        const API_KEY = import.meta.env.VITE_SUPABASE_API_KEY || '';
-        if (API_KEY) {
-          // Fetch vehicles
-          try {
-            const vehicleResponse = await fetch(
-              "https://n8n.srv799538.hstgr.cloud/webhook/5397517f-8d9a-493f-9365-ad74381b20b2",
-              {
-                method: "GET",
-                headers: {
-                  "Content-Type": "application/json",
-                  apikey: API_KEY,
-                  Authorization: `Bearer ${API_KEY}`,
-                  "Content-Profile": "srtms",
-                  jwt_token: "9082c5f9b14d12773ec0ead79742d239cec142c3",
-                  session_id: "1",
-                },
-              }
-            );
-            if (vehicleResponse.ok) {
-              const vehicleData = await vehicleResponse.json();
-              if (Array.isArray(vehicleData)) {
-                setVehicles(vehicleData);
-              }
-            }
-          } catch (error) {
-            console.log('Vehicle API failed, using mock data:', error);
-          }
-
-          // Fetch products
-          try {
-            const productResponse = await fetch(
-              "https://n8n.srv799538.hstgr.cloud/webhook/e69a0b74-7a9a-4e8b-aa7d-4d55f003df3d",
-              {
-                method: "GET",
-                headers: {
-                  "Content-Type": "application/json",
-                  apikey: API_KEY,
-                  Authorization: `Bearer ${API_KEY}`,
-                  "Content-Profile": "srtms",
-                  jwt_token: "9082c5f9b14d12773ec0ead79742d239cec142c3",
-                  session_id: "1",
-                },
-              }
-            );
-            if (productResponse.ok) {
-              const productData = await productResponse.json();
-              if (Array.isArray(productData)) {
-                setProducts(productData);
-              }
-            }
-          } catch (error) {
-            console.log('Product API failed, using mock data:', error);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
+        const [poList, productList] = await Promise.all([
+          listPurchaseOrders(),
+          listProducts()
+        ]);
+        setPurchaseOrders(poList);
+        setProducts(productList);
+      } catch (err) {
+        console.error('Error fetching data:', err);
+        setError('Failed to load form data');
+      } finally {
+        setDataLoading(false);
       }
     };
 
     fetchData();
   }, []);
 
-  // Update available quantity when product is selected
-  useEffect(() => {
-    if (productId) {
-      const selectedProduct = products.find(p => p.product_id.toString() === productId);
-      if (selectedProduct) {
-        setSelectedProductQuantity(selectedProduct.available_quantity || null);
-        // Auto-select part number if available
-        if (selectedProduct.part_number) {
-          setVendorId(selectedProduct.part_number);
-        }
-      } else {
-        setSelectedProductQuantity(null);
-      }
-    } else {
-      setSelectedProductQuantity(null);
-    }
-  }, [productId, products]);
-
-  // Check quantity warning
-  useEffect(() => {
-    if (selectedProductQuantity !== null && productQuantity && Number(productQuantity) > selectedProductQuantity) {
-      setQuantityWarning(`⚠️ Warning: You are requesting ${productQuantity} items, but only ${selectedProductQuantity} are available.`);
-    } else {
-      setQuantityWarning('');
-    }
-  }, [productQuantity, selectedProductQuantity]);
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!productId || !vehicleId || !productQuantity || !dateOfUse || !reasonNotes) {
+    if (!productId || !purchaseOrderId || !quantity || !dateOfUse || !reasonNotes) {
+      setError('Please fill in all required fields');
       return;
     }
 
     setIsLoading(true);
+    setError(null);
+
+    const payload: AssignmentPayload = {
+      product_id: Number(productId),
+      purchase_order_id: Number(purchaseOrderId),
+      quantity: Number(quantity),
+      date_of_use: dateOfUse,
+      reason_notes: reasonNotes
+    };
+
     try {
-      // Try Supabase API first (optional)
-      const API_KEY = import.meta.env.VITE_SUPABASE_API_KEY || '';
-      const hasApiConfig = !!API_KEY;
-
-      if (hasApiConfig) {
-        try {
-          const response = await fetch(
-            "https://n8n.srv799538.hstgr.cloud/webhook/product_usage_master",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                apikey: API_KEY,
-                Authorization: `Bearer ${API_KEY}`,
-                "Content-Profile": "srtms",
-                jwt_token: "9082c5f9b14d12773ec0ead79742d239cec142c3",
-                session_id: "1",
-              },
-              body: JSON.stringify({
-                product_id: productId,
-                vendor_id: vendorId,
-                vehicle_id: vehicleId,
-                product_quantity: Number(productQuantity),
-                created_by: 'Admin',
-                updated_by: 'Admin',
-                date_of_use: dateOfUse,
-                reason_notes: reasonNotes,
-              }),
-            }
-          );
-
-          if (response.ok) {
-            // Success - continue with onSubmit
-          }
-        } catch (error) {
-          console.log('API call failed, using static data:', error);
-        }
-      }
-
-      // Submit with static data fallback
+      const newAssignment = await createAssignment(payload);
       onSubmit({
-        product_id: productId,
-        vendor_id: vendorId,
-        vehicle_id: vehicleId,
-        product_quantity: Number(productQuantity),
-        created_by: 'Admin',
-        updated_by: 'Admin',
-        dateOfUse,
-        reasonNotes,
+        product_id: newAssignment.product_id,
+        purchase_order_id: newAssignment.purchase_order_id,
+        quantity: newAssignment.quantity,
+        date_of_use: newAssignment.date_of_use,
+        reason_notes: newAssignment.reason_notes
       });
-    } catch (error) {
-      console.error('Submit error:', error);
+    } catch (err) {
+      console.error('Submit error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to assign inventory. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const selectedProduct = products.find(p => p.id === productId);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-xs">
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Assignment Information</h3>
+        
+        {error && (
+          <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-red-800 text-[11px]">
+            {error}
+          </div>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Select
             label="Product"
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
+            value={productId.toString()}
+            onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : '')}
+            disabled={dataLoading}
             required
           >
             <option value="">Select product</option>
             {products.map((product) => (
-              <option key={product.product_id} value={product.product_id.toString()}>
-                {product.product_name} ({product.part_number}) - Qty: {product.available_quantity}
+              <option key={product.id} value={product.id.toString()}>
+                {product.name} ({product.product_code})
               </option>
             ))}
           </Select>
           <Select
-            label="Vehicle"
-            value={vehicleId}
-            onChange={(e) => setVehicleId(e.target.value)}
+            label="Purchase Order"
+            value={purchaseOrderId.toString()}
+            onChange={(e) => setPurchaseOrderId(e.target.value ? Number(e.target.value) : '')}
+            disabled={dataLoading}
             required
           >
-            <option value="">Select vehicle</option>
-            {vehicles.map((vehicle) => (
-              <option key={vehicle.vehicle_id} value={vehicle.vehicle_id.toString()}>
-                {vehicle.registration_number} - {vehicle.vehicle_model}
+            <option value="">Select purchase order</option>
+            {purchaseOrders.map((po) => (
+              <option key={po.id} value={po.id.toString()}>
+                {po.po_number} - {po.supplier_name} ({po.status})
               </option>
             ))}
           </Select>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
-            label="Part Number"
-            value={vendorId}
-            onChange={(e) => setVendorId(e.target.value)}
+            label="Product Code"
+            value={selectedProduct?.product_code ?? ''}
             placeholder="Auto-filled from product"
             readOnly
           />
           <Input
             label="Quantity"
             type="number"
-            value={productQuantity}
-            onChange={(e) => setProductQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="Enter quantity"
             min={1}
-            max={selectedProductQuantity || undefined}
             required
           />
         </div>
-        {quantityWarning && (
-          <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px]">
-            {quantityWarning}
-          </div>
-        )}
-        {selectedProductQuantity !== null && (
-          <p className="text-[11px] text-slate-500">
-            Available quantity: <span className="font-semibold">{selectedProductQuantity}</span>
-          </p>
-        )}
         <Input
           label="Date of Use"
           type="date"
@@ -289,7 +178,7 @@ export function AssignInventoryForm({ initial, onSubmit, onCancel }: Props) {
         <Button type="button" variant="ghost" size="md" onClick={onCancel} className="w-full sm:w-auto">
           Cancel
         </Button>
-        <Button type="submit" variant="primary" size="md" disabled={isLoading} className="w-full sm:w-auto">
+        <Button type="submit" variant="primary" size="md" disabled={isLoading || dataLoading} className="w-full sm:w-auto">
           {isLoading ? 'Assigning...' : 'Assign Inventory'}
         </Button>
       </div>

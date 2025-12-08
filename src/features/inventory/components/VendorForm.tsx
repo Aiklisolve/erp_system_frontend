@@ -2,17 +2,16 @@ import { useState, FormEvent } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Textarea } from '../../../components/ui/Textarea';
+import { createVendor, updateVendor, type VendorPayload } from '../api/inventoryApi';
 
 export interface VendorFormData {
   id?: number;
-  category_name: string;
+  vendor_name: string;
   phone_number: string;
-  email_id: string;
+  email: string;
   contact_person_name: string;
   address: string;
   materials_products: string;
-  created_by?: string;
-  updated_by?: string;
 }
 
 type Props = {
@@ -21,89 +20,65 @@ type Props = {
   onCancel?: () => void;
 };
 
-// Static mock vendors for fallback
-const mockVendors: VendorFormData[] = [
-  {
-    id: 1,
-    category_name: 'ABC Electronics Ltd',
-    phone_number: '9876543210',
-    email_id: 'contact@abcelectronics.com',
-    contact_person_name: 'John Doe',
-    address: '123 Industrial Area, City',
-    materials_products: 'Electronic components, Circuit boards'
-  }
-];
-
 export function VendorForm({ initial, onSubmit, onCancel }: Props) {
-  const [vendorName, setVendorName] = useState(initial?.category_name ?? '');
+  const [vendorName, setVendorName] = useState(initial?.vendor_name ?? '');
   const [phoneNumber, setPhoneNumber] = useState(initial?.phone_number ?? '');
-  const [emailId, setEmailId] = useState(initial?.email_id ?? '');
+  const [email, setEmail] = useState(initial?.email ?? '');
   const [contactPerson, setContactPerson] = useState(initial?.contact_person_name ?? '');
   const [address, setAddress] = useState(initial?.address ?? '');
   const [materialsProducts, setMaterialsProducts] = useState(initial?.materials_products ?? '');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!vendorName || !phoneNumber || !emailId || !contactPerson || !address || !materialsProducts) {
+    if (!vendorName || !phoneNumber || !email || !contactPerson || !address || !materialsProducts) {
+      setError('Please fill in all required fields');
       return;
     }
 
     setIsLoading(true);
+    setError(null);
+
+    const payload: VendorPayload = {
+      vendor_name: vendorName,
+      phone_number: phoneNumber,
+      email: email,
+      contact_person_name: contactPerson,
+      address: address,
+      materials_products: materialsProducts,
+      is_active: true
+    };
+
     try {
-      // Try Supabase API first (optional)
-      const API_KEY = import.meta.env.VITE_SUPABASE_API_KEY || '';
-      const hasApiConfig = !!API_KEY;
-
-      if (hasApiConfig) {
-        try {
-          const response = await fetch(
-            "https://n8n.srv799538.hstgr.cloud/webhook/vendor_add",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                apikey: API_KEY,
-                Authorization: `Bearer ${API_KEY}`,
-                "Content-Profile": "srtms",
-                jwt_token: "9082c5f9b14d12773ec0ead79742d239cec142c3",
-                session_id: "1",
-              },
-              body: JSON.stringify({
-                category_name: vendorName,
-                phone_number: phoneNumber,
-                email_id: emailId,
-                contact_person_name: contactPerson,
-                address: address,
-                materials_products: materialsProducts,
-                created_by: 'Admin',
-                updated_by: 'Admin',
-              }),
-            }
-          );
-
-          if (response.ok) {
-            // Success - continue with onSubmit
-          }
-        } catch (error) {
-          console.log('API call failed, using static data:', error);
-        }
+      if (initial?.id) {
+        // Update existing vendor
+        const updatedVendor = await updateVendor(initial.id, payload);
+        onSubmit({
+          id: updatedVendor.id,
+          vendor_name: updatedVendor.vendor_name,
+          phone_number: updatedVendor.phone_number,
+          email: updatedVendor.email,
+          contact_person_name: updatedVendor.contact_person_name,
+          address: updatedVendor.address,
+          materials_products: updatedVendor.materials_products
+        });
+      } else {
+        // Create new vendor
+        const newVendor = await createVendor(payload);
+        onSubmit({
+          id: newVendor.id,
+          vendor_name: newVendor.vendor_name,
+          phone_number: newVendor.phone_number,
+          email: newVendor.email,
+          contact_person_name: newVendor.contact_person_name,
+          address: newVendor.address,
+          materials_products: newVendor.materials_products
+        });
       }
-
-      // Submit with static data fallback
-      onSubmit({
-        id: initial?.id || mockVendors.length + 1,
-        category_name: vendorName,
-        phone_number: phoneNumber,
-        email_id: emailId,
-        contact_person_name: contactPerson,
-        address: address,
-        materials_products: materialsProducts,
-        created_by: 'Admin',
-        updated_by: 'Admin',
-      });
-    } catch (error) {
-      console.error('Submit error:', error);
+    } catch (err) {
+      console.error('Submit error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save vendor. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -113,6 +88,13 @@ export function VendorForm({ initial, onSubmit, onCancel }: Props) {
     <form onSubmit={handleSubmit} className="space-y-6 text-xs">
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Vendor Information</h3>
+        
+        {error && (
+          <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-red-800 text-[11px]">
+            {error}
+          </div>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
             label="Vendor Name"
@@ -138,8 +120,8 @@ export function VendorForm({ initial, onSubmit, onCancel }: Props) {
           <Input
             label="Email Address"
             type="email"
-            value={emailId}
-            onChange={(e) => setEmailId(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="Enter email address"
             required
           />
@@ -174,7 +156,7 @@ export function VendorForm({ initial, onSubmit, onCancel }: Props) {
           Cancel
         </Button>
         <Button type="submit" variant="primary" size="md" disabled={isLoading} className="w-full sm:w-auto">
-          {isLoading ? 'Adding...' : initial ? 'Update Vendor' : 'Add Vendor'}
+          {isLoading ? 'Saving...' : initial?.id ? 'Update Vendor' : 'Add Vendor'}
         </Button>
       </div>
     </form>

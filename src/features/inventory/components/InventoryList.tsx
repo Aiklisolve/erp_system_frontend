@@ -58,18 +58,18 @@ const mockAssignedInventory: AssignedInventoryItem[] = [
 const mockVendorsData: VendorFormData[] = [
   {
     id: 1,
-    category_name: 'ABC Electronics Ltd',
+    vendor_name: 'ABC Electronics Ltd',
     phone_number: '9876543210',
-    email_id: 'contact@abcelectronics.com',
+    email: 'contact@abcelectronics.com',
     contact_person_name: 'John Doe',
     address: '123 Industrial Area, City',
     materials_products: 'Electronic components, Circuit boards',
   },
   {
     id: 2,
-    category_name: 'XYZ Auto Parts',
+    vendor_name: 'XYZ Auto Parts',
     phone_number: '9876543211',
-    email_id: 'info@xyzautoparts.com',
+    email: 'info@xyzautoparts.com',
     contact_person_name: 'Jane Smith',
     address: '456 Auto Street, City',
     materials_products: 'Vehicle parts, Brake pads, Filters',
@@ -156,40 +156,22 @@ export function InventoryList() {
     }
   }, [activeTab]);
 
-  // Fetch vendors (optional API call)
+  // Fetch vendors from backend API
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const API_KEY = import.meta.env.VITE_SUPABASE_API_KEY || '';
-        if (API_KEY) {
-          const response = await fetch(
-            "https://n8n.srv799538.hstgr.cloud/webhook/vendor",
-            {
-              method: 'GET',
-              headers: {
-                'apikey': API_KEY,
-                'Authorization': `Bearer ${API_KEY}`,
-                'content-Profile': 'srtms',
-                'session_id': '1',
-                'jwt_token': '9082c5f9b14d12773ec0ead79742d239cec142c3',
-              },
-            }
-          );
-          if (response.ok) {
-            const data = await response.json();
-            if (Array.isArray(data) && data[0]?.status === 'success' && data[0]?.data) {
-              const activeVendors = data[0].data.filter((v: any) => !v.deleted_flag);
-              setVendors(activeVendors.map((v: any) => ({
-                id: v.vendor_id,
-                category_name: v.company_name,
-                phone_number: v.phone_number || '',
-                email_id: v.email_id || '',
-                contact_person_name: v.contact_person_name || '',
-                address: '',
-                materials_products: '',
-              })));
-            }
-          }
+        const { listVendors } = await import('../api/inventoryApi');
+        const vendorList = await listVendors();
+        if (vendorList && vendorList.length > 0) {
+          setVendors(vendorList.map((v: any) => ({
+            id: v.id,
+            vendor_name: v.vendor_name || '',
+            phone_number: v.phone_number || '',
+            email: v.email || '',
+            contact_person_name: v.contact_person_name || '',
+            address: v.address || '',
+            materials_products: v.materials_products || '',
+          })));
         }
       } catch (error) {
         console.log('Using mock vendors:', error);
@@ -245,9 +227,9 @@ export function InventoryList() {
   // Filter inventory items
   const filteredItems = items.filter((item) => {
     const matchesSearch =
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.location.toLowerCase().includes(searchTerm.toLowerCase());
+      (item.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.location || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
     const matchesStock =
       stockFilter === 'all' ||
@@ -259,9 +241,9 @@ export function InventoryList() {
   // Filter assigned inventory
   const filteredAssigned = assignedInventory.filter((item) => {
     const matchesSearch =
-      item.registration_number.toLowerCase().includes(assignedSearchTerm.toLowerCase()) ||
-      item.item_name.toLowerCase().includes(assignedSearchTerm.toLowerCase()) ||
-      item.part_number.toLowerCase().includes(assignedSearchTerm.toLowerCase());
+      (item.registration_number || '').toLowerCase().includes(assignedSearchTerm.toLowerCase()) ||
+      (item.item_name || '').toLowerCase().includes(assignedSearchTerm.toLowerCase()) ||
+      (item.part_number || '').toLowerCase().includes(assignedSearchTerm.toLowerCase());
     const matchesCategory = assignedCategoryFilter === 'all' || item.category === assignedCategoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -277,15 +259,15 @@ export function InventoryList() {
 
   // Filter vendors
   const filteredVendors = vendors.filter((vendor) =>
-    vendor.category_name.toLowerCase().includes(vendorSearchTerm.toLowerCase()) ||
-    vendor.contact_person_name.toLowerCase().includes(vendorSearchTerm.toLowerCase()) ||
-    vendor.email_id.toLowerCase().includes(vendorSearchTerm.toLowerCase()) ||
-    vendor.phone_number.includes(vendorSearchTerm)
+    (vendor.vendor_name || '').toLowerCase().includes(vendorSearchTerm.toLowerCase()) ||
+    (vendor.contact_person_name || '').toLowerCase().includes(vendorSearchTerm.toLowerCase()) ||
+    (vendor.email || '').toLowerCase().includes(vendorSearchTerm.toLowerCase()) ||
+    (vendor.phone_number || '').includes(vendorSearchTerm)
   );
 
   // Filter categories
   const filteredCategories = categories.filter((category) =>
-    category.category_name.toLowerCase().includes(categorySearchTerm.toLowerCase())
+    (category.category_name || '').toLowerCase().includes(categorySearchTerm.toLowerCase())
   );
 
   // Pagination for vendors
@@ -452,7 +434,7 @@ export function InventoryList() {
     if (window.confirm('Are you sure you want to delete this vendor?')) {
       if (vendor.id) {
         setVendors((prev) => prev.filter((v) => v.id !== vendor.id));
-        showToast('success', 'Vendor Deleted', `Vendor "${vendor.vendor_name}" has been deleted successfully.`);
+        showToast('success', 'Vendor Deleted', `Vendor "${vendor.vendor_name || 'Unknown'}" has been deleted successfully.`);
       }
     }
   };
@@ -776,10 +758,10 @@ export function InventoryList() {
                 <div className="overflow-x-auto">
                   <Table
                     columns={[
-                      { key: 'category_name', header: 'Vendor Name' },
+                      { key: 'vendor_name', header: 'Vendor Name' },
                       { key: 'contact_person_name', header: 'Contact Person' },
                       { key: 'phone_number', header: 'Phone' },
-                      { key: 'email_id', header: 'Email' },
+                      { key: 'email', header: 'Email' },
                       {
                         key: 'id',
                         header: 'Actions',
@@ -897,7 +879,7 @@ export function InventoryList() {
                         header: 'Vendor',
                         render: (row) => {
                           const vendor = vendors.find((v) => v.id === row.vendor_id);
-                          return vendor?.category_name || `Vendor #${row.vendor_id}`;
+                          return vendor?.vendor_name || `Vendor #${row.vendor_id}`;
                         },
                       },
                       {

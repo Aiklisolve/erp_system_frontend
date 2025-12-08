@@ -2,13 +2,19 @@ import { useState, useEffect, FormEvent } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
+import { 
+  createCategory, 
+  updateCategory, 
+  listVendors, 
+  type CategoryPayload,
+  type Vendor 
+} from '../api/inventoryApi';
 
 export interface CategoryFormData {
-  category_id?: number;
+  id?: number;
   category_name: string;
   vendor_id: number;
-  created_by?: string;
-  updated_by?: string;
+  description?: string;
 }
 
 type Props = {
@@ -17,123 +23,76 @@ type Props = {
   onCancel?: () => void;
 };
 
-// Static mock categories and vendors for fallback
-const mockCategories: CategoryFormData[] = [
-  { category_id: 1, category_name: 'Electronics', vendor_id: 1 },
-  { category_id: 2, category_name: 'Tools', vendor_id: 1 },
-  { category_id: 3, category_name: 'Safety Equipment', vendor_id: 1 },
-];
-
-const mockVendors = [
-  { vendor_id: 1, company_name: 'ABC Electronics Ltd', contact_person_name: 'John Doe' },
-  { vendor_id: 2, company_name: 'XYZ Auto Parts', contact_person_name: 'Jane Smith' },
-  { vendor_id: 3, company_name: 'Global Tools Inc', contact_person_name: 'Bob Johnson' },
-];
-
 export function CategoryForm({ initial, onSubmit, onCancel }: Props) {
   const [categoryName, setCategoryName] = useState(initial?.category_name ?? '');
-  const [vendorId, setVendorId] = useState<number>(initial?.vendor_id ?? mockVendors[0]?.vendor_id ?? 1);
-  const [vendors, setVendors] = useState(mockVendors);
+  const [vendorId, setVendorId] = useState<number | ''>(initial?.vendor_id ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [vendorsLoading, setVendorsLoading] = useState(false);
+  const [vendorsLoading, setVendorsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch vendors from API (optional)
+  // Fetch vendors from API
   useEffect(() => {
     const fetchVendors = async () => {
       setVendorsLoading(true);
       try {
-        const API_KEY = import.meta.env.VITE_SUPABASE_API_KEY || '';
-        if (API_KEY) {
-          const response = await fetch(
-            "https://n8n.srv799538.hstgr.cloud/webhook/vendor",
-            {
-              method: 'GET',
-              headers: {
-                'apikey': API_KEY,
-                'Authorization': `Bearer ${API_KEY}`,
-                'content-Profile': 'srtms',
-                'session_id': '1',
-                'jwt_token': '9082c5f9b14d12773ec0ead79742d239cec142c3',
-              },
-            }
-          );
-
-          if (response.ok) {
-            const data = await response.json();
-            if (Array.isArray(data) && data[0]?.status === 'success' && data[0]?.data) {
-              const activeVendors = data[0].data.filter((v: any) => !v.deleted_flag);
-              setVendors(activeVendors.map((v: any) => ({
-                vendor_id: v.vendor_id,
-                company_name: v.company_name,
-                contact_person_name: v.contact_person_name,
-              })));
-            }
-          }
+        const vendorList = await listVendors();
+        setVendors(vendorList);
+        // Set default vendor if not already set
+        if (!initial?.vendor_id && vendorList.length > 0) {
+          setVendorId(vendorList[0].id);
         }
       } catch (err) {
         console.error('Error fetching vendors:', err);
-        // Use mock vendors on error
+        setError('Failed to load vendors');
       } finally {
         setVendorsLoading(false);
       }
     };
 
     fetchVendors();
-  }, []);
+  }, [initial?.vendor_id]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!categoryName || !vendorId) {
+      setError('Please fill in all required fields');
       return;
     }
 
     setIsLoading(true);
+    setError(null);
+
+    const payload: CategoryPayload = {
+      category_name: categoryName,
+      vendor_id: Number(vendorId),
+      description: description || undefined
+    };
+
     try {
-      // Try Supabase API first (optional)
-      const API_KEY = import.meta.env.VITE_SUPABASE_API_KEY || '';
-      const hasApiConfig = !!API_KEY;
-
-      if (hasApiConfig) {
-        try {
-          const response = await fetch(
-            "https://n8n.srv799538.hstgr.cloud/webhook/Category",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                apikey: API_KEY,
-                Authorization: `Bearer ${API_KEY}`,
-                "Content-Profile": "srtms",
-                jwt_token: "9082c5f9b14d12773ec0ead79742d239cec142c3",
-                session_id: "1",
-              },
-              body: JSON.stringify({
-                category_id: initial?.category_id || mockCategories.length + 1,
-                category_name: categoryName,
-                created_by: 'Admin',
-                updated_by: 'Admin',
-              }),
-            }
-          );
-
-          if (response.ok) {
-            // Success - continue with onSubmit
-          }
-        } catch (error) {
-          console.log('API call failed, using static data:', error);
-        }
+      if (initial?.id) {
+        // Update existing category
+        const updatedCategory = await updateCategory(initial.id, payload);
+        onSubmit({
+          id: updatedCategory.id,
+          category_name: updatedCategory.category_name,
+          vendor_id: updatedCategory.vendor_id,
+          description: updatedCategory.description
+        });
+      } else {
+        // Create new category
+        const newCategory = await createCategory(payload);
+        onSubmit({
+          id: newCategory.id,
+          category_name: newCategory.category_name,
+          vendor_id: newCategory.vendor_id,
+          description: newCategory.description
+        });
       }
-
-      // Submit with static data fallback
-      onSubmit({
-        category_id: initial?.category_id || mockCategories.length + 1,
-        category_name: categoryName,
-        vendor_id: vendorId,
-        created_by: 'Admin',
-        updated_by: 'Admin',
-      });
-    } catch (error) {
-      console.error('Submit error:', error);
+    } catch (err) {
+      console.error('Submit error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save category. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -143,6 +102,13 @@ export function CategoryForm({ initial, onSubmit, onCancel }: Props) {
     <form onSubmit={handleSubmit} className="space-y-6 text-xs">
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Category Information</h3>
+        
+        {error && (
+          <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-red-800 text-[11px]">
+            {error}
+          </div>
+        )}
+
         <Input
           label="Category Name"
           value={categoryName}
@@ -153,16 +119,23 @@ export function CategoryForm({ initial, onSubmit, onCancel }: Props) {
         <Select
           label="Vendor"
           value={vendorId.toString()}
-          onChange={(e) => setVendorId(Number(e.target.value))}
+          onChange={(e) => setVendorId(e.target.value ? Number(e.target.value) : '')}
           disabled={vendorsLoading}
+          required
         >
           <option value="">Select vendor</option>
           {vendors.map((vendor) => (
-            <option key={vendor.vendor_id} value={vendor.vendor_id.toString()}>
-              {vendor.company_name} - {vendor.contact_person_name}
+            <option key={vendor.id} value={vendor.id.toString()}>
+              {vendor.vendor_name} - {vendor.contact_person_name}
             </option>
           ))}
         </Select>
+        <Input
+          label="Description (Optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Enter category description"
+        />
       </div>
 
       <div className="mt-4 border-t border-slate-200 bg-white pt-3 flex flex-col sm:flex-row justify-end gap-2 sticky bottom-0">
@@ -170,7 +143,7 @@ export function CategoryForm({ initial, onSubmit, onCancel }: Props) {
           Cancel
         </Button>
         <Button type="submit" variant="primary" size="md" disabled={isLoading || vendorsLoading} className="w-full sm:w-auto">
-          {isLoading ? 'Creating...' : 'Create Category'}
+          {isLoading ? 'Saving...' : initial?.id ? 'Update Category' : 'Create Category'}
         </Button>
       </div>
     </form>
