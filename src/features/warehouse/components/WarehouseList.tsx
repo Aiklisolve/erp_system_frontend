@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWarehouse } from '../hooks/useWarehouse';
 import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
@@ -13,15 +13,24 @@ import { StatCard } from '../../../components/ui/StatCard';
 import { Tabs } from '../../../components/ui/Tabs';
 import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
-import type { StockMovement } from '../types';
+import type { StockMovement, Warehouse } from '../types';
 import { WarehouseForm } from './WarehouseForm';
+import { CreateWarehouseForm } from './CreateWarehouseForm';
+import * as warehouseApi from '../api/warehouseApi';
 
 export function WarehouseList() {
   const { movements, loading, create, update, remove, refresh, metrics } = useWarehouse();
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'all' | 'transfers' | 'receipts' | 'shipments' | 'adjustments'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'transfers' | 'receipts' | 'shipments' | 'adjustments' | 'warehouses'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<StockMovement | null>(null);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [warehousesLoading, setWarehousesLoading] = useState(false);
+  const [warehouseModalOpen, setWarehouseModalOpen] = useState(false);
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
+  const [warehouseSearchTerm, setWarehouseSearchTerm] = useState('');
+  const [warehouseCurrentPage, setWarehouseCurrentPage] = useState(1);
+  const [warehouseItemsPerPage, setWarehouseItemsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -32,15 +41,15 @@ export function WarehouseList() {
   const filteredMovements = movements.filter((movement) => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
-      movement.item_id.toLowerCase().includes(searchLower) ||
+      (movement.item_id && movement.item_id.toLowerCase().includes(searchLower)) ||
       (movement.item_name && movement.item_name.toLowerCase().includes(searchLower)) ||
       (movement.item_sku && movement.item_sku.toLowerCase().includes(searchLower)) ||
       (movement.movement_number && movement.movement_number.toLowerCase().includes(searchLower)) ||
       (movement.reference_number && movement.reference_number.toLowerCase().includes(searchLower)) ||
       (movement.tracking_number && movement.tracking_number.toLowerCase().includes(searchLower)) ||
-      movement.from_location.toLowerCase().includes(searchLower) ||
-      movement.to_location.toLowerCase().includes(searchLower) ||
-      movement.movement_date.includes(searchTerm);
+      (movement.from_location && movement.from_location.toLowerCase().includes(searchLower)) ||
+      (movement.to_location && movement.to_location.toLowerCase().includes(searchLower)) ||
+      (movement.movement_date && movement.movement_date.includes(searchTerm));
     
     const matchesType = typeFilter === 'all' || movement.movement_type === typeFilter;
     const matchesStatus = statusFilter === 'all' || movement.status === statusFilter;
@@ -61,8 +70,12 @@ export function WarehouseList() {
   const paginatedMovements = filteredMovements.slice(startIndex, startIndex + itemsPerPage);
 
   // Get unique types and statuses for filters
-  const movementTypes = Array.from(new Set(movements.map((m) => m.movement_type)));
-  const statuses = Array.from(new Set(movements.map((m) => m.status)));
+  const movementTypes = Array.from(
+    new Set(movements.map((mv) => mv.movement_type).filter((type): type is Exclude<StockMovement["movement_type"], undefined | null> => type != null))
+  );
+  const statuses = Array.from(
+    new Set(movements.map((mv) => mv.status).filter((status): status is Exclude<StockMovement["status"], undefined | null> => status != null))
+  );
 
   // Calculate metrics by type
   const metricsByType = movements.reduce(
@@ -107,11 +120,13 @@ export function WarehouseList() {
           ADJUSTMENT: 'bg-amber-50 text-amber-700',
           RETURN: 'bg-red-50 text-red-700',
           CYCLE_COUNT: 'bg-indigo-50 text-indigo-700',
+          IN: 'bg-green-50 text-green-700',
+          OUT: 'bg-purple-50 text-purple-700',
         };
         const color = typeColors[row.movement_type] || 'bg-slate-50 text-slate-700';
         return (
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${color}`}>
-            {row.movement_type.replace('_', ' ')}
+            {row.movement_type ? row.movement_type.replace('_', ' ') : 'N/A'}
           </span>
         );
       },
@@ -128,7 +143,7 @@ export function WarehouseList() {
             : row.status === 'IN_PROGRESS'
             ? 'warning'
             : 'neutral';
-        return <Badge tone={statusTone}>{row.status.replace('_', ' ')}</Badge>;
+        return <Badge tone={statusTone}>{row.status ? row.status.replace('_', ' ') : 'N/A'}</Badge>;
       },
     },
     {
@@ -221,6 +236,148 @@ export function WarehouseList() {
     }
   };
 
+  // Load warehouses when warehouses tab is active
+  const loadWarehouses = async () => {
+    setWarehousesLoading(true);
+    try {
+      const data = await warehouseApi.listWarehouses();
+      setWarehouses(data);
+    } catch (error) {
+      console.error('Failed to load warehouses:', error);
+      showToast('error', 'Error', 'Failed to load warehouses');
+    } finally {
+      setWarehousesLoading(false);
+    }
+  };
+
+  // Load warehouses when tab changes to warehouses
+  useEffect(() => {
+    if (activeTab === 'warehouses') {
+      loadWarehouses();
+    }
+  }, [activeTab]);
+
+  // Warehouse handlers
+  const handleWarehouseSubmit = async (data: Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      if (editingWarehouse) {
+        await warehouseApi.updateWarehouse(editingWarehouse.id, data);
+        showToast('success', 'Warehouse Updated', `Warehouse ${data.name} has been updated successfully.`);
+      } else {
+        await warehouseApi.createWarehouse(data);
+        showToast('success', 'Warehouse Created', `Warehouse ${data.name} has been created successfully.`);
+      }
+      setWarehouseModalOpen(false);
+      setEditingWarehouse(null);
+      await loadWarehouses();
+    } catch (error: any) {
+      showToast('error', 'Operation Failed', error.message || 'Failed to save warehouse. Please try again.');
+    }
+  };
+
+  const handleWarehouseDelete = async (warehouse: Warehouse) => {
+    if (window.confirm(`Are you sure you want to delete warehouse "${warehouse.name}"?`)) {
+      try {
+        await warehouseApi.deleteWarehouse(warehouse.id);
+        showToast('success', 'Warehouse Deleted', `Warehouse ${warehouse.name} has been deleted successfully.`);
+        await loadWarehouses();
+      } catch (error: any) {
+        showToast('error', 'Deletion Failed', error.message || 'Failed to delete warehouse. Please try again.');
+      }
+    }
+  };
+
+  // Filter warehouses based on search
+  const filteredWarehouses = warehouses.filter((warehouse) => {
+    const searchLower = warehouseSearchTerm.toLowerCase();
+    return (
+      !warehouseSearchTerm ||
+      (warehouse.warehouse_code && warehouse.warehouse_code.toLowerCase().includes(searchLower)) ||
+      (warehouse.name && warehouse.name.toLowerCase().includes(searchLower)) ||
+      (warehouse.address && warehouse.address.toLowerCase().includes(searchLower)) ||
+      (warehouse.city && warehouse.city.toLowerCase().includes(searchLower)) ||
+      (warehouse.state && warehouse.state.toLowerCase().includes(searchLower)) ||
+      (warehouse.country && warehouse.country.toLowerCase().includes(searchLower))
+    );
+  });
+
+  // Warehouse pagination
+  const warehouseTotalPages = Math.ceil(filteredWarehouses.length / warehouseItemsPerPage);
+  const warehouseStartIndex = (warehouseCurrentPage - 1) * warehouseItemsPerPage;
+  const paginatedWarehouses = filteredWarehouses.slice(warehouseStartIndex, warehouseStartIndex + warehouseItemsPerPage);
+
+  // Warehouse table columns
+  const warehouseColumns: TableColumn<Warehouse>[] = [
+    {
+      key: 'warehouse_code',
+      header: 'Code',
+      render: (row) => <div className="font-medium text-slate-900">{row.warehouse_code}</div>,
+    },
+    {
+      key: 'name',
+      header: 'Name',
+      render: (row) => <div className="font-medium text-slate-900">{row.name}</div>,
+    },
+    {
+      key: 'address',
+      header: 'Location',
+      render: (row) => (
+        <div className="space-y-0.5">
+          {row.address && <div className="text-slate-900">{row.address}</div>}
+          {(row.city || row.state) && (
+            <div className="text-[10px] text-slate-500">
+              {[row.city, row.state, row.pincode].filter(Boolean).join(', ')}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'country',
+      header: 'Country',
+      render: (row) => <div className="text-slate-900">{row.country || '—'}</div>,
+    },
+    {
+      key: 'capacity',
+      header: 'Capacity',
+      render: (row) => <div className="text-slate-900">{row.capacity ? row.capacity.toLocaleString() : '—'}</div>,
+    },
+    {
+      key: 'is_active',
+      header: 'Status',
+      render: (row) => (
+        <Badge tone={row.is_active ? 'success' : 'neutral'}>
+          {row.is_active ? 'Active' : 'Inactive'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'id',
+      header: 'Actions',
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setEditingWarehouse(row);
+              setWarehouseModalOpen(true);
+            }}
+            className="text-[11px] text-primary hover:text-primary-dark"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => handleWarehouseDelete(row)}
+            className="text-[11px] text-red-500 hover:text-red-600"
+          >
+            Delete
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -293,15 +450,17 @@ export function WarehouseList() {
             { id: 'receipts', label: 'Receipts' },
             { id: 'shipments', label: 'Shipments' },
             { id: 'adjustments', label: 'Adjustments' },
+            { id: 'warehouses', label: 'Warehouses' },
           ]}
           activeId={activeTab}
           onChange={(id) => {
-            setActiveTab(id as 'all' | 'transfers' | 'receipts' | 'shipments' | 'adjustments');
+            setActiveTab(id as 'all' | 'transfers' | 'receipts' | 'shipments' | 'adjustments' | 'warehouses');
             setCurrentPage(1);
           }}
         />
 
-        {/* Filters */}
+        {/* Filters - Only show for movement tabs */}
+        {activeTab !== 'warehouses' && (
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Input
@@ -324,7 +483,7 @@ export function WarehouseList() {
             <option value="all">All Types</option>
             {movementTypes.map((type) => (
               <option key={type} value={type}>
-                {type.replace('_', ' ')}
+                {type ? type.replace('_', ' ') : 'N/A'}
               </option>
             ))}
           </Select>
@@ -339,14 +498,104 @@ export function WarehouseList() {
             <option value="all">All Statuses</option>
             {statuses.map((status) => (
               <option key={status} value={status}>
-                {status.replace('_', ' ')}
+                {status ? status.replace('_', ' ') : 'N/A'}
               </option>
             ))}
           </Select>
         </div>
+        )}
 
         {/* Table */}
-        {loading ? (
+        {activeTab === 'warehouses' ? (
+          // Warehouses Tab
+          <>
+            {/* Warehouse Search */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search by warehouse code, name, address, city, state, or country..."
+                  value={warehouseSearchTerm}
+                  onChange={(e) => {
+                    setWarehouseSearchTerm(e.target.value);
+                    setWarehouseCurrentPage(1);
+                  }}
+                />
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setEditingWarehouse(null);
+                  setWarehouseModalOpen(true);
+                }}
+                className="w-full sm:w-auto"
+              >
+                New Warehouse
+              </Button>
+            </div>
+
+            {warehousesLoading ? (
+              <LoadingState label="Loading warehouses..." />
+            ) : filteredWarehouses.length === 0 ? (
+              <EmptyState
+                title="No warehouses found"
+                description={
+                  warehouseSearchTerm
+                    ? 'Try adjusting your search to see more results.'
+                    : 'Create your first warehouse to get started.'
+                }
+              />
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <Table
+                    columns={warehouseColumns}
+                    data={paginatedWarehouses}
+                    getRowKey={(row, index) => `${row.id}-${index}`}
+                  />
+                </div>
+                {/* Warehouse Pagination */}
+                <div className="px-4 py-3 border-t border-slate-200">
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Left: Page size selector */}
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <span>Show</span>
+                      <select
+                        value={warehouseItemsPerPage}
+                        onChange={(e) => {
+                          setWarehouseItemsPerPage(Number(e.target.value));
+                          setWarehouseCurrentPage(1);
+                        }}
+                        className="border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                      <span>per page</span>
+                    </div>
+
+                    {/* Center: Page numbers */}
+                    <div className="flex-1 flex justify-center">
+                      <Pagination
+                        page={warehouseCurrentPage}
+                        totalPages={warehouseTotalPages}
+                        onChange={setWarehouseCurrentPage}
+                      />
+                    </div>
+
+                    {/* Right: Showing info */}
+                    <div className="text-xs text-slate-600 whitespace-nowrap">
+                      Showing <span className="font-medium text-slate-900">{warehouseStartIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(warehouseStartIndex + warehouseItemsPerPage, filteredWarehouses.length)}</span> of <span className="font-medium text-slate-900">{filteredWarehouses.length}</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        ) : loading ? (
           <LoadingState label="Loading stock movements..." />
         ) : filteredMovements.length === 0 ? (
           <EmptyState
@@ -408,7 +657,7 @@ export function WarehouseList() {
         )}
       </Card>
 
-      {/* Modal */}
+      {/* Stock Movement Modal */}
       <Modal
         title={editingMovement ? 'Edit Stock Movement' : 'New Stock Movement'}
         open={modalOpen}
@@ -424,6 +673,26 @@ export function WarehouseList() {
           onCancel={() => {
             setModalOpen(false);
             setEditingMovement(null);
+          }}
+        />
+      </Modal>
+
+      {/* Warehouse Modal */}
+      <Modal
+        title={editingWarehouse ? 'Edit Warehouse' : 'New Warehouse'}
+        open={warehouseModalOpen}
+        onClose={() => {
+          setWarehouseModalOpen(false);
+          setEditingWarehouse(null);
+        }}
+        hideCloseButton
+      >
+        <CreateWarehouseForm
+          initial={editingWarehouse || undefined}
+          onSubmit={handleWarehouseSubmit}
+          onCancel={() => {
+            setWarehouseModalOpen(false);
+            setEditingWarehouse(null);
           }}
         />
       </Modal>

@@ -108,3 +108,17 @@ export interface ReceivingItem {
   lot_number?: string;
   condition?: 'GOOD' | 'DAMAGED' | 'SHORT' | 'OVER';
 }
+
+// Warehouse
+export interface Warehouse extends BaseEntity {
+  warehouse_code: string;
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+  manager_id?: number;
+  capacity?: number;
+  is_active?: boolean;
+}
