@@ -356,7 +356,10 @@ export function InventoryList() {
     },
   ];
 
+  const [formLoading, setFormLoading] = useState(false);
+
   const handleFormSubmit = async (data: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => {
+    setFormLoading(true);
     try {
       if (editingItem) {
         await update(editingItem.id, data);
@@ -367,8 +370,12 @@ export function InventoryList() {
       }
       setModalOpen(false);
       setEditingItem(null);
+      // Refresh the list to get updated data from backend
+      await refresh();
     } catch (error) {
       showToast('error', 'Operation Failed', 'Failed to save inventory item. Please try again.');
+    } finally {
+      setFormLoading(false);
     }
   };
 
@@ -377,6 +384,8 @@ export function InventoryList() {
       try {
         await remove(item.id);
         showToast('success', 'Inventory Item Deleted', `Item "${item.name}" has been deleted successfully.`);
+        // Refresh the list to get updated data from backend
+        await refresh();
       } catch (error) {
         showToast('error', 'Deletion Failed', 'Failed to delete inventory item. Please try again.');
       }
@@ -973,6 +982,7 @@ export function InventoryList() {
             setModalOpen(false);
             setEditingItem(null);
           }}
+          isLoading={formLoading}
         />
       </Modal>
 

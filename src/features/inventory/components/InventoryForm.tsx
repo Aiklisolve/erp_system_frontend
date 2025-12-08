@@ -1,13 +1,15 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
+import { listCategories, type Category } from '../api/inventoryApi';
 import type { InventoryItem } from '../types';
 
 type Props = {
   initial?: Partial<InventoryItem>;
   onSubmit: (data: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => void;
   onCancel?: () => void;
+  isLoading?: boolean;
 };
 
 // Static mock categories for fallback
@@ -22,22 +24,52 @@ const mockCategories = [
   'Other',
 ];
 
-export function InventoryForm({ initial, onSubmit, onCancel }: Props) {
-  const [sku, setSku] = useState(initial?.sku ?? '');
+export function InventoryForm({ initial, onSubmit, onCancel, isLoading = false }: Props) {
   const [name, setName] = useState(initial?.name ?? '');
   const [category, setCategory] = useState(initial?.category ?? '');
   const [qtyOnHand, setQtyOnHand] = useState<number | ''>(initial?.qty_on_hand ?? '');
   const [reorderLevel, setReorderLevel] = useState<number | ''>(initial?.reorder_level ?? '');
   const [location, setLocation] = useState(initial?.location ?? '');
+  const [error, setError] = useState<string | null>(null);
+  
+  // Categories from backend
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
-  const handleSubmit = (e: FormEvent) => {
+  // Fetch categories from backend
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setCategoriesLoading(true);
+      try {
+        const categoryList = await listCategories();
+        setCategories(categoryList);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Get category options - combine backend categories with static fallbacks
+  const categoryOptions = categories.length > 0 
+    ? categories.map(c => c.category_name)
+    : mockCategories;
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!sku || !name || !category || qtyOnHand === '' || reorderLevel === '' || !location) {
+    if (!name || !category || qtyOnHand === '' || reorderLevel === '' || !location) {
+      setError('Please fill in all required fields');
       return;
     }
 
+    setError(null);
+
+    // Pass data to parent - the hook will handle the API call
     onSubmit({
-      sku,
+      sku: initial?.sku || '', // Keep existing SKU for edits, empty for new (auto-generated)
       name,
       category,
       qty_on_hand: Number(qtyOnHand),
@@ -50,30 +82,35 @@ export function InventoryForm({ initial, onSubmit, onCancel }: Props) {
     <form onSubmit={handleSubmit} className="space-y-6 text-xs">
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Basic Information</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="SKU"
-            value={sku}
-            onChange={(e) => setSku(e.target.value)}
-            placeholder="e.g., SKU-1001"
-            required
-          />
-          <Input
-            label="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Item name"
-            required
-          />
-        </div>
+        
+        {error && (
+          <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-red-800 text-[11px]">
+            {error}
+          </div>
+        )}
+
+        {initial?.sku && (
+          <div className="p-2 rounded-lg bg-slate-50 border border-slate-200 text-slate-600 text-[11px]">
+            <span className="font-medium">SKU:</span> {initial.sku}
+          </div>
+        )}
+
+        <Input
+          label="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Item name"
+          required
+        />
         <Select
           label="Category"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
+          disabled={categoriesLoading}
           required
         >
           <option value="">Select category</option>
-          {mockCategories.map((cat) => (
+          {categoryOptions.map((cat) => (
             <option key={cat} value={cat}>
               {cat}
             </option>
@@ -116,8 +153,8 @@ export function InventoryForm({ initial, onSubmit, onCancel }: Props) {
         <Button type="button" variant="ghost" size="md" onClick={onCancel} className="w-full sm:w-auto">
           Cancel
         </Button>
-        <Button type="submit" variant="primary" size="md" className="w-full sm:w-auto">
-          {initial ? 'Update Item' : 'Create Item'}
+        <Button type="submit" variant="primary" size="md" disabled={isLoading} className="w-full sm:w-auto">
+          {isLoading ? 'Saving...' : initial?.id ? 'Update Item' : 'Create Item'}
         </Button>
       </div>
     </form>

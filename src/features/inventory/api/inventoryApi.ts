@@ -1,10 +1,7 @@
-import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
-import { handleApiError } from '../../../lib/errorHandler';
 import { apiRequest } from '../../../config/api';
 import type { InventoryItem } from '../types';
 
-let useStatic = !hasSupabaseConfig;
-
+// Mock inventory for fallback
 const mockInventory: InventoryItem[] = [
   {
     id: 'inv-1',
@@ -28,20 +25,48 @@ const mockInventory: InventoryItem[] = [
   }
 ];
 
-function nextId() {
-  return `inv-${Math.random().toString(36).slice(2, 8)}`;
+interface InventoryListResponse {
+  success: boolean;
+  data: {
+    products: Array<{
+      id: number;
+      product_code: string;
+      name: string;
+      description?: string;
+      category?: string;
+      unit_of_measure?: string;
+      is_active?: boolean;
+      qty_on_hand?: number;
+      qty_available?: number;
+      qty_reserved?: number;
+      created_at?: string;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
 }
 
 export async function listInventory(): Promise<InventoryItem[]> {
-  if (useStatic) return mockInventory;
-
   try {
-    const { data, error } = await supabase.from('inventory_items').select('*');
-    if (error) throw error;
-    return (data as InventoryItem[]) ?? [];
+    const response = await apiRequest<InventoryListResponse>('/inventory/products?limit=1000');
+    
+    // Transform backend data to InventoryItem format
+    return response.data.products.map(p => ({
+      id: String(p.id),
+      sku: p.product_code || '',
+      name: p.name || '',
+      category: p.category || 'Other',
+      qty_on_hand: p.qty_on_hand || 0,
+      reorder_level: 10, // Default reorder level
+      location: p.description || 'Main Warehouse',
+      created_at: p.created_at
+    }));
   } catch (error) {
-    handleApiError('inventory.listInventory', error);
-    useStatic = true;
+    console.error('Error fetching inventory:', error);
     return mockInventory;
   }
 }
@@ -49,28 +74,33 @@ export async function listInventory(): Promise<InventoryItem[]> {
 export async function createInventoryItem(
   payload: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>
 ): Promise<InventoryItem> {
-  if (useStatic) {
-    const item: InventoryItem = {
-      ...payload,
-      id: nextId(),
-      created_at: new Date().toISOString()
-    };
-    mockInventory.unshift(item);
-    return item;
-  }
-
   try {
-    const { data, error } = await supabase
-      .from('inventory_items')
-      .insert(payload)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as InventoryItem;
+    const response = await apiRequest<{ success: boolean; data: any }>('/inventory/products', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.location,
+        category: payload.category,
+        unit_of_measure: 'PCS',
+        qty_on_hand: payload.qty_on_hand,
+        warehouse_id: 1
+      })
+    });
+    
+    const p = response.data;
+    return {
+      id: String(p.id),
+      sku: p.product_code || '',
+      name: p.name || '',
+      category: p.category || 'Other',
+      qty_on_hand: payload.qty_on_hand,
+      reorder_level: payload.reorder_level,
+      location: payload.location,
+      created_at: p.created_at
+    };
   } catch (error) {
-    handleApiError('inventory.createInventoryItem', error);
-    useStatic = true;
-    return createInventoryItem(payload);
+    console.error('Error creating inventory item:', error);
+    throw error;
   }
 }
 
@@ -78,43 +108,44 @@ export async function updateInventoryItem(
   id: string,
   changes: Partial<InventoryItem>
 ): Promise<InventoryItem | null> {
-  if (useStatic) {
-    const index = mockInventory.findIndex((i) => i.id === id);
-    if (index === -1) return null;
-    mockInventory[index] = { ...mockInventory[index], ...changes };
-    return mockInventory[index];
-  }
-
   try {
-    const { data, error } = await supabase
-      .from('inventory_items')
-      .update(changes)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as InventoryItem;
+    const response = await apiRequest<{ success: boolean; data: any }>(`/inventory/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: changes.name,
+        description: changes.location,
+        category: changes.category,
+        unit_of_measure: 'PCS',
+        qty_on_hand: changes.qty_on_hand,
+        warehouse_id: 1
+      })
+    });
+    
+    const p = response.data;
+    return {
+      id: String(p.id),
+      sku: p.product_code || '',
+      name: p.name || '',
+      category: p.category || 'Other',
+      qty_on_hand: changes.qty_on_hand || 0,
+      reorder_level: changes.reorder_level || 10,
+      location: p.description || 'Main Warehouse',
+      created_at: p.created_at
+    };
   } catch (error) {
-    handleApiError('inventory.updateInventoryItem', error);
-    useStatic = true;
-    return updateInventoryItem(id, changes);
+    console.error('Error updating inventory item:', error);
+    return null;
   }
 }
 
 export async function deleteInventoryItem(id: string): Promise<void> {
-  if (useStatic) {
-    const index = mockInventory.findIndex((i) => i.id === id);
-    if (index !== -1) mockInventory.splice(index, 1);
-    return;
-  }
-
   try {
-    const { error } = await supabase.from('inventory_items').delete().eq('id', id);
-    if (error) throw error;
+    await apiRequest<{ success: boolean }>(`/inventory/products/${id}`, {
+      method: 'DELETE'
+    });
   } catch (error) {
-    handleApiError('inventory.deleteInventoryItem', error);
-    useStatic = true;
-    await deleteInventoryItem(id);
+    console.error('Error deleting inventory item:', error);
+    throw error;
   }
 }
 
@@ -484,6 +515,74 @@ export async function listProducts(): Promise<Product[]> {
   } catch (error) {
     console.error('Error fetching products:', error);
     return mockProductsList;
+  }
+}
+
+// -------------------- INVENTORY ITEM CRUD (Products with Stock) --------------------
+
+export interface InventoryItemPayload {
+  name: string;
+  description?: string;
+  category: string;
+  unit_of_measure?: string;
+  qty_on_hand: number;
+  reorder_level?: number;
+  location?: string;
+  warehouse_id?: number;
+}
+
+interface ProductResponse {
+  success: boolean;
+  message?: string;
+  data: Product;
+}
+
+export async function createInventoryProduct(payload: InventoryItemPayload): Promise<Product> {
+  try {
+    const response = await apiRequest<ProductResponse>('/inventory/products', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description || payload.location,
+        category: payload.category,
+        unit_of_measure: payload.unit_of_measure || 'PCS',
+        qty_on_hand: payload.qty_on_hand,
+        warehouse_id: payload.warehouse_id || 1
+      })
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating inventory product:', error);
+    throw error;
+  }
+}
+
+export async function updateInventoryProduct(id: number, payload: Partial<InventoryItemPayload>): Promise<Product> {
+  try {
+    const response = await apiRequest<ProductResponse>(`/inventory/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description || payload.location,
+        category: payload.category,
+        unit_of_measure: payload.unit_of_measure
+      })
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating inventory product:', error);
+    throw error;
+  }
+}
+
+export async function deleteInventoryProduct(id: number): Promise<void> {
+  try {
+    await apiRequest<{ success: boolean }>(`/inventory/products/${id}`, {
+      method: 'DELETE'
+    });
+  } catch (error) {
+    console.error('Error deleting inventory product:', error);
+    throw error;
   }
 }
 
