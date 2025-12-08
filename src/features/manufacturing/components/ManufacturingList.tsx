@@ -312,7 +312,7 @@ export function ManufacturingList() {
         />
         <StatCard
           label="Total Cost"
-          value={`$${totalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+          value={`₹${totalCost.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
         />
         <StatCard
           label="Avg Efficiency"

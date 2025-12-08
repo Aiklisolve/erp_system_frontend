@@ -143,11 +143,11 @@ export function CampaignList() {
         return (
           <div className="space-y-0.5">
             <div className="text-slate-900">
-              {budget.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'USD' })}
+              {budget.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'INR' })}
             </div>
             {spent > 0 && (
               <div className="text-[10px] text-slate-500">
-                Spent: {spent.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'USD' })} ({spentPercent.toFixed(0)}%)
+                Spent: {spent.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'INR' })} ({spentPercent.toFixed(0)}%)
               </div>
             )}
           </div>
@@ -192,7 +192,7 @@ export function CampaignList() {
           <div className="space-y-0.5">
             {row.revenue && (
               <div className="text-slate-900">
-                {row.revenue.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'USD' })}
+                {row.revenue.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'INR' })}
               </div>
             )}
             {row.return_on_investment !== undefined && (
@@ -302,7 +302,7 @@ export function CampaignList() {
           label="Total Budget"
           value={metrics.totalBudget.toLocaleString(undefined, {
             style: 'currency',
-            currency: 'USD'
+            currency: 'INR'
           })}
           helper="Across all campaigns."
           trend="up"

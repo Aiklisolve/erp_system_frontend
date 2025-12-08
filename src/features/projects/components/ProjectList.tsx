@@ -188,7 +188,7 @@ export function ProjectList() {
         return (
           <div className="space-y-0.5">
             <div className="text-slate-900">
-              {budget.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'USD' })}
+              {budget.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'INR' })}
             </div>
             {spent > 0 && (
               <div className={`text-[10px] ${isOverBudget ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
@@ -331,7 +331,7 @@ export function ProjectList() {
           label="Total Budget"
           value={metrics.totalBudget.toLocaleString(undefined, {
             style: 'currency',
-            currency: 'USD'
+            currency: 'INR'
           })}
           helper="Across all projects."
           trend="up"
@@ -341,7 +341,7 @@ export function ProjectList() {
           label="Active Budget"
           value={metrics.activeBudget.toLocaleString(undefined, {
             style: 'currency',
-            currency: 'USD'
+            currency: 'INR'
           })}
           helper="Planning & in progress."
           trend="flat"

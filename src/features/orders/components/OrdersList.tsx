@@ -14,7 +14,7 @@ import { Tabs } from '../../../components/ui/Tabs';
 import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
 import type { SalesOrder } from '../types';
-import { OrderForm } from './OrderForm';
+import { SimpleOrderForm } from './SimpleOrderForm';
 
 export function OrdersList() {
   const { orders, loading, create, update, remove, refresh, metrics } = useOrders();
@@ -31,15 +31,15 @@ export function OrdersList() {
   const filteredOrders = orders.filter((order) => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
-      order.customer.toLowerCase().includes(searchLower) ||
-      order.id.toLowerCase().includes(searchLower) ||
+      (order.customer && order.customer.toLowerCase().includes(searchLower)) ||
+      (order.id && order.id.toString().toLowerCase().includes(searchLower)) ||
       (order.order_number && order.order_number.toLowerCase().includes(searchLower)) ||
       (order.customer_email && order.customer_email.toLowerCase().includes(searchLower)) ||
       (order.customer_phone && order.customer_phone.includes(searchTerm)) ||
       (order.customer_po_number && order.customer_po_number.toLowerCase().includes(searchLower)) ||
       (order.invoice_number && order.invoice_number.toLowerCase().includes(searchLower)) ||
       (order.tracking_number && order.tracking_number.toLowerCase().includes(searchLower)) ||
-      order.date.includes(searchTerm);
+      (order.date && order.date.includes(searchTerm));
     
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     
@@ -66,13 +66,17 @@ export function OrdersList() {
       header: 'Order #',
       render: (row) => row.order_number || row.id,
     },
-    { key: 'date', header: 'Date' },
+    {
+      key: 'date',
+      header: 'Date',
+      render: (row) => row.date || <span className="text-[11px] text-slate-400">-</span>,
+    },
     {
       key: 'customer',
       header: 'Customer',
       render: (row) => (
         <div className="space-y-0.5">
-          <div className="font-medium text-slate-900">{row.customer}</div>
+          <div className="font-medium text-slate-900">{row.customer || 'N/A'}</div>
           {row.contact_person && (
             <div className="text-[10px] text-slate-500">{row.contact_person}</div>
           )}
@@ -83,6 +87,7 @@ export function OrdersList() {
       key: 'status',
       header: 'Status',
       render: (row) => {
+        if (!row.status) return <span className="text-[11px] text-slate-400">-</span>;
         const statusTone =
           row.status === 'SHIPPED' || row.status === 'DELIVERED'
             ? 'success'
@@ -124,7 +129,7 @@ export function OrdersList() {
           URGENT: 'text-red-600',
         };
         return (
-          <span className={`text-[11px] font-medium ${priorityColors[row.priority] || 'text-slate-500'}`}>
+          <span className={`text-[11px] font-medium ₹{priorityColors[row.priority] || 'text-slate-500'}`}>
             {row.priority}
           </span>
         );
@@ -134,10 +139,12 @@ export function OrdersList() {
       key: 'total_amount',
       header: 'Total',
       render: (row) =>
-        row.total_amount.toLocaleString(undefined, {
-          style: 'currency',
-          currency: row.currency || 'USD',
-        }),
+        row.total_amount
+          ? (row.total_amount || 0).toLocaleString(undefined, {
+              style: 'currency',
+              currency: row.currency || 'INR',
+            })
+          : <span className="text-[11px] text-slate-400">-</span>,
     },
     {
       key: 'expected_delivery_date',
@@ -175,10 +182,10 @@ export function OrdersList() {
     try {
       if (editingOrder) {
         await update(editingOrder.id, data);
-        showToast('success', 'Order Updated', `Order for "${data.customer}" has been updated successfully.`);
+        showToast('success', 'Order Updated', `Order for "₹{data.customer}" has been updated successfully.`);
       } else {
         await create(data);
-        showToast('success', 'Order Created', `Order for "${data.customer}" has been created successfully.`);
+        showToast('success', 'Order Created', `Order for "₹{data.customer}" has been created successfully.`);
       }
       setModalOpen(false);
       setEditingOrder(null);
@@ -191,7 +198,7 @@ export function OrdersList() {
     if (window.confirm('Are you sure you want to delete this order?')) {
       try {
         await remove(order.id);
-        showToast('success', 'Order Deleted', `Order for "${order.customer}" has been deleted successfully.`);
+        showToast('success', 'Order Deleted', `Order for "₹{order.customer}" has been deleted successfully.`);
       } catch (error) {
         showToast('error', 'Deletion Failed', 'Failed to delete order. Please try again.');
       }
@@ -249,7 +256,7 @@ export function OrdersList() {
           label="Total Order Value"
           value={metrics.totalValue.toLocaleString(undefined, {
             style: 'currency',
-            currency: 'USD',
+            currency: 'INR',
           })}
           helper="Combined value of all orders."
           trend="up"
@@ -320,7 +327,7 @@ export function OrdersList() {
               <Table
                 columns={columns}
                 data={paginatedOrders}
-                getRowKey={(row, index) => `${row.id}-${index}`}
+                getRowKey={(row, index) => `₹{row.id}-₹{index}`}
               />
             </div>
             {/* Pagination */}
@@ -375,7 +382,7 @@ export function OrdersList() {
         }}
         hideCloseButton
       >
-        <OrderForm
+        <SimpleOrderForm
           initial={editingOrder || undefined}
           onSubmit={handleFormSubmit}
           onCancel={() => {

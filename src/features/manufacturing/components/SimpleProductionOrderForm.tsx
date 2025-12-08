@@ -1,9 +1,11 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect, useMemo } from 'react';
 import type { ProductionOrder, ProductionOrderStatus, ProductionOrderPriority, ProductionType, Currency } from '../types';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
+import { listProducts, listUsers, type Product, type User } from '../api/manufacturingApi';
 
 type Props = {
   initial?: Partial<ProductionOrder>;
@@ -20,55 +22,116 @@ function generateProductionOrderNumber(): string {
 }
 
 export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props) {
-  // Essential fields only (matching backend API requirements)
+  // Only fields that backend API actually accepts (based on curl example)
   const [productionOrderNumber, setProductionOrderNumber] = useState(
     initial?.production_order_number ?? generateProductionOrderNumber()
   );
-  const [workOrderNumber, setWorkOrderNumber] = useState(initial?.work_order_number ?? '');
-  const [referenceNumber, setReferenceNumber] = useState(initial?.reference_number ?? '');
-  const [productName, setProductName] = useState(initial?.product ?? '');
-  const [productCode, setProductCode] = useState(initial?.product_code ?? '');
   const [productId, setProductId] = useState(initial?.product_id ?? '');
   const [plannedQty, setPlannedQty] = useState(initial?.planned_qty?.toString() ?? '');
-  const [unit, setUnit] = useState(initial?.unit ?? 'Units');
   const [startDate, setStartDate] = useState(
     initial?.start_date ?? new Date().toISOString().split('T')[0]
   );
   const [endDate, setEndDate] = useState(initial?.end_date ?? '');
   const [status, setStatus] = useState<ProductionOrderStatus>(initial?.status ?? 'DRAFT');
   const [priority, setPriority] = useState<ProductionOrderPriority>(initial?.priority ?? 'MEDIUM');
-  const [productionType, setProductionType] = useState<ProductionType>(
-    initial?.production_type ?? 'MAKE_TO_STOCK'
-  );
-  const [estimatedCost, setEstimatedCost] = useState(initial?.estimated_cost?.toString() ?? '');
-  const [cost, setCost] = useState(initial?.cost?.toString() ?? '0');
-  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'INR');
+  const [productionLine, setProductionLine] = useState(initial?.production_line ?? '');
+  const [shift, setShift] = useState(initial?.shift ?? '');
+  const [supervisorId, setSupervisorId] = useState(initial?.supervisor_id ?? '');
+  const [qualityStatus, setQualityStatus] = useState(initial?.quality_status ?? 'PENDING');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  
+  // Products and Users for dropdowns
+  const [products, setProducts] = useState<Product[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  
+  // Load products and users on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoadingProducts(true);
+      setLoadingUsers(true);
+      
+      try {
+        const [productsData, usersData] = await Promise.all([
+          listProducts(),
+          listUsers(),
+        ]);
+        
+        setProducts(productsData);
+        setUsers(usersData);
+        
+        console.log('✅ Loaded products:', productsData.length);
+        console.log('✅ Loaded users:', usersData.length);
+      } catch (error) {
+        console.error('❌ Error loading dropdown data:', error);
+      } finally {
+        setLoadingProducts(false);
+        setLoadingUsers(false);
+      }
+    };
+    
+    loadData();
+  }, []);
+  
+  // Convert products to SearchableSelect options format
+  const productOptions = useMemo(() => {
+    return products.map((product) => ({
+      value: product.id.toString(),
+      label: `${product.id} - ${product.product_name || product.name || 'Unknown Product'}`,
+      id: product.id,
+    }));
+  }, [products]);
+  
+  // Convert users to Select options format
+  const userOptions = useMemo(() => {
+    return users.map((user) => ({
+      value: user.id.toString(),
+      label: `${user.id} - ${user.name || user.full_name || 'Unknown User'}`,
+      id: user.id,
+    }));
+  }, [users]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
 
+    // Only send fields that backend API accepts (matching curl example exactly)
     const values: Omit<ProductionOrder, 'id' | 'created_at' | 'updated_at'> = {
       production_order_number: productionOrderNumber,
-      work_order_number: workOrderNumber || undefined,
-      reference_number: referenceNumber || undefined,
-      product: productName,
-      product_code: productCode || undefined,
-      product_id: productId || undefined,
+      product_id: productId ? productId.toString() : undefined, // Will be converted to number in API
       planned_qty: parseInt(plannedQty) || 0,
-      produced_qty: 0,
-      pending_qty: parseInt(plannedQty) || 0,
-      unit,
       start_date: startDate,
       end_date: endDate,
       status,
       priority,
-      production_type: productionType,
-      estimated_cost: parseFloat(estimatedCost) || 0,
-      cost: parseFloat(cost) || 0,
-      currency,
+      production_line: productionLine || undefined,
+      shift: shift || undefined,
+      supervisor_id: supervisorId ? supervisorId.toString() : undefined, // Will be converted to number in API
+      quality_status: qualityStatus as any,
       notes: notes || undefined,
+      // Required by frontend type but not sent to backend
+      product: '', // Not sent to backend
+      unit: 'Units', // Not sent to backend
+      production_type: 'MAKE_TO_STOCK', // Not sent to backend
+      estimated_cost: 0, // Not sent to backend
+      cost: 0, // Not sent to backend
+      currency: 'INR', // Not sent to backend
     };
+    
+    console.log('📝 Form submitted values:', {
+      production_order_number: productionOrderNumber,
+      product_id: productId,
+      planned_qty: plannedQty,
+      start_date: startDate,
+      end_date: endDate,
+      status,
+      priority,
+      production_line: productionLine,
+      shift: shift,
+      supervisor_id: supervisorId,
+      quality_status: qualityStatus,
+      notes: notes
+    });
 
     onSubmit(values);
   };
@@ -76,7 +139,7 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="text-sm text-slate-600 mb-4 p-3 bg-blue-50 rounded border border-blue-200">
-        📝 <strong>Simplified Form:</strong> Only essential fields required by backend API
+        📝 <strong>Backend API Form:</strong> Only fields accepted by backend API
       </div>
 
       {/* Section 1: Basic Information */}
@@ -85,28 +148,12 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
           Basic Information
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Production Order Number"
-            value={productionOrderNumber}
-            onChange={(e) => setProductionOrderNumber(e.target.value)}
-            required
-            placeholder="MO-2025-0001"
-          />
-          
-          <Input
-            label="Work Order Number"
-            value={workOrderNumber}
-            onChange={(e) => setWorkOrderNumber(e.target.value)}
-            placeholder="WO-2025-0001"
-          />
-        </div>
-
         <Input
-          label="Reference Number"
-          value={referenceNumber}
-          onChange={(e) => setReferenceNumber(e.target.value)}
-          placeholder="REF-001"
+          label="Production Order Number"
+          value={productionOrderNumber}
+          onChange={(e) => setProductionOrderNumber(e.target.value)}
+          required
+          placeholder="MO-2025-0001"
         />
       </div>
 
@@ -116,30 +163,35 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
           Product Information
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Input
-            label="Product Name"
-            value={productName}
-            onChange={(e) => setProductName(e.target.value)}
+        {loadingProducts ? (
+          <div className="space-y-1">
+            <label className="block text-[11px] font-semibold text-slate-800">
+              Product <span className="text-red-500">*</span>
+            </label>
+            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              Loading products...
+            </div>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="space-y-1">
+            <label className="block text-[11px] font-semibold text-slate-800">
+              Product <span className="text-red-500">*</span>
+            </label>
+            <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+              No products available. Please add products first.
+            </div>
+          </div>
+        ) : (
+          <SearchableSelect
+            label="Product"
+            value={productId}
+            onChange={(value) => setProductId(value)}
+            options={productOptions}
+            placeholder="Search and select product..."
             required
-            placeholder="Industrial Pump"
+            maxHeight="200px"
           />
-          
-          <Input
-            label="Product Code"
-            value={productCode}
-            onChange={(e) => setProductCode(e.target.value)}
-            placeholder="IP-500"
-          />
-        </div>
-
-        <Input
-          label="Product ID (Optional)"
-          value={productId}
-          onChange={(e) => setProductId(e.target.value)}
-          placeholder="Leave empty if not required"
-          helperText="Backend will auto-assign if not provided"
-        />
+        )}
       </div>
 
       {/* Section 3: Quantity & Dates */}
@@ -148,41 +200,15 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
           Quantity & Timeline
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Input
-            label="Planned Quantity"
-            type="number"
-            value={plannedQty}
-            onChange={(e) => setPlannedQty(e.target.value)}
-            required
-            min="1"
-            placeholder="100"
-          />
-          
-          <Input
-            label="Unit"
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-            required
-            placeholder="Units, Pcs, Kg, etc."
-          />
-          
-          <Select
-            label="Currency"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as Currency)}
-            required
-          >
-            <option value="INR">INR - Indian Rupee</option>
-            <option value="USD">USD - US Dollar</option>
-            <option value="EUR">EUR - Euro</option>
-            <option value="GBP">GBP - British Pound</option>
-            <option value="JPY">JPY - Japanese Yen</option>
-            <option value="CNY">CNY - Chinese Yuan</option>
-            <option value="AUD">AUD - Australian Dollar</option>
-            <option value="CAD">CAD - Canadian Dollar</option>
-          </Select>
-        </div>
+        <Input
+          label="Planned Quantity"
+          type="number"
+          value={plannedQty}
+          onChange={(e) => setPlannedQty(e.target.value)}
+          required
+          min="1"
+          placeholder="543"
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
@@ -194,7 +220,7 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
           />
           
           <Input
-            label="Expected End Date"
+            label="End Date"
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
@@ -206,10 +232,10 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
       {/* Section 4: Status & Priority */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
-          Status & Classification
+          Status & Priority
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Select
             label="Status"
             value={status}
@@ -238,55 +264,87 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
             <option value="HIGH">High</option>
             <option value="URGENT">Urgent</option>
           </Select>
-
-          <Select
-            label="Production Type"
-            value={productionType}
-            onChange={(e) => setProductionType(e.target.value as ProductionType)}
-            required
-          >
-            <option value="MAKE_TO_STOCK">Make to Stock</option>
-            <option value="MAKE_TO_ORDER">Make to Order</option>
-            <option value="ASSEMBLY">Assembly</option>
-            <option value="BATCH">Batch</option>
-            <option value="CONTINUOUS">Continuous</option>
-            <option value="JOB_SHOP">Job Shop</option>
-          </Select>
         </div>
       </div>
 
-      {/* Section 5: Cost Information */}
+      {/* Section 5: Production Details */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
-          Cost Information
+          Production Details
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
-            label="Estimated Cost"
-            type="number"
-            value={estimatedCost}
-            onChange={(e) => setEstimatedCost(e.target.value)}
-            required
-            min="0"
-            step="0.01"
-            placeholder="0.00"
+            label="Production Line"
+            value={productionLine}
+            onChange={(e) => setProductionLine(e.target.value)}
+            placeholder="Line-1"
           />
           
-          <Input
-            label="Actual Cost (Optional)"
-            type="number"
-            value={cost}
-            onChange={(e) => setCost(e.target.value)}
-            min="0"
-            step="0.01"
-            placeholder="0.00"
-            helperText="Leave as 0 for new orders"
-          />
+          <Select
+            label="Shift"
+            value={shift}
+            onChange={(e) => setShift(e.target.value)}
+          >
+            <option value="">Select Shift</option>
+            <option value="DAY">Day</option>
+            <option value="NIGHT">Night</option>
+            <option value="MORNING">Morning</option>
+            <option value="EVENING">Evening</option>
+          </Select>
         </div>
+
+        {loadingUsers ? (
+          <div className="space-y-1">
+            <label className="block text-[11px] font-semibold text-slate-800">
+              Supervisor
+            </label>
+            <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              Loading users...
+            </div>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="space-y-1">
+            <label className="block text-[11px] font-semibold text-slate-800">
+              Supervisor
+            </label>
+            <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+              No users available.
+            </div>
+          </div>
+        ) : (
+          <SearchableSelect
+            label="Supervisor"
+            value={supervisorId}
+            onChange={(value) => setSupervisorId(value)}
+            options={userOptions}
+            placeholder="Search and select supervisor..."
+            maxHeight="200px"
+          />
+        )}
       </div>
 
-      {/* Section 6: Notes */}
+      {/* Section 6: Quality Status */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
+          Quality Control
+        </h3>
+        
+        <Select
+          label="Quality Status"
+          value={qualityStatus}
+          onChange={(e) => setQualityStatus(e.target.value as any)}
+          required
+        >
+          <option value="PENDING">Pending</option>
+          <option value="PASSED">Passed</option>
+          <option value="FAILED">Failed</option>
+          <option value="REWORK_REQUIRED">Rework Required</option>
+          <option value="NOT_REQUIRED">Not Required</option>
+        </Select>
+      </div>
+
+      {/* Section 7: Notes */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">
           Additional Notes
@@ -296,7 +354,7 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
           label="Notes (Optional)"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Add any additional notes or instructions..."
+          placeholder="Production order for batch 8488"
           rows={3}
         />
       </div>
