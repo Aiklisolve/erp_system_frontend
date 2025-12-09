@@ -11,9 +11,12 @@ import { LoadingState } from '../../../components/ui/LoadingState';
 import { StatCard } from '../../../components/ui/StatCard';
 import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 import type { Task, TaskType, TaskStatus, TaskPriority, ErpUser } from '../types';
+import type { Employee } from '../../hr/types';
 import { toast } from '../../../lib/toast';
 import * as crmApi from '../api/crmApi';
+import * as hrApi from '../../hr/api/hrApi';
 
 type TaskFormProps = {
   initial?: Partial<Task>;
@@ -37,7 +40,7 @@ function TaskFormComponent({ initial, employees, onSubmit, onCancel }: TaskFormP
   const [taskType, setTaskType] = useState<TaskType>(initial?.task_type ?? 'SUPPORT');
   const [priority, setPriority] = useState<TaskPriority>(initial?.priority ?? 'MEDIUM');
   const [status, setStatus] = useState<TaskStatus>(initial?.status ?? 'NEW');
-  const [assignedToId, setAssignedToId] = useState(initial?.assigned_to_id ?? '');
+  const [assignedToId, setAssignedToId] = useState(initial?.assigned_to ?? '');
   const [startDate, setStartDate] = useState(initial?.start_date ?? '');
   const [dueDate, setDueDate] = useState(initial?.due_date ?? '');
   const [progressPercentage, setProgressPercentage] = useState(initial?.progress_percentage?.toString() ?? '');
@@ -45,6 +48,69 @@ function TaskFormComponent({ initial, employees, onSubmit, onCancel }: TaskFormP
   const [actualHours, setActualHours] = useState(initial?.actual_hours?.toString() ?? '');
   const [tags, setTags] = useState(initial?.tags?.join(', ') ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+
+  // Employee dropdown state
+  const [employeeList, setEmployeeList] = useState<Employee[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+
+  // Get logged-in user ID from localStorage
+  const getLoggedInUserId = (): string | null => {
+    try {
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        // Try different possible ID fields
+        return user.id?.toString() || user.user_id?.toString() || user.employee_id?.toString() || null;
+      }
+      
+      // Try session data
+      const sessionData = localStorage.getItem('session');
+      if (sessionData) {
+        const session = JSON.parse(sessionData);
+        if (session.user) {
+          return session.user.id?.toString() || session.user.user_id?.toString() || session.user.employee_id?.toString() || null;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting logged-in user ID:', error);
+      return null;
+    }
+  };
+
+  // Fetch employees on mount
+  useEffect(() => {
+    const loadEmployees = async () => {
+      setEmployeesLoading(true);
+      try {
+        const employees = await hrApi.listEmployees();
+        setEmployeeList(employees);
+      } catch (error) {
+        console.error('Failed to load employees:', error);
+      } finally {
+        setEmployeesLoading(false);
+      }
+    };
+    loadEmployees();
+  }, []);
+
+  // Prepare employee options for SearchableSelect
+  const employeeOptions = employeeList.map((emp) => {
+    const displayName = emp.full_name || `${emp.first_name} ${emp.last_name}`.trim() || 'Unknown Employee';
+    const displayInfo = [
+      emp.employee_number,
+      emp.email,
+      emp.department ? String(emp.department).replace(/_/g, ' ') : null,
+      emp.role
+    ].filter(Boolean).join(' • ');
+    
+    return {
+      value: emp.id,
+      label: displayInfo ? `${displayName} - ${displayInfo}` : displayName,
+      id: emp.id,
+    };
+  });
 
   // Validation
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -69,7 +135,8 @@ function TaskFormComponent({ initial, employees, onSubmit, onCancel }: TaskFormP
       return;
     }
 
-    const selectedEmployee = employees.find(emp => emp.id === assignedToId);
+    const selectedEmployee = employeeList.find(emp => emp.id === assignedToId);
+    const loggedInUserId = getLoggedInUserId();
     
     const payload: Omit<Task, 'id' | 'created_at' | 'updated_at'> = {
       task_number: taskNumber,
@@ -78,10 +145,11 @@ function TaskFormComponent({ initial, employees, onSubmit, onCancel }: TaskFormP
       task_type: taskType,
       priority,
       status,
-      assigned_to_id: assignedToId,
-      assigned_to_name: selectedEmployee?.full_name || `${selectedEmployee?.first_name} ${selectedEmployee?.last_name}`,
+      assigned_to: assignedToId,
+      assigned_to_name: selectedEmployee?.full_name || `${selectedEmployee?.first_name} ${selectedEmployee?.last_name}`.trim() || '',
       assigned_to_email: selectedEmployee?.email,
-      assigned_to_role: selectedEmployee?.role,
+      assigned_to_role: selectedEmployee?.erp_role || selectedEmployee?.role,
+      assigned_by: loggedInUserId || initial?.assigned_by || undefined,
       assigned_date: initial?.assigned_date || new Date().toISOString().split('T')[0],
       start_date: startDate || undefined,
       due_date: dueDate || undefined,
@@ -91,6 +159,9 @@ function TaskFormComponent({ initial, employees, onSubmit, onCancel }: TaskFormP
       tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : undefined,
       notes: notes || undefined
     };
+    
+    // Add approved_by_id (same as assigned_by for now, can be changed later)
+    (payload as any).approved_by_id = loggedInUserId || initial?.assigned_by || undefined;
     
     onSubmit(payload);
   };
@@ -115,17 +186,35 @@ function TaskFormComponent({ initial, employees, onSubmit, onCancel }: TaskFormP
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              Assign To <span className="text-red-500">*</span>
-            </label>
-            <Select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} required>
-              <option value="">Select Employee</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.full_name || `${emp.first_name} ${emp.last_name}`} - {emp.role.replace(/_/g, ' ')}
-                </option>
-              ))}
-            </Select>
+            {employeesLoading ? (
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Assign To <span className="text-red-500">*</span>
+                </label>
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  Loading employees...
+                </div>
+              </div>
+            ) : employeeList.length === 0 ? (
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Assign To <span className="text-red-500">*</span>
+                </label>
+                <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+                  No employees available. Please add employees first.
+                </div>
+              </div>
+            ) : (
+              <SearchableSelect
+                label="Assign To"
+                value={assignedToId}
+                onChange={(value) => setAssignedToId(value)}
+                options={employeeOptions}
+                placeholder="Search and select employee..."
+                required
+                maxHeight="200px"
+              />
+            )}
             {errors.assignedToId && <p className="text-xs text-red-600 mt-1">{errors.assignedToId}</p>}
           </div>
           <div className="md:col-span-2">
@@ -517,7 +606,38 @@ export function TaskManagement({ employees }: { employees: ErpUser[] }) {
   const handleUpdate = async (data: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
     if (editingTask) {
       try {
-        await crmApi.updateTask(editingTask.id, data);
+        // Get logged-in user ID for update
+        const getLoggedInUserId = (): string | null => {
+          try {
+            const userData = localStorage.getItem('user');
+            if (userData) {
+              const user = JSON.parse(userData);
+              return user.id?.toString() || user.user_id?.toString() || user.employee_id?.toString() || null;
+            }
+            const sessionData = localStorage.getItem('session');
+            if (sessionData) {
+              const session = JSON.parse(sessionData);
+              if (session.user) {
+                return session.user.id?.toString() || session.user.user_id?.toString() || session.user.employee_id?.toString() || null;
+              }
+            }
+            return null;
+          } catch (error) {
+            console.error('Error getting logged-in user ID:', error);
+            return null;
+          }
+        };
+        
+        const loggedInUserId = getLoggedInUserId();
+        const updateData = {
+          ...data,
+          assigned_by: loggedInUserId || data.assigned_by,
+        };
+        
+        // Add approved_by_id (same as assigned_by for now)
+        (updateData as any).approved_by_id = loggedInUserId || (data as any).approved_by_id;
+        
+        await crmApi.updateTask(editingTask.id, updateData);
         setModalOpen(false);
         setEditingTask(null);
         await loadTasks();
