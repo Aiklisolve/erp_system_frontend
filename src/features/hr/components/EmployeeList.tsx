@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useHr } from '../hooks/useHr';
 import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
@@ -13,9 +13,10 @@ import { StatCard } from '../../../components/ui/StatCard';
 import { Tabs } from '../../../components/ui/Tabs';
 import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
-import type { Employee } from '../types';
+import type { Employee, LeaveRequest, EmploymentType } from '../types';
 import { EmployeeForm } from './EmployeeForm';
 import { HrLeaveManagement } from './HrLeaveManagement';
+import * as hrApi from '../api/hrApi';
 
 export function EmployeeList() {
   const { employees, loading, create, update, remove, refresh, metrics } = useHr();
@@ -29,6 +30,69 @@ export function EmployeeList() {
   const [employmentTypeFilter, setEmploymentTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [leavesLoading, setLeavesLoading] = useState(false);
+
+  // Fetch leave requests to determine who is on leave
+  useEffect(() => {
+    const loadLeaves = async () => {
+      setLeavesLoading(true);
+      try {
+        const leaves = await hrApi.listLeaves();
+        setLeaveRequests(leaves);
+      } catch (error) {
+        console.error('Failed to load leave requests:', error);
+      } finally {
+        setLeavesLoading(false);
+      }
+    };
+    loadLeaves();
+  }, []);
+
+  // Get employees currently on leave based on approved leave requests for current date
+  const getEmployeesOnLeave = (): Set<string> => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const employeesOnLeave = new Set<string>();
+    
+    leaveRequests.forEach((leave) => {
+      // Only consider APPROVED leaves
+      if (leave.status === 'APPROVED' && leave.start_date && leave.end_date) {
+        const startDate = new Date(leave.start_date);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(leave.end_date);
+        endDate.setHours(23, 59, 59, 999);
+        const todayDate = new Date(todayStr);
+        todayDate.setHours(0, 0, 0, 0);
+        
+        // Check if current date is between start and end date
+        if (todayDate >= startDate && todayDate <= endDate) {
+          const employeeId = leave.employee_id?.toString() || '';
+          if (employeeId) {
+            employeesOnLeave.add(employeeId);
+            // Also try to match by employee number or name if ID doesn't match
+            const matchingEmployee = employees.find(
+              (emp) => 
+                emp.id === employeeId || 
+                emp.employee_id === employeeId ||
+                emp.employee_number === employeeId ||
+                (leave.employee_name && (emp.full_name === leave.employee_name || `${emp.first_name} ${emp.last_name}`.trim() === leave.employee_name))
+            );
+            if (matchingEmployee) {
+              employeesOnLeave.add(matchingEmployee.id);
+            }
+          }
+        }
+      }
+    });
+    
+    return employeesOnLeave;
+  };
+
+  // Get employees currently on leave (recalculate when leaveRequests or employees change)
+  const employeesOnLeaveSet = getEmployeesOnLeave();
 
   // Filter employees based on search, status, department, employment type, and active tab
   const filteredEmployees = employees.filter((employee) => {
@@ -45,15 +109,26 @@ export function EmployeeList() {
       (employee.department && employee.department.toLowerCase().includes(searchLower)) ||
       (employee.national_id && employee.national_id.includes(searchTerm));
     
-    const matchesStatus = statusFilter === 'all' || employee.status === statusFilter;
+    const normalizedStatus = employee.status ? String(employee.status).toUpperCase() : '';
+    const normalizedFilterStatus = statusFilter !== 'all' ? String(statusFilter).toUpperCase() : '';
+    const matchesStatus = statusFilter === 'all' || normalizedStatus === normalizedFilterStatus;
     const matchesDepartment = departmentFilter === 'all' || employee.department === departmentFilter;
-    const matchesEmploymentType = employmentTypeFilter === 'all' || employee.employment_type === employmentTypeFilter;
+    const normalizedEmploymentType = employee.employment_type ? String(employee.employment_type).toUpperCase() : '';
+    const normalizedFilterType = employmentTypeFilter !== 'all' ? String(employmentTypeFilter).toUpperCase() : '';
+    const matchesEmploymentType = employmentTypeFilter === 'all' || normalizedEmploymentType === normalizedFilterType;
     
-    const matchesTab =
-      activeTab === 'all' ||
-      (activeTab === 'active' && employee.status === 'ACTIVE') ||
-      (activeTab === 'on_leave' && employee.status === 'ON_LEAVE') ||
-      (activeTab === 'inactive' && (employee.status === 'INACTIVE' || employee.status === 'TERMINATED' || employee.status === 'RESIGNED'));
+    // Tab filtering logic
+    let matchesTab = false;
+    if (activeTab === 'all') {
+      matchesTab = true;
+    } else if (activeTab === 'active') {
+      matchesTab = normalizedStatus === 'ACTIVE' && !employeesOnLeaveSet.has(employee.id);
+    } else if (activeTab === 'on_leave') {
+      // Show employees who are currently on leave (based on leave requests)
+      matchesTab = employeesOnLeaveSet.has(employee.id);
+    } else if (activeTab === 'inactive') {
+      matchesTab = (normalizedStatus === 'INACTIVE' || normalizedStatus === 'TERMINATED' || normalizedStatus === 'RESIGNED' || normalizedStatus === 'RETIRED');
+    }
     
     return matchesSearch && matchesStatus && matchesDepartment && matchesEmploymentType && matchesTab;
   });
@@ -64,28 +139,79 @@ export function EmployeeList() {
   const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
 
   // Get unique values for filters
-  const statuses = Array.from(new Set(employees.map((e) => e.status)));
+  const statuses = Array.from(new Set(employees.map((e) => e.status).filter(Boolean)));
   const departments = Array.from(new Set(employees.map((e) => e.department).filter(Boolean)));
-  const employmentTypes = Array.from(new Set(employees.map((e) => e.employment_type)));
+  
+  // All possible employment types (from type definition)
+  const allEmploymentTypes: EmploymentType[] = [
+    'FULL_TIME',
+    'PART_TIME',
+    'CONTRACT',
+    'TEMPORARY',
+    'INTERN',
+    'CONSULTANT'
+  ];
+  
+  // Get unique employment types from actual data (for reference)
+  const employmentTypesFromData = Array.from(new Set(employees.map((e) => e.employment_type).filter(Boolean)));
+  
+  // Use all types for filter dropdown
+  const employmentTypes = allEmploymentTypes;
 
-  // Calculate metrics
+  // Calculate metrics - use actual leave requests for onLeave count
   const metricsByStatus = employees.reduce(
     (acc, e) => {
-      if (e.status === 'ACTIVE') acc.active += 1;
-      if (e.status === 'ON_LEAVE') acc.onLeave += 1;
-      if (e.status === 'TERMINATED' || e.status === 'RESIGNED') acc.terminated += 1;
+      const normalizedStatus = e.status ? String(e.status).toUpperCase() : '';
+      const isOnLeave = employeesOnLeaveSet.has(e.id);
+      
+      if (normalizedStatus === 'ACTIVE' && !isOnLeave) acc.active += 1;
+      if (isOnLeave) acc.onLeave += 1;
+      if (normalizedStatus === 'TERMINATED' || normalizedStatus === 'RESIGNED') acc.terminated += 1;
       if (e.employment_type === 'FULL_TIME') acc.fullTime += 1;
-      if (e.performance_rating && e.performance_rating >= 4.5) acc.highPerformers += 1;
+      if (e.employment_type === 'PART_TIME') acc.partTime += 1;
+      if (normalizedStatus === 'INACTIVE') acc.inactive += 1;
+      
+      // Check for high performers - handle both number and string types
+      const performanceRating = e.performance_rating;
+      if (performanceRating !== null && performanceRating !== undefined) {
+        const rating = typeof performanceRating === 'number' 
+          ? performanceRating 
+          : typeof performanceRating === 'string' 
+            ? parseFloat(performanceRating) 
+            : 0;
+        if (!isNaN(rating) && rating >= 4.5) {
+          acc.highPerformers += 1;
+        }
+      }
+      
       return acc;
     },
-    { active: 0, onLeave: 0, terminated: 0, fullTime: 0, highPerformers: 0 }
+    { active: 0, onLeave: 0, terminated: 0, fullTime: 0, partTime: 0, inactive: 0, highPerformers: 0 }
   );
+
+  // Debug logging
+  useEffect(() => {
+    console.log('📊 HR Metrics:', {
+      total: employees.length,
+      active: metricsByStatus.active,
+      onLeave: metricsByStatus.onLeave,
+      fullTime: metricsByStatus.fullTime,
+      highPerformers: metricsByStatus.highPerformers,
+      employeesOnLeaveCount: employeesOnLeaveSet.size,
+      leaveRequestsCount: leaveRequests.length,
+      approvedLeaves: leaveRequests.filter(l => l.status === 'APPROVED').length
+    });
+  }, [employees.length, metricsByStatus, employeesOnLeaveSet.size, leaveRequests.length]);
 
   const columns: TableColumn<Employee>[] = [
     {
       key: 'employee_number',
       header: 'Emp #',
-      render: (row) => row.employee_number || row.id,
+      render: (row) => (
+        <span className="text-[11px] font-medium text-slate-900">
+          {row.employee_number || row.id || '-'}
+        </span>
+      ),
     },
     {
       key: 'first_name',
@@ -94,9 +220,12 @@ export function EmployeeList() {
         const fullName = row.full_name || `${row.first_name} ${row.last_name}`.trim();
         return (
           <div className="space-y-0.5">
-            <div className="font-medium text-slate-900">{fullName}</div>
+            <div className="font-medium text-slate-900">{fullName || '-'}</div>
             {row.email && (
               <div className="text-[10px] text-slate-500">{row.email}</div>
+            )}
+            {row.phone && (
+              <div className="text-[10px] text-slate-500">{row.phone}</div>
             )}
           </div>
         );
@@ -104,12 +233,12 @@ export function EmployeeList() {
     },
     {
       key: 'role',
-      header: 'Role',
+      header: 'Position/Role',
       render: (row) => (
         <div className="space-y-0.5">
-          <div className="text-slate-900">{row.role}</div>
+          <div className="text-slate-900 font-medium">{row.role || '-'}</div>
           {row.erp_role && (
-            <div className="text-[10px] text-slate-500">{row.erp_role.replace('_', ' ')}</div>
+            <div className="text-[10px] text-slate-500">{String(row.erp_role).replace(/_/g, ' ')}</div>
           )}
         </div>
       ),
@@ -121,7 +250,7 @@ export function EmployeeList() {
         if (!row.department) return <span className="text-[11px] text-slate-400">-</span>;
         return (
           <span className="text-[11px] text-slate-600">
-            {row.department.replace('_', ' ')}
+            {String(row.department).replace(/_/g, ' ')}
           </span>
         );
       },
@@ -138,10 +267,11 @@ export function EmployeeList() {
           INTERN: 'bg-green-50 text-green-700',
           CONSULTANT: 'bg-indigo-50 text-indigo-700',
         };
+        if (!row.employment_type) return <span className="text-[11px] text-slate-400">-</span>;
         const color = typeColors[row.employment_type] || 'bg-slate-50 text-slate-700';
         return (
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${color} border`}>
-            {row.employment_type.replace('_', ' ')}
+            {String(row.employment_type).replace(/_/g, ' ')}
           </span>
         );
       },
@@ -150,15 +280,48 @@ export function EmployeeList() {
       key: 'status',
       header: 'Status',
       render: (row) => {
+        const normalizedStatus = row.status ? String(row.status).toUpperCase() : '';
+        const isOnLeave = employeesOnLeaveSet.has(row.id);
+        
+        // If employee is on leave, show that status
+        if (isOnLeave) {
+          const activeLeave = leaveRequests.find(
+            (leave) => 
+              leave.employee_id === row.id && 
+              leave.status === 'APPROVED' &&
+              leave.start_date && 
+              leave.end_date &&
+              (() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const startDate = new Date(leave.start_date);
+                startDate.setHours(0, 0, 0, 0);
+                const endDate = new Date(leave.end_date);
+                endDate.setHours(23, 59, 59, 999);
+                return today >= startDate && today <= endDate;
+              })()
+          );
+          
+          return (
+            <div className="space-y-0.5">
+              <Badge tone="warning">On Leave</Badge>
+              {activeLeave && (
+                <div className="text-[10px] text-slate-500">
+                  {activeLeave.leave_type.replace(/_/g, ' ')} • Until {new Date(activeLeave.end_date).toLocaleDateString()}
+                </div>
+              )}
+            </div>
+          );
+        }
+        
         const statusTone =
-          row.status === 'ACTIVE'
+          normalizedStatus === 'ACTIVE'
             ? 'success'
-            : row.status === 'ON_LEAVE'
-            ? 'warning'
-            : row.status === 'TERMINATED' || row.status === 'RESIGNED'
+            : normalizedStatus === 'TERMINATED' || normalizedStatus === 'RESIGNED'
             ? 'danger'
             : 'neutral';
-        return <Badge tone={statusTone}>{row.status.replace('_', ' ')}</Badge>;
+        if (!row.status) return <Badge tone="neutral">-</Badge>;
+        return <Badge tone={statusTone}>{String(row.status).replace(/_/g, ' ')}</Badge>;
       },
     },
     {
@@ -166,7 +329,7 @@ export function EmployeeList() {
       header: 'Join Date',
       render: (row) => (
         <div className="space-y-0.5">
-          <div className="text-slate-900">{row.join_date}</div>
+          <div className="text-slate-900">{row.join_date || '-'}</div>
           {row.years_of_experience && (
             <div className="text-[10px] text-slate-500">{row.years_of_experience} yrs exp</div>
           )}
@@ -174,22 +337,41 @@ export function EmployeeList() {
       ),
     },
     {
-      key: 'performance_rating',
-      header: 'Performance',
+      key: 'manager_name',
+      header: 'Manager',
+      render: (row) => (
+        <span className="text-[11px] text-slate-600">
+          {row.manager_name || row.reporting_manager || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'salary',
+      header: 'Salary',
       render: (row) => {
-        if (!row.performance_rating) return <span className="text-[11px] text-slate-400">-</span>;
-        const ratingColor =
-          row.performance_rating >= 4.5
-            ? 'text-emerald-700 bg-emerald-50'
-            : row.performance_rating >= 3.5
-            ? 'text-blue-700 bg-blue-50'
-            : row.performance_rating >= 2.5
-            ? 'text-amber-700 bg-amber-50'
-            : 'text-red-700 bg-red-50';
+        if (!row.salary) return <span className="text-[11px] text-slate-400">-</span>;
+        const currency = row.currency || 'USD';
+        const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : currency === 'INR' ? '₹' : currency;
         return (
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ratingColor} border`}>
-            {row.performance_rating.toFixed(1)} ⭐
+          <span className="text-[11px] text-slate-900 font-medium">
+            {currencySymbol}{typeof row.salary === 'number' ? row.salary.toLocaleString() : row.salary}
           </span>
+        );
+      },
+    },
+    {
+      key: 'location',
+      header: 'Location',
+      render: (row) => {
+        const locationParts = [row.city, row.state].filter(Boolean);
+        if (locationParts.length === 0) return <span className="text-[11px] text-slate-400">-</span>;
+        return (
+          <div className="space-y-0.5">
+            <span className="text-[11px] text-slate-600">{locationParts.join(', ')}</span>
+            {row.postal_code && (
+              <div className="text-[10px] text-slate-500">{row.postal_code}</div>
+            )}
+          </div>
         );
       },
     },
@@ -277,38 +459,38 @@ export function EmployeeList() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label="Total Employees"
-          value={metrics.total.toString()}
+          value={employees.length.toString()}
           helper="All employees in system."
           trend="up"
           variant="teal"
         />
         <StatCard
           label="Active"
-          value={metrics.active.toString()}
-          helper="Currently active."
+          value={metricsByStatus.active.toString()}
+          helper="Currently active (excluding on leave)."
           trend="up"
           variant="blue"
         />
         <StatCard
           label="On Leave"
-          value={metrics.onLeave.toString()}
-          helper="On approved leave."
-          trend={metrics.onLeave > 0 ? 'down' : 'flat'}
+          value={metricsByStatus.onLeave?.toString() || '0'}
+          helper={`On approved leave (current date). ${employeesOnLeaveSet.size > 0 ? `${employeesOnLeaveSet.size} employee(s) on leave today.` : 'No employees on leave today.'}`}
+          trend={metricsByStatus.onLeave > 0 ? 'down' : 'flat'}
           variant="yellow"
         />
         <StatCard
           label="Full Time"
-          value={metricsByStatus.fullTime.toString()}
+          value={metricsByStatus.fullTime?.toString() || '0'}
           helper="Full-time employees."
           trend="flat"
           variant="purple"
         />
         <StatCard
-          label="High Performers"
-          value={metricsByStatus.highPerformers.toString()}
-          helper="Rating 4.5+."
-          trend="up"
-          variant="yellow"
+          label="Terminated"
+          value={metricsByStatus.terminated?.toString() || '0'}
+          helper="Terminated or resigned employees."
+          trend={metricsByStatus.terminated > 0 ? 'down' : 'flat'}
+          variant="neutral"
         />
       </div>
 
@@ -358,8 +540,8 @@ export function EmployeeList() {
               >
                 <option value="all">All Statuses</option>
                 {statuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status.replace('_', ' ')}
+                  <option key={status || 'unknown'} value={status || ''}>
+                    {status ? String(status).replace(/_/g, ' ') : 'Unknown'}
                   </option>
                 ))}
               </Select>
@@ -389,14 +571,14 @@ export function EmployeeList() {
                 <option value="all">All Types</option>
                 {employmentTypes.map((type) => (
                   <option key={type} value={type}>
-                    {type.replace('_', ' ')}
+                    {String(type).replace(/_/g, ' ')}
                   </option>
                 ))}
               </Select>
             </div>
 
             {/* Table */}
-            {loading ? (
+            {(loading || leavesLoading) ? (
               <LoadingState label="Loading employees..." />
             ) : filteredEmployees.length === 0 ? (
               <EmptyState

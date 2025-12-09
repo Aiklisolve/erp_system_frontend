@@ -1,0 +1,142 @@
+import { FormEvent, useState } from 'react';
+import type { Warehouse } from '../types';
+import { Input } from '../../../components/ui/Input';
+import { Select } from '../../../components/ui/Select';
+import { Textarea } from '../../../components/ui/Textarea';
+import { Button } from '../../../components/ui/Button';
+
+type Props = {
+  initial?: Partial<Warehouse>;
+  onSubmit: (values: Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>) => void;
+  onCancel?: () => void;
+};
+
+export function CreateWarehouseForm({ initial, onSubmit, onCancel }: Props) {
+  const [warehouseCode, setWarehouseCode] = useState(initial?.warehouse_code ?? '');
+  const [name, setName] = useState(initial?.name ?? '');
+  const [address, setAddress] = useState(initial?.address ?? '');
+  const [city, setCity] = useState(initial?.city ?? '');
+  const [state, setState] = useState(initial?.state ?? '');
+  const [pincode, setPincode] = useState(initial?.pincode ?? '');
+  const [country, setCountry] = useState(initial?.country ?? '');
+  const [managerId, setManagerId] = useState<number | ''>(initial?.manager_id ?? '');
+  const [capacity, setCapacity] = useState<number | ''>(initial?.capacity ?? '');
+  const [isActive, setIsActive] = useState(initial?.is_active ?? true);
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!warehouseCode || !name) return;
+
+    onSubmit({
+      warehouse_code: warehouseCode,
+      name,
+      address: address || undefined,
+      city: city || undefined,
+      state: state || undefined,
+      pincode: pincode || undefined,
+      country: country || undefined,
+      manager_id: managerId ? Number(managerId) : undefined,
+      capacity: capacity ? Number(capacity) : undefined,
+      is_active: isActive,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6 text-xs">
+      {/* Basic Information */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Warehouse Information</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Warehouse Code"
+            value={warehouseCode}
+            onChange={(e) => setWarehouseCode(e.target.value)}
+            placeholder="e.g., WH-001"
+            required
+          />
+          <Input
+            label="Warehouse Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Warehouse name"
+            required
+          />
+        </div>
+        <Textarea
+          label="Address"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="Full address"
+          rows={2}
+        />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Input
+            label="City"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="City"
+          />
+          <Input
+            label="State"
+            value={state}
+            onChange={(e) => setState(e.target.value)}
+            placeholder="State"
+          />
+          <Input
+            label="Pincode"
+            value={pincode}
+            onChange={(e) => setPincode(e.target.value)}
+            placeholder="Pincode"
+          />
+          <Input
+            label="Country"
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            placeholder="Country"
+          />
+        </div>
+      </div>
+
+      {/* Management & Capacity */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Management & Capacity</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Manager ID"
+            type="number"
+            value={managerId}
+            onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
+            placeholder="Manager user ID"
+          />
+          <Input
+            label="Capacity"
+            type="number"
+            value={capacity}
+            onChange={(e) => setCapacity(e.target.value ? Number(e.target.value) : '')}
+            placeholder="Storage capacity"
+          />
+        </div>
+        <Select
+          label="Status"
+          value={isActive ? 'true' : 'false'}
+          onChange={(e) => setIsActive(e.target.value === 'true')}
+        >
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </Select>
+      </div>
+
+      {/* Form Actions */}
+      <div className="mt-4 border-t border-slate-200 bg-white pt-3 flex flex-col sm:flex-row justify-end gap-2 sticky bottom-0">
+        {onCancel && (
+          <Button type="button" variant="ghost" size="md" onClick={onCancel} className="w-full sm:w-auto">
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" variant="primary" size="md" className="w-full sm:w-auto">
+          {initial?.id ? 'Update Warehouse' : 'Create Warehouse'}
+        </Button>
+      </div>
+    </form>
+  );
+}

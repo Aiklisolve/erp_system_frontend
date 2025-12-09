@@ -79,8 +79,18 @@ export function WorkforceList() {
   );
 
   // Calculate total hours and pay
-  const totalHours = shifts.reduce((sum, s) => sum + (s.total_hours || s.actual_hours || 0), 0);
-  const totalPay = shifts.reduce((sum, s) => sum + (s.total_pay || 0), 0);
+  const totalHours = shifts.reduce((sum, s) => {
+    const hours = s.total_hours || s.actual_hours || 0;
+    // Ensure hours is a number
+    const numHours = typeof hours === 'number' ? hours : parseFloat(String(hours)) || 0;
+    return sum + numHours;
+  }, 0);
+  const totalPay = shifts.reduce((sum, s) => {
+    const pay = s.total_pay || 0;
+    // Ensure pay is a number
+    const numPay = typeof pay === 'number' ? pay : parseFloat(String(pay)) || 0;
+    return sum + numPay;
+  }, 0);
 
   const columns: TableColumn<Shift>[] = [
     {
@@ -88,13 +98,27 @@ export function WorkforceList() {
       header: 'Shift #',
       render: (row) => row.shift_number || row.id,
     },
-    { key: 'date', header: 'Date' },
+    { 
+      key: 'date', 
+      header: 'Date',
+      render: (row) => {
+        if (!row.date) return <span className="text-[11px] text-slate-400">-</span>;
+        // Format date for display (YYYY-MM-DD to readable format)
+        try {
+          const date = new Date(row.date);
+          if (isNaN(date.getTime())) return row.date; // Return as-is if invalid
+          return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch {
+          return row.date;
+        }
+      }
+    },
     {
       key: 'employee_name',
       header: 'Employee',
       render: (row) => (
         <div className="space-y-0.5">
-          <div className="font-medium text-slate-900">{row.employee_name}</div>
+          <div className="font-medium text-slate-900">{row.employee_name || 'Unknown Employee'}</div>
           {row.employee_email && (
             <div className="text-[10px] text-slate-500">{row.employee_email}</div>
           )}
@@ -108,7 +132,7 @@ export function WorkforceList() {
         <div className="space-y-0.5">
           <div className="text-slate-900">{row.role}</div>
           {row.erp_role && (
-            <div className="text-[10px] text-slate-500">{row.erp_role.replace('_', ' ')}</div>
+            <div className="text-[10px] text-slate-500">{String(row.erp_role).replace(/_/g, ' ')}</div>
           )}
         </div>
       ),
@@ -120,7 +144,7 @@ export function WorkforceList() {
         if (!row.department) return <span className="text-[11px] text-slate-400">-</span>;
         return (
           <span className="text-[11px] text-slate-600">
-            {row.department.replace('_', ' ')}
+            {String(row.department).replace(/_/g, ' ')}
           </span>
         );
       },
@@ -140,7 +164,7 @@ export function WorkforceList() {
         const color = typeColors[row.shift_type] || 'bg-slate-50 text-slate-700';
         return (
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${color} border`}>
-            {row.shift_type.replace('_', ' ')}
+            {String(row.shift_type).replace(/_/g, ' ')}
           </span>
         );
       },
@@ -157,20 +181,38 @@ export function WorkforceList() {
             : row.status === 'IN_PROGRESS'
             ? 'warning'
             : 'neutral';
-        return <Badge tone={statusTone}>{row.status.replace('_', ' ')}</Badge>;
+        return <Badge tone={statusTone}>{String(row.status).replace(/_/g, ' ')}</Badge>;
       },
     },
     {
       key: 'start_time',
       header: 'Time',
-      render: (row) => (
-        <div className="space-y-0.5">
-          <div className="text-slate-900">{row.start_time} - {row.end_time}</div>
-          {row.total_hours && (
-            <div className="text-[10px] text-slate-500">{row.total_hours.toFixed(1)}h</div>
-          )}
-        </div>
-      ),
+      render: (row) => {
+        const startTime = row.start_time || 'N/A';
+        const endTime = row.end_time || 'N/A';
+        const totalHours = row.total_hours || row.actual_hours;
+        
+        // Safely format hours
+        const formatHours = (hours: any): string => {
+          if (!hours) return '';
+          const numHours = typeof hours === 'number' ? hours : parseFloat(String(hours));
+          if (isNaN(numHours)) return '';
+          return `${numHours.toFixed(1)}h`;
+        };
+        
+        return (
+          <div className="space-y-0.5">
+            <div className="text-slate-900">
+              {startTime} - {endTime}
+            </div>
+            {totalHours && (
+              <div className="text-[10px] text-slate-500">
+                {formatHours(totalHours)}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'attendance_status',
@@ -187,7 +229,7 @@ export function WorkforceList() {
         const color = attendanceColors[row.attendance_status] || 'text-slate-700';
         return (
           <span className={`text-[11px] font-medium ${color}`}>
-            {row.attendance_status.replace('_', ' ')}
+            {String(row.attendance_status).replace(/_/g, ' ')}
           </span>
         );
       },
@@ -295,7 +337,7 @@ export function WorkforceList() {
         />
         <StatCard
           label="Total Hours"
-          value={totalHours.toFixed(1)}
+          value={typeof totalHours === 'number' ? totalHours.toFixed(1) : '0.0'}
           helper="Scheduled/worked hours."
           trend="flat"
           variant="purple"
