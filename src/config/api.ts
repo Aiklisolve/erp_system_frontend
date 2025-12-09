@@ -66,7 +66,21 @@ export async function apiRequest<T>(
     const response = await fetch(url, {
       ...options,
       headers,
+      cache: 'no-cache', // Prevent caching for development
     });
+    
+    // Handle 304 Not Modified - return empty or cached data
+    if (response.status === 304) {
+      console.warn('API returned 304 Not Modified - using cached data or empty response');
+      // Try to get data anyway
+      try {
+        const data = await response.json();
+        return data;
+      } catch {
+        // If no JSON, return empty success response
+        return { success: true, data: { movements: [], pagination: {} } };
+      }
+    }
     
     const data = await response.json();
     

@@ -1,23 +1,17 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import type { StockMovement, MovementType, MovementStatus, WarehouseZone } from '../types';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
+import { listProducts, type Product } from '../../inventory/api/inventoryApi';
+import { apiRequest } from '../../../config/api';
 
 type Props = {
   initial?: Partial<StockMovement>;
   onSubmit: (values: Omit<StockMovement, 'id' | 'created_at' | 'updated_at'>) => void;
   onCancel?: () => void;
 };
-
-// Generate movement number
-function generateMovementNumber(): string {
-  const prefix = 'MV';
-  const year = new Date().getFullYear();
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `${prefix}-${year}-${random}`;
-}
 
 // Mock locations for dropdowns
 const mockLocations = [
@@ -30,128 +24,215 @@ const mockZones: WarehouseZone[] = [
   'RECEIVING', 'STORAGE', 'PICKING', 'PACKING', 'SHIPPING', 'QUARANTINE'
 ];
 
+// Determine if movement is going OUT (reduces stock)
+function isOutMovement(movementType: MovementType): boolean {
+  return ['SHIPMENT', 'TRANSFER'].includes(movementType) || 
+         movementType === 'ADJUSTMENT'; // Adjustments can be negative
+}
+
+// Determine if movement is coming IN (increases stock)
+function isInMovement(movementType: MovementType): boolean {
+  return ['RECEIPT'].includes(movementType);
+}
+
 export function WarehouseForm({ initial, onSubmit, onCancel }: Props) {
-  const [movementNumber, setMovementNumber] = useState(initial?.movement_number ?? generateMovementNumber());
-  const [itemId, setItemId] = useState(initial?.item_id ?? '');
-  const [itemName, setItemName] = useState(initial?.item_name ?? '');
-  const [itemSku, setItemSku] = useState(initial?.item_sku ?? '');
+  const [products, setProducts] = useState<Product[]>([]);
+  
+  // Format date for input field (YYYY-MM-DD)
+  const formatDateForInput = (dateStr?: string): string => {
+    if (!dateStr) return new Date().toISOString().slice(0, 10);
+    try {
+      const date = new Date(dateStr);
+      return date.toISOString().slice(0, 10);
+    } catch {
+      return new Date().toISOString().slice(0, 10);
+    }
+  };
+
+  const [selectedProductId, setSelectedProductId] = useState<number | ''>(
+    initial?.item_id ? (typeof initial.item_id === 'string' ? parseInt(initial.item_id) : initial.item_id) || '' : ''
+  );
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [availableStock, setAvailableStock] = useState<number>(0);
+  const [loadingStock, setLoadingStock] = useState(false);
   
   const [movementType, setMovementType] = useState<MovementType>(initial?.movement_type ?? 'TRANSFER');
   const [status, setStatus] = useState<MovementStatus>(initial?.status ?? 'PENDING');
-  const [movementDate, setMovementDate] = useState(
-    initial?.movement_date ?? new Date().toISOString().slice(0, 10)
-  );
-  const [completedDate, setCompletedDate] = useState(initial?.completed_date ?? '');
+  const [movementDate, setMovementDate] = useState(formatDateForInput(initial?.movement_date));
   
   const [fromLocation, setFromLocation] = useState(initial?.from_location ?? '');
   const [fromZone, setFromZone] = useState<WarehouseZone | ''>(initial?.from_zone ?? '');
-  const [fromBin, setFromBin] = useState(initial?.from_bin ?? '');
   const [toLocation, setToLocation] = useState(initial?.to_location ?? '');
   const [toZone, setToZone] = useState<WarehouseZone | ''>(initial?.to_zone ?? '');
-  const [toBin, setToBin] = useState(initial?.to_bin ?? '');
   
   const [quantity, setQuantity] = useState<number | ''>(initial?.quantity ?? '');
   const [unit, setUnit] = useState(initial?.unit ?? 'pcs');
-  const [availableQuantity, setAvailableQuantity] = useState<number | ''>(initial?.available_quantity ?? '');
-  const [receivedQuantity, setReceivedQuantity] = useState<number | ''>(initial?.received_quantity ?? '');
   
-  const [referenceNumber, setReferenceNumber] = useState(initial?.reference_number ?? '');
+  // Handle reference_number - could be from reference_id or reference_number field
+  const getReferenceNumber = () => {
+    if (initial?.reference_number) return initial.reference_number;
+    // If reference_id exists but no reference_number, use reference_id as fallback
+    if ((initial as any)?.reference_id) return String((initial as any).reference_id);
+    return '';
+  };
+  const [referenceNumber, setReferenceNumber] = useState(getReferenceNumber());
   const [referenceType, setReferenceType] = useState(initial?.reference_type ?? 'OTHER');
-  const [batchNumber, setBatchNumber] = useState(initial?.batch_number ?? '');
-  const [lotNumber, setLotNumber] = useState(initial?.lot_number ?? '');
   
-  const [assignedTo, setAssignedTo] = useState(initial?.assigned_to ?? '');
-  const [operatorName, setOperatorName] = useState(initial?.operator_name ?? '');
-  const [supervisor, setSupervisor] = useState(initial?.supervisor ?? '');
-  
-  const [qualityCheckRequired, setQualityCheckRequired] = useState(initial?.quality_check_required ?? false);
-  const [qualityCheckPassed, setQualityCheckPassed] = useState(initial?.quality_check_passed ?? false);
-  const [inspectedBy, setInspectedBy] = useState(initial?.inspected_by ?? '');
-  const [inspectionDate, setInspectionDate] = useState(initial?.inspection_date ?? '');
-  
-  const [carrier, setCarrier] = useState(initial?.carrier ?? '');
-  const [trackingNumber, setTrackingNumber] = useState(initial?.tracking_number ?? '');
-  const [expectedArrivalDate, setExpectedArrivalDate] = useState(initial?.expected_arrival_date ?? '');
-  const [actualArrivalDate, setActualArrivalDate] = useState(initial?.actual_arrival_date ?? '');
-  
-  const [unitCost, setUnitCost] = useState<number | ''>(initial?.unit_cost ?? '');
-  const [totalCost, setTotalCost] = useState<number | ''>(initial?.total_cost ?? '');
-  const [currency, setCurrency] = useState(initial?.currency ?? 'USD');
-  
-  const [reason, setReason] = useState(initial?.reason ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
-  const [internalNotes, setInternalNotes] = useState(initial?.internal_notes ?? '');
 
-  // Calculate total cost
-  const handleQuantityOrCostChange = () => {
-    const qty = Number(quantity) || 0;
-    const cost = Number(unitCost) || 0;
-    if (qty > 0 && cost > 0) {
-      setTotalCost(qty * cost);
-    } else {
-      setTotalCost('');
+  // Fetch products on mount and initialize form when initial changes
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const productsList = await listProducts();
+        setProducts(productsList);
+        
+        // If editing, find the selected product and initialize all fields
+        if (initial?.item_id) {
+          const productId = typeof initial.item_id === 'string' ? parseInt(initial.item_id) : initial.item_id;
+          if (!isNaN(productId)) {
+            const product = productsList.find(p => p.id === productId);
+            if (product) {
+              setSelectedProduct(product);
+              setSelectedProductId(productId);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      }
+    };
+    
+    fetchProducts();
+  }, [initial?.item_id]);
+
+  // Update form fields when initial prop changes (for edit mode)
+  useEffect(() => {
+    if (initial) {
+      // Update all fields from initial data
+      const productId = typeof initial.item_id === 'string' ? parseInt(initial.item_id) : (initial.item_id as number | undefined);
+      if (productId !== undefined && !isNaN(productId)) {
+        setSelectedProductId(productId);
+      }
+      setMovementType(initial.movement_type ?? 'TRANSFER');
+      setStatus(initial.status ?? 'PENDING');
+      setMovementDate(formatDateForInput(initial.movement_date));
+      setFromLocation(initial.from_location ?? '');
+      setFromZone(initial.from_zone ?? '');
+      setToLocation(initial.to_location ?? '');
+      setToZone(initial.to_zone ?? '');
+      setQuantity(initial.quantity !== undefined ? initial.quantity : '');
+      setUnit(initial.unit ?? 'pcs');
+      setReferenceNumber(getReferenceNumber());
+      setReferenceType(initial.reference_type ?? 'OTHER');
+      setNotes(initial.notes ?? '');
     }
+  }, [initial]);
+
+  // Fetch stock when product is selected and movement is OUT
+  useEffect(() => {
+    const fetchStock = async () => {
+      if (!selectedProductId || !isOutMovement(movementType)) {
+        setAvailableStock(0);
+        return;
+      }
+
+      setLoadingStock(true);
+      try {
+        // Extract warehouse_id from from_location (e.g., "WH-1" -> 1)
+        const warehouseMatch = fromLocation.match(/WH-(\d+)/);
+        const warehouseId = warehouseMatch ? parseInt(warehouseMatch[1]) : 1;
+
+        const response = await apiRequest<{
+          success: boolean;
+          data: {
+            quantity_available: number;
+            quantity_on_hand: number;
+          };
+        }>(`/inventory/stock/${selectedProductId}?warehouse_id=${warehouseId}`);
+        
+        if (response.success && response.data) {
+          setAvailableStock(response.data.quantity_available || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching stock:', error);
+        setAvailableStock(0);
+      } finally {
+        setLoadingStock(false);
+      }
+    };
+
+    fetchStock();
+  }, [selectedProductId, movementType, fromLocation]);
+
+  // Update selected product when dropdown changes
+  const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const productId = e.target.value ? parseInt(e.target.value) : '';
+    setSelectedProductId(productId);
+    const product = products.find(p => p.id === productId);
+    setSelectedProduct(product || null);
+    setQuantity(''); // Reset quantity when product changes
+  };
+
+  // Validate quantity for OUT movements
+  const validateQuantity = (qty: number | ''): boolean => {
+    if (qty === '') return true; // Empty is okay during typing
+    if (isOutMovement(movementType) && availableStock > 0) {
+      return Number(qty) <= availableStock;
+    }
+    return Number(qty) > 0;
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!itemId || quantity === '' || !fromLocation || !toLocation || !movementDate) return;
     
+    if (!selectedProductId || quantity === '' || !fromLocation || !toLocation || !movementDate) {
+      return;
+    }
+
+    // Validate quantity for OUT movements
+    if (isOutMovement(movementType) && availableStock > 0 && Number(quantity) > availableStock) {
+      alert(`Quantity cannot exceed available stock (${availableStock})`);
+      return;
+    }
+
+    // Extract warehouse IDs from locations (e.g., "WH-1" -> 1)
+    const fromMatch = fromLocation.match(/WH-(\d+)/);
+    const toMatch = toLocation.match(/WH-(\d+)/);
+    const fromWarehouseId = fromMatch ? parseInt(fromMatch[1]) : 1;
+    const toWarehouseId = toMatch ? parseInt(toMatch[1]) : 1;
+
     onSubmit({
-      movement_number: movementNumber,
-      item_id: itemId,
-      item_name: itemName || undefined,
-      item_sku: itemSku || undefined,
+      item_id: selectedProductId.toString(),
+      item_name: selectedProduct?.name || '',
+      item_sku: selectedProduct?.product_code || '',
       movement_type: movementType,
       status,
       movement_date: movementDate,
-      completed_date: completedDate || undefined,
       from_location: fromLocation,
       from_zone: fromZone || undefined,
-      from_bin: fromBin || undefined,
       to_location: toLocation,
       to_zone: toZone || undefined,
-      to_bin: toBin || undefined,
       quantity: Number(quantity),
       unit: unit || undefined,
-      available_quantity: Number(availableQuantity) || undefined,
-      received_quantity: Number(receivedQuantity) || undefined,
       reference_number: referenceNumber || undefined,
       reference_type: referenceType as any,
-      batch_number: batchNumber || undefined,
-      lot_number: lotNumber || undefined,
-      assigned_to: assignedTo || undefined,
-      operator_name: operatorName || undefined,
-      supervisor: supervisor || undefined,
-      quality_check_required: qualityCheckRequired,
-      quality_check_passed: qualityCheckPassed || undefined,
-      inspected_by: inspectedBy || undefined,
-      inspection_date: inspectionDate || undefined,
-      carrier: carrier || undefined,
-      tracking_number: trackingNumber || undefined,
-      expected_arrival_date: expectedArrivalDate || undefined,
-      actual_arrival_date: actualArrivalDate || undefined,
-      unit_cost: Number(unitCost) || undefined,
-      total_cost: Number(totalCost) || undefined,
-      currency: currency || undefined,
-      reason: reason || undefined,
       notes: notes || undefined,
-      internal_notes: internalNotes || undefined,
-    });
+      // Include product_id and warehouse IDs for backend mapping
+      product_id: selectedProductId,
+      from: fromWarehouseId,
+      to: toWarehouseId,
+    } as any);
   };
+
+  const showAvailableStock = isOutMovement(movementType) && selectedProductId && availableStock > 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-xs">
       {/* Movement Information */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Movement Information</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Input
-            label="Movement Number"
-            value={movementNumber}
-            onChange={(e) => setMovementNumber(e.target.value)}
-            placeholder="Auto-generated"
-          />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Input
             label="Movement Date"
             type="date"
@@ -163,15 +244,16 @@ export function WarehouseForm({ initial, onSubmit, onCancel }: Props) {
           <Select
             label="Movement Type"
             value={movementType}
-            onChange={(e) => setMovementType(e.target.value as MovementType)}
+            onChange={(e) => {
+              setMovementType(e.target.value as MovementType);
+              setQuantity(''); // Reset quantity when type changes
+            }}
             required
           >
             <option value="TRANSFER">Transfer</option>
             <option value="RECEIPT">Receipt</option>
             <option value="SHIPMENT">Shipment</option>
             <option value="ADJUSTMENT">Adjustment</option>
-            <option value="RETURN">Return</option>
-            <option value="CYCLE_COUNT">Cycle Count</option>
           </Select>
           <Select
             label="Status"
@@ -185,47 +267,40 @@ export function WarehouseForm({ initial, onSubmit, onCancel }: Props) {
             <option value="CANCELLED">Cancelled</option>
           </Select>
         </div>
-        {status === 'COMPLETED' && (
-          <Input
-            label="Completed Date"
-            type="date"
-            value={completedDate}
-            onChange={(e) => setCompletedDate(e.target.value)}
-            max={new Date().toISOString().slice(0, 10)}
-          />
-        )}
       </div>
 
       {/* Item Information */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Item Information</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Input
-            label="Item ID / SKU"
-            value={itemId}
-            onChange={(e) => setItemId(e.target.value)}
-            placeholder="Item ID or SKU"
-            required
-          />
-          <Input
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Select
             label="Item Name"
-            value={itemName}
-            onChange={(e) => setItemName(e.target.value)}
-            placeholder="Item name"
-          />
-          <Input
-            label="SKU"
-            value={itemSku}
-            onChange={(e) => setItemSku(e.target.value)}
-            placeholder="SKU code"
-          />
+            value={selectedProductId}
+            onChange={handleProductChange}
+            required
+          >
+            <option value="">Select product</option>
+            {products.map((product) => (
+              <option key={product.id} value={product.id}>
+                {product.name} ({product.product_code})
+              </option>
+            ))}
+          </Select>
+          {selectedProduct && (
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <span>SKU: {selectedProduct.product_code}</span>
+              {selectedProduct.unit_of_measure && (
+                <span>• Unit: {selectedProduct.unit_of_measure}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Locations */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">From Location</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <h3 className="text-sm font-semibold text-slate-900">Locations</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Select
             label="From Location"
             value={fromLocation}
@@ -251,18 +326,6 @@ export function WarehouseForm({ initial, onSubmit, onCancel }: Props) {
               </option>
             ))}
           </Select>
-          <Input
-            label="From Bin"
-            value={fromBin}
-            onChange={(e) => setFromBin(e.target.value)}
-            placeholder="Bin number"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">To Location</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Select
             label="To Location"
             value={toLocation}
@@ -288,53 +351,43 @@ export function WarehouseForm({ initial, onSubmit, onCancel }: Props) {
               </option>
             ))}
           </Select>
-          <Input
-            label="To Bin"
-            value={toBin}
-            onChange={(e) => setToBin(e.target.value)}
-            placeholder="Bin number"
-          />
         </div>
       </div>
 
       {/* Quantities */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Quantities</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Input
             label="Quantity"
             type="number"
             value={quantity}
             onChange={(e) => {
-              setQuantity(e.target.value === '' ? '' : Number(e.target.value));
-              handleQuantityOrCostChange();
+              const val = e.target.value === '' ? '' : Number(e.target.value);
+              setQuantity(val);
             }}
             placeholder="0"
             min={0}
+            max={showAvailableStock ? availableStock : undefined}
             required
+            className={showAvailableStock && quantity !== '' && Number(quantity) > availableStock ? 'border-red-500' : ''}
           />
+          {showAvailableStock && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-600">Available Stock:</span>
+              <span className={`font-semibold ${loadingStock ? 'text-slate-400' : 'text-slate-900'}`}>
+                {loadingStock ? 'Loading...' : availableStock}
+              </span>
+              {quantity !== '' && Number(quantity) > availableStock && (
+                <span className="text-red-500">(Exceeds available stock)</span>
+              )}
+            </div>
+          )}
           <Input
             label="Unit"
             value={unit}
             onChange={(e) => setUnit(e.target.value)}
             placeholder="pcs, kg, etc."
-          />
-          <Input
-            label="Available Quantity"
-            type="number"
-            value={availableQuantity}
-            onChange={(e) => setAvailableQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="Available at source"
-            min={0}
-          />
-          <Input
-            label="Received Quantity"
-            type="number"
-            value={receivedQuantity}
-            onChange={(e) => setReceivedQuantity(e.target.value === '' ? Number(quantity) : Number(e.target.value))}
-            placeholder="Actually received"
-            min={0}
-            max={Number(quantity) || undefined}
           />
         </div>
       </div>
@@ -342,7 +395,7 @@ export function WarehouseForm({ initial, onSubmit, onCancel }: Props) {
       {/* References */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">References</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Input
             label="Reference Number"
             value={referenceNumber}
@@ -352,7 +405,7 @@ export function WarehouseForm({ initial, onSubmit, onCancel }: Props) {
           <Select
             label="Reference Type"
             value={referenceType}
-            onChange={(e) => setReferenceType(e.target.value)}
+            onChange={(e) => setReferenceType(e.target.value as 'PURCHASE_ORDER' | 'SALES_ORDER' | 'TRANSFER_ORDER' | 'ADJUSTMENT' | 'OTHER')}
           >
             <option value="PURCHASE_ORDER">Purchase Order</option>
             <option value="SALES_ORDER">Sales Order</option>
@@ -360,191 +413,18 @@ export function WarehouseForm({ initial, onSubmit, onCancel }: Props) {
             <option value="ADJUSTMENT">Adjustment</option>
             <option value="OTHER">Other</option>
           </Select>
-          <Input
-            label="Batch Number"
-            value={batchNumber}
-            onChange={(e) => setBatchNumber(e.target.value)}
-            placeholder="Batch #"
-          />
-          <Input
-            label="Lot Number"
-            value={lotNumber}
-            onChange={(e) => setLotNumber(e.target.value)}
-            placeholder="Lot #"
-          />
-        </div>
-      </div>
-
-      {/* Assignment */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Assignment</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Input
-            label="Assigned To"
-            value={assignedTo}
-            onChange={(e) => setAssignedTo(e.target.value)}
-            placeholder="Assigned user"
-          />
-          <Input
-            label="Operator Name"
-            value={operatorName}
-            onChange={(e) => setOperatorName(e.target.value)}
-            placeholder="Operator performing movement"
-          />
-          <Input
-            label="Supervisor"
-            value={supervisor}
-            onChange={(e) => setSupervisor(e.target.value)}
-            placeholder="Supervisor name"
-          />
-        </div>
-      </div>
-
-      {/* Quality Check */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Quality & Inspection</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="qualityCheckRequired"
-              checked={qualityCheckRequired}
-              onChange={(e) => setQualityCheckRequired(e.target.checked)}
-              className="rounded border-slate-300"
-            />
-            <label htmlFor="qualityCheckRequired" className="text-[11px] font-semibold text-slate-800">
-              Quality Check Required
-            </label>
-          </div>
-          {qualityCheckRequired && (
-            <>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="qualityCheckPassed"
-                  checked={qualityCheckPassed}
-                  onChange={(e) => setQualityCheckPassed(e.target.checked)}
-                  className="rounded border-slate-300"
-                />
-                <label htmlFor="qualityCheckPassed" className="text-[11px] font-semibold text-slate-800">
-                  Quality Check Passed
-                </label>
-              </div>
-              <Input
-                label="Inspected By"
-                value={inspectedBy}
-                onChange={(e) => setInspectedBy(e.target.value)}
-                placeholder="Inspector name"
-              />
-              <Input
-                label="Inspection Date"
-                type="date"
-                value={inspectionDate}
-                onChange={(e) => setInspectionDate(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
-              />
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Shipping & Receiving */}
-      {(movementType === 'SHIPMENT' || movementType === 'RECEIPT') && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-900">Shipping & Receiving</h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Input
-              label="Carrier"
-              value={carrier}
-              onChange={(e) => setCarrier(e.target.value)}
-              placeholder="Shipping carrier"
-            />
-            <Input
-              label="Tracking Number"
-              value={trackingNumber}
-              onChange={(e) => setTrackingNumber(e.target.value)}
-              placeholder="Tracking #"
-            />
-            <Input
-              label="Expected Arrival Date"
-              type="date"
-              value={expectedArrivalDate}
-              onChange={(e) => setExpectedArrivalDate(e.target.value)}
-              min={movementDate}
-            />
-            <Input
-              label="Actual Arrival Date"
-              type="date"
-              value={actualArrivalDate}
-              onChange={(e) => setActualArrivalDate(e.target.value)}
-              max={new Date().toISOString().slice(0, 10)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Cost & Valuation */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Cost & Valuation</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Input
-            label="Unit Cost"
-            type="number"
-            value={unitCost}
-            onChange={(e) => {
-              setUnitCost(e.target.value === '' ? '' : Number(e.target.value));
-              handleQuantityOrCostChange();
-            }}
-            placeholder="0.00"
-            min={0}
-            step="0.01"
-          />
-          <Input
-            label="Total Cost"
-            type="number"
-            value={totalCost}
-            onChange={(e) => setTotalCost(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="Auto-calculated"
-            min={0}
-            step="0.01"
-            readOnly
-            className="bg-slate-50"
-          />
-          <Select
-            label="Currency"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-          >
-            <option value="USD">USD ($)</option>
-            <option value="EUR">EUR (€)</option>
-            <option value="GBP">GBP (£)</option>
-            <option value="INR">INR (₹)</option>
-          </Select>
         </div>
       </div>
 
       {/* Notes */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Notes</h3>
-        <Input
-          label="Reason"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Reason for movement/adjustment"
-        />
         <Textarea
           label="Notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Public notes"
-          rows={2}
-        />
-        <Textarea
-          label="Internal Notes"
-          value={internalNotes}
-          onChange={(e) => setInternalNotes(e.target.value)}
-          placeholder="Internal notes (not visible externally)"
-          rows={2}
+          placeholder="Additional notes"
+          rows={3}
         />
       </div>
 
