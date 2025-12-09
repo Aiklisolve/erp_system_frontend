@@ -1,7 +1,9 @@
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import { handleApiError } from '../../../lib/errorHandler';
+import { apiRequest } from '../../../config/api';
 import type { Employee, LeaveRequest } from '../types';
 
+const USE_BACKEND_API = true; // Use backend API by default
 let useStatic = !hasSupabaseConfig;
 
 const mockEmployees: Employee[] = [
@@ -151,7 +153,172 @@ function nextLeaveId() {
   return `leave-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Map backend employee response to frontend Employee type
+function mapBackendEmployee(backendEmployee: any): Employee {
+  const formatDate = (date: string | Date | null | undefined): string => {
+    if (!date) return '';
+    if (typeof date === 'string') return date.split('T')[0];
+    if (date instanceof Date) return date.toISOString().split('T')[0];
+    return '';
+  };
+
+  const formatArray = (value: any): string[] => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return value.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
+    return [];
+  };
+
+  return {
+    id: backendEmployee.id?.toString() || backendEmployee.employee_id?.toString() || nextId(),
+    employee_number: backendEmployee.employee_number || backendEmployee.employee_id?.toString() || null,
+    employee_id: backendEmployee.employee_id?.toString() || backendEmployee.id?.toString() || null,
+    
+    // Personal Information
+    first_name: backendEmployee.first_name || '',
+    last_name: backendEmployee.last_name || '',
+    full_name: backendEmployee.full_name || 
+      (backendEmployee.first_name && backendEmployee.last_name 
+        ? `${backendEmployee.first_name} ${backendEmployee.last_name}`.trim()
+        : backendEmployee.name || ''),
+    date_of_birth: formatDate(backendEmployee.date_of_birth),
+    gender: backendEmployee.gender || undefined,
+    marital_status: backendEmployee.marital_status || undefined,
+    national_id: backendEmployee.national_id || backendEmployee.aadhar_number || backendEmployee.ssn || undefined,
+    passport_number: backendEmployee.passport_number || undefined,
+    
+    // Contact Information
+    email: backendEmployee.email || '',
+    phone: backendEmployee.phone || backendEmployee.mobile || undefined,
+    alternate_phone: backendEmployee.alternate_phone || undefined,
+    emergency_contact_name: backendEmployee.emergency_contact_name || undefined,
+    emergency_contact_phone: backendEmployee.emergency_contact_phone || undefined,
+    emergency_contact_relationship: backendEmployee.emergency_contact_relationship || undefined,
+    
+    // Address
+    address: backendEmployee.address || undefined,
+    city: backendEmployee.city || undefined,
+    state: backendEmployee.state || undefined,
+    postal_code: backendEmployee.postal_code || backendEmployee.pincode || backendEmployee.zip_code || undefined,
+    country: backendEmployee.country || undefined,
+    
+    // Employment Details
+    role: backendEmployee.role || backendEmployee.position || backendEmployee.job_title || backendEmployee.designation || '',
+    erp_role: backendEmployee.erp_role || backendEmployee.erp_user?.role || undefined,
+    department: backendEmployee.department || undefined,
+    employment_type: backendEmployee.employment_type || backendEmployee.employment_status || 'FULL_TIME',
+    status: (backendEmployee.status || backendEmployee.employment_status || 'ACTIVE').toString().toUpperCase() as any,
+    
+    // Dates
+    join_date: formatDate(backendEmployee.join_date || backendEmployee.hire_date || backendEmployee.joining_date),
+    probation_end_date: formatDate(backendEmployee.probation_end_date),
+    contract_start_date: formatDate(backendEmployee.contract_start_date),
+    contract_end_date: formatDate(backendEmployee.contract_end_date),
+    last_promotion_date: formatDate(backendEmployee.last_promotion_date),
+    termination_date: formatDate(backendEmployee.termination_date),
+    
+    // Manager & Reporting - Handle nested manager object
+    manager_id: backendEmployee.manager_id?.toString() || backendEmployee.manager?.id?.toString() || undefined,
+    manager_name: backendEmployee.manager_name || 
+      (backendEmployee.manager && backendEmployee.manager.full_name ? backendEmployee.manager.full_name : undefined) ||
+      (backendEmployee.manager && backendEmployee.manager.first_name && backendEmployee.manager.last_name 
+        ? `${backendEmployee.manager.first_name} ${backendEmployee.manager.last_name}`.trim()
+        : undefined) ||
+      backendEmployee.reporting_manager || 
+      undefined,
+    reporting_manager: backendEmployee.reporting_manager || 
+      (backendEmployee.manager && backendEmployee.manager.full_name ? backendEmployee.manager.full_name : undefined) ||
+      (backendEmployee.manager && backendEmployee.manager.first_name && backendEmployee.manager.last_name 
+        ? `${backendEmployee.manager.first_name} ${backendEmployee.manager.last_name}`.trim()
+        : undefined) ||
+      backendEmployee.manager_name || 
+      undefined,
+    team: backendEmployee.team || undefined,
+    
+    // Compensation
+    salary: backendEmployee.salary ? parseFloat(backendEmployee.salary) : undefined,
+    hourly_rate: backendEmployee.hourly_rate ? parseFloat(backendEmployee.hourly_rate) : undefined,
+    currency: backendEmployee.currency || 'USD',
+    pay_frequency: backendEmployee.pay_frequency || 'MONTHLY',
+    bonus: backendEmployee.bonus ? parseFloat(backendEmployee.bonus) : undefined,
+    commission_rate: backendEmployee.commission_rate ? parseFloat(backendEmployee.commission_rate) : undefined,
+    
+    // Benefits
+    benefits: formatArray(backendEmployee.benefits),
+    insurance_policy_number: backendEmployee.insurance_policy_number || undefined,
+    insurance_expiry: formatDate(backendEmployee.insurance_expiry),
+    
+    // Skills & Qualifications
+    skills: formatArray(backendEmployee.skills),
+    certifications: formatArray(backendEmployee.certifications),
+    education_level: backendEmployee.education_level || undefined,
+    education_field: backendEmployee.education_field || undefined,
+    years_of_experience: backendEmployee.years_of_experience ? parseFloat(backendEmployee.years_of_experience) : undefined,
+    
+    // Performance
+    performance_rating: backendEmployee.performance_rating ? parseFloat(backendEmployee.performance_rating) : undefined,
+    last_review_date: formatDate(backendEmployee.last_review_date),
+    next_review_date: formatDate(backendEmployee.next_review_date),
+    
+    // Leave Balance
+    annual_leave_balance: backendEmployee.annual_leave_balance ? parseFloat(backendEmployee.annual_leave_balance) : undefined,
+    sick_leave_balance: backendEmployee.sick_leave_balance ? parseFloat(backendEmployee.sick_leave_balance) : undefined,
+    other_leave_balance: backendEmployee.other_leave_balance ? parseFloat(backendEmployee.other_leave_balance) : undefined,
+    
+    // Additional
+    notes: backendEmployee.notes || undefined,
+    internal_notes: backendEmployee.internal_notes || undefined,
+    tags: formatArray(backendEmployee.tags),
+    
+    created_at: backendEmployee.created_at || new Date().toISOString(),
+    updated_at: backendEmployee.updated_at || new Date().toISOString(),
+  };
+}
+
 export async function listEmployees(): Promise<Employee[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching employees from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { employees: any[]; pagination?: any } } | { employees: any[] } | any[]>(
+        '/hr/employees?page=1&limit=1000'
+      );
+
+      console.log('👥 Backend employees response:', response);
+
+      // Handle different response formats
+      let employees = [];
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.employees) {
+          employees = response.data.employees;
+        } else if ('employees' in response) {
+          employees = response.employees;
+        } else if (Array.isArray(response)) {
+          employees = response;
+        }
+      }
+
+      if (employees.length > 0) {
+        const mapped = employees.map(mapBackendEmployee);
+        console.log('✅ Mapped employees:', mapped.length);
+        return mapped;
+      }
+
+      console.log('⚠️ No employees in response, falling back to mock data');
+      return mockEmployees;
+    } catch (error) {
+      console.error('❌ Backend API error fetching employees:', error);
+      return mockEmployees;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) return mockEmployees;
 
   try {
@@ -168,6 +335,52 @@ export async function listEmployees(): Promise<Employee[]> {
 export async function createEmployee(
   payload: Omit<Employee, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Employee> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Creating employee via backend API...', payload);
+      
+      const response = await apiRequest<{ success: boolean; data: { employee: any } } | { employee: any } | any>(
+        '/hr/employees',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+
+      console.log('✅ Backend create employee response:', response);
+
+      let employee = null;
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.employee) {
+          employee = response.data.employee;
+        } else if ('employee' in response) {
+          employee = response.employee;
+        } else if (!('success' in response)) {
+          employee = response;
+        }
+      }
+
+      if (employee) {
+        const mapped = mapBackendEmployee(employee);
+        console.log('✅ Created employee:', mapped.id);
+        return mapped;
+      }
+
+      throw new Error('Invalid response format from backend');
+    } catch (error) {
+      console.error('❌ Backend API error creating employee:', error);
+      // Fallback to mock
+      const emp: Employee = {
+        ...payload,
+        id: nextId(),
+        created_at: new Date().toISOString()
+      };
+      mockEmployees.unshift(emp);
+      return emp;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const emp: Employee = {
       ...payload,
@@ -197,6 +410,49 @@ export async function updateEmployee(
   id: string,
   changes: Partial<Employee>
 ): Promise<Employee | null> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Updating employee via backend API...', id, changes);
+      
+      const response = await apiRequest<{ success: boolean; data: { employee: any } } | { employee: any } | any>(
+        `/hr/employees/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(changes),
+        }
+      );
+
+      console.log('✅ Backend update employee response:', response);
+
+      let employee = null;
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.employee) {
+          employee = response.data.employee;
+        } else if ('employee' in response) {
+          employee = response.employee;
+        } else if (!('success' in response)) {
+          employee = response;
+        }
+      }
+
+      if (employee) {
+        const mapped = mapBackendEmployee(employee);
+        console.log('✅ Updated employee:', mapped.id);
+        return mapped;
+      }
+
+      throw new Error('Invalid response format from backend');
+    } catch (error) {
+      console.error('❌ Backend API error updating employee:', error);
+      // Fallback to mock
+      const index = mockEmployees.findIndex((e) => e.id === id);
+      if (index === -1) return null;
+      mockEmployees[index] = { ...mockEmployees[index], ...changes };
+      return mockEmployees[index];
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const index = mockEmployees.findIndex((e) => e.id === id);
     if (index === -1) return null;
@@ -221,6 +477,29 @@ export async function updateEmployee(
 }
 
 export async function deleteEmployee(id: string): Promise<void> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Deleting employee via backend API...', id);
+      
+      await apiRequest(
+        `/hr/employees/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      console.log('✅ Deleted employee:', id);
+      return;
+    } catch (error) {
+      console.error('❌ Backend API error deleting employee:', error);
+      // Fallback to mock
+      const index = mockEmployees.findIndex((e) => e.id === id);
+      if (index !== -1) mockEmployees.splice(index, 1);
+      return;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const index = mockEmployees.findIndex((e) => e.id === id);
     if (index !== -1) mockEmployees.splice(index, 1);
@@ -295,7 +574,76 @@ const mockLeaves: LeaveRequest[] = [
   }
 ];
 
+// Map backend leave response to frontend LeaveRequest type
+function mapBackendLeave(backendLeave: any): LeaveRequest {
+  const formatDate = (date: string | Date | null | undefined): string => {
+    if (!date) return '';
+    if (typeof date === 'string') return date.split('T')[0];
+    if (date instanceof Date) return date.toISOString().split('T')[0];
+    return '';
+  };
+
+  return {
+    id: backendLeave.id?.toString() || backendLeave.leave_id?.toString() || nextLeaveId(),
+    leave_number: backendLeave.leave_number || backendLeave.leave_id?.toString() || null,
+    employee_id: backendLeave.employee_id?.toString() || '',
+    employee_name: backendLeave.employee_name || backendLeave.employee?.name || backendLeave.employee?.full_name || '',
+    leave_type: backendLeave.leave_type || 'ANNUAL',
+    start_date: formatDate(backendLeave.start_date),
+    end_date: formatDate(backendLeave.end_date),
+    total_days: backendLeave.total_days ? parseFloat(backendLeave.total_days) : undefined,
+    status: backendLeave.status || 'PENDING',
+    reason: backendLeave.reason || undefined,
+    medical_certificate_required: backendLeave.medical_certificate_required || false,
+    medical_certificate_provided: backendLeave.medical_certificate_provided || false,
+    applied_date: formatDate(backendLeave.applied_date || backendLeave.created_at),
+    approved_by: backendLeave.approved_by || undefined,
+    approved_date: formatDate(backendLeave.approved_date),
+    rejected_reason: backendLeave.rejected_reason || undefined,
+    notes: backendLeave.notes || undefined,
+    created_at: backendLeave.created_at || new Date().toISOString(),
+    updated_at: backendLeave.updated_at || new Date().toISOString(),
+  };
+}
+
 export async function listLeaves(): Promise<LeaveRequest[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching leave requests from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { leaves: any[]; pagination?: any } } | { leaves: any[] } | any[]>(
+        '/hr/leaves?page=1&limit=1000'
+      );
+
+      console.log('📋 Backend leaves response:', response);
+
+      // Handle different response formats
+      let leaves = [];
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.leaves) {
+          leaves = response.data.leaves;
+        } else if ('leaves' in response) {
+          leaves = response.leaves;
+        } else if (Array.isArray(response)) {
+          leaves = response;
+        }
+      }
+
+      if (leaves.length > 0) {
+        const mapped = leaves.map(mapBackendLeave);
+        console.log('✅ Mapped leave requests:', mapped.length);
+        return mapped;
+      }
+
+      console.log('⚠️ No leaves in response, falling back to mock data');
+      return mockLeaves;
+    } catch (error) {
+      console.error('❌ Backend API error fetching leaves:', error);
+      return mockLeaves;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) return mockLeaves;
 
   try {
@@ -312,6 +660,52 @@ export async function listLeaves(): Promise<LeaveRequest[]> {
 export async function createLeave(
   payload: Omit<LeaveRequest, 'id' | 'created_at' | 'updated_at'>
 ): Promise<LeaveRequest> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Creating leave request via backend API...', payload);
+      
+      const response = await apiRequest<{ success: boolean; data: { leave: any } } | { leave: any } | any>(
+        '/hr/leaves',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        }
+      );
+
+      console.log('✅ Backend create leave response:', response);
+
+      let leave = null;
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.leave) {
+          leave = response.data.leave;
+        } else if ('leave' in response) {
+          leave = response.leave;
+        } else if (!('success' in response)) {
+          leave = response;
+        }
+      }
+
+      if (leave) {
+        const mapped = mapBackendLeave(leave);
+        console.log('✅ Created leave request:', mapped.id);
+        return mapped;
+      }
+
+      throw new Error('Invalid response format from backend');
+    } catch (error) {
+      console.error('❌ Backend API error creating leave:', error);
+      // Fallback to mock
+      const leave: LeaveRequest = {
+        ...payload,
+        id: nextLeaveId(),
+        created_at: new Date().toISOString()
+      };
+      mockLeaves.unshift(leave);
+      return leave;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const leave: LeaveRequest = {
       ...payload,
@@ -341,6 +735,49 @@ export async function updateLeave(
   id: string,
   changes: Partial<LeaveRequest>
 ): Promise<LeaveRequest | null> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Updating leave request via backend API...', id, changes);
+      
+      const response = await apiRequest<{ success: boolean; data: { leave: any } } | { leave: any } | any>(
+        `/hr/leaves/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(changes),
+        }
+      );
+
+      console.log('✅ Backend update leave response:', response);
+
+      let leave = null;
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.leave) {
+          leave = response.data.leave;
+        } else if ('leave' in response) {
+          leave = response.leave;
+        } else if (!('success' in response)) {
+          leave = response;
+        }
+      }
+
+      if (leave) {
+        const mapped = mapBackendLeave(leave);
+        console.log('✅ Updated leave request:', mapped.id);
+        return mapped;
+      }
+
+      throw new Error('Invalid response format from backend');
+    } catch (error) {
+      console.error('❌ Backend API error updating leave:', error);
+      // Fallback to mock
+      const index = mockLeaves.findIndex((l) => l.id === id);
+      if (index === -1) return null;
+      mockLeaves[index] = { ...mockLeaves[index], ...changes };
+      return mockLeaves[index];
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const index = mockLeaves.findIndex((l) => l.id === id);
     if (index === -1) return null;
@@ -365,6 +802,29 @@ export async function updateLeave(
 }
 
 export async function deleteLeave(id: string): Promise<void> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Deleting leave request via backend API...', id);
+      
+      await apiRequest(
+        `/hr/leaves/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      console.log('✅ Deleted leave request:', id);
+      return;
+    } catch (error) {
+      console.error('❌ Backend API error deleting leave:', error);
+      // Fallback to mock
+      const index = mockLeaves.findIndex((l) => l.id === id);
+      if (index !== -1) mockLeaves.splice(index, 1);
+      return;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const index = mockLeaves.findIndex((l) => l.id === id);
     if (index !== -1) mockLeaves.splice(index, 1);

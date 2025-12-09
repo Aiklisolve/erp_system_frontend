@@ -199,6 +199,8 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
             value={employeeNumber}
             onChange={(e) => setEmployeeNumber(e.target.value)}
             placeholder="Auto-generated"
+            readOnly
+            className="bg-slate-50"
           />
           <Input
             label="First Name"
@@ -214,57 +216,13 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
             placeholder="Last name"
             required
           />
-          <Input
-            label="Date of Birth"
-            type="date"
-            value={dateOfBirth}
-            onChange={(e) => setDateOfBirth(e.target.value)}
-            max={new Date().toISOString().slice(0, 10)}
-          />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Select
-            label="Gender"
-            value={gender}
-            onChange={(e) => setGender(e.target.value as Gender)}
-          >
-            <option value="">Select gender</option>
-            <option value="MALE">Male</option>
-            <option value="FEMALE">Female</option>
-            <option value="OTHER">Other</option>
-            <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
-          </Select>
-          <Select
-            label="Marital Status"
-            value={maritalStatus}
-            onChange={(e) => setMaritalStatus(e.target.value as MaritalStatus)}
-          >
-            <option value="">Select status</option>
-            <option value="SINGLE">Single</option>
-            <option value="MARRIED">Married</option>
-            <option value="DIVORCED">Divorced</option>
-            <option value="WIDOWED">Widowed</option>
-            <option value="OTHER">Other</option>
-          </Select>
-          <Input
-            label="National ID"
-            value={nationalId}
-            onChange={(e) => setNationalId(e.target.value)}
-            placeholder="SSN/National ID"
-          />
-          <Input
-            label="Passport Number"
-            value={passportNumber}
-            onChange={(e) => setPassportNumber(e.target.value)}
-            placeholder="Passport #"
-          />
         </div>
       </div>
 
       {/* Contact Information */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Contact Information</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Input
             label="Email"
             type="email"
@@ -279,72 +237,6 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+1 (555) 123-4567"
-          />
-          <Input
-            label="Alternate Phone"
-            type="tel"
-            value={alternatePhone}
-            onChange={(e) => setAlternatePhone(e.target.value)}
-            placeholder="Alternate contact"
-          />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Input
-            label="Emergency Contact Name"
-            value={emergencyContactName}
-            onChange={(e) => setEmergencyContactName(e.target.value)}
-            placeholder="Emergency contact"
-          />
-          <Input
-            label="Emergency Contact Phone"
-            type="tel"
-            value={emergencyContactPhone}
-            onChange={(e) => setEmergencyContactPhone(e.target.value)}
-            placeholder="Emergency phone"
-          />
-          <Input
-            label="Relationship"
-            value={emergencyContactRelationship}
-            onChange={(e) => setEmergencyContactRelationship(e.target.value)}
-            placeholder="Spouse, Parent, etc."
-          />
-        </div>
-      </div>
-
-      {/* Address */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Address</h3>
-        <Textarea
-          label="Street Address"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="Street address"
-          rows={2}
-        />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Input
-            label="City"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-            placeholder="City"
-          />
-          <Input
-            label="State/Province"
-            value={state}
-            onChange={(e) => setState(e.target.value)}
-            placeholder="State"
-          />
-          <Input
-            label="Postal Code"
-            value={postalCode}
-            onChange={(e) => setPostalCode(e.target.value)}
-            placeholder="ZIP/Postal"
-          />
-          <Input
-            label="Country"
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            placeholder="Country"
           />
         </div>
       </div>
@@ -424,7 +316,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
       {/* Dates */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Important Dates</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Input
             label="Join Date"
             type="date"
@@ -433,45 +325,16 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
             required
             max={new Date().toISOString().slice(0, 10)}
           />
-          <Input
-            label="Probation End Date"
-            type="date"
-            value={probationEndDate}
-            onChange={(e) => setProbationEndDate(e.target.value)}
-            min={joinDate}
-          />
-          <Input
-            label="Last Promotion Date"
-            type="date"
-            value={lastPromotionDate}
-            onChange={(e) => setLastPromotionDate(e.target.value)}
-            max={new Date().toISOString().slice(0, 10)}
-          />
+          {(status === 'TERMINATED' || status === 'RESIGNED') && (
+            <Input
+              label="Termination Date"
+              type="date"
+              value={terminationDate}
+              onChange={(e) => setTerminationDate(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+            />
+          )}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Contract Start Date"
-            type="date"
-            value={contractStartDate}
-            onChange={(e) => setContractStartDate(e.target.value)}
-          />
-          <Input
-            label="Contract End Date"
-            type="date"
-            value={contractEndDate}
-            onChange={(e) => setContractEndDate(e.target.value)}
-            min={contractStartDate}
-          />
-        </div>
-        {(status === 'TERMINATED' || status === 'RESIGNED') && (
-          <Input
-            label="Termination Date"
-            type="date"
-            value={terminationDate}
-            onChange={(e) => setTerminationDate(e.target.value)}
-            max={new Date().toISOString().slice(0, 10)}
-          />
-        )}
       </div>
 
       {/* Manager & Reporting */}
@@ -483,12 +346,6 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
             value={managerName}
             onChange={(e) => setManagerName(e.target.value)}
             placeholder="Direct manager"
-          />
-          <Input
-            label="Reporting Manager"
-            value={reportingManager}
-            onChange={(e) => setReportingManager(e.target.value)}
-            placeholder="Reporting manager"
           />
         </div>
       </div>
@@ -502,15 +359,6 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
             type="number"
             value={salary}
             onChange={(e) => setSalary(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0.00"
-            min={0}
-            step="0.01"
-          />
-          <Input
-            label="Hourly Rate"
-            type="number"
-            value={hourlyRate}
-            onChange={(e) => setHourlyRate(e.target.value === '' ? '' : Number(e.target.value))}
             placeholder="0.00"
             min={0}
             step="0.01"
@@ -536,52 +384,6 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
             <option value="DAILY">Daily</option>
           </Select>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Bonus"
-            type="number"
-            value={bonus}
-            onChange={(e) => setBonus(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0.00"
-            min={0}
-            step="0.01"
-          />
-          <Input
-            label="Commission Rate (%)"
-            type="number"
-            value={commissionRate}
-            onChange={(e) => setCommissionRate(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0.00"
-            min={0}
-            max={100}
-            step="0.01"
-          />
-        </div>
-      </div>
-
-      {/* Benefits */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Benefits</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Benefits"
-            value={benefits}
-            onChange={(e) => setBenefits(e.target.value)}
-            placeholder="Health Insurance, Dental, Vision (comma-separated)"
-          />
-          <Input
-            label="Insurance Policy Number"
-            value={insurancePolicyNumber}
-            onChange={(e) => setInsurancePolicyNumber(e.target.value)}
-            placeholder="Policy #"
-          />
-        </div>
-        <Input
-          label="Insurance Expiry"
-          type="date"
-          value={insuranceExpiry}
-          onChange={(e) => setInsuranceExpiry(e.target.value)}
-        />
       </div>
 
       {/* Skills & Qualifications */}
@@ -594,14 +396,6 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
             onChange={(e) => setSkills(e.target.value)}
             placeholder="Skill 1, Skill 2, Skill 3 (comma-separated)"
           />
-          <Input
-            label="Certifications"
-            value={certifications}
-            onChange={(e) => setCertifications(e.target.value)}
-            placeholder="Cert 1, Cert 2 (comma-separated)"
-          />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
           <Select
             label="Education Level"
             value={educationLevel}
@@ -615,86 +409,15 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
             <option value="DOCTORATE">Doctorate</option>
             <option value="OTHER">Other</option>
           </Select>
-          <Input
-            label="Education Field"
-            value={educationField}
-            onChange={(e) => setEducationField(e.target.value)}
-            placeholder="Field of study"
-          />
-          <Input
-            label="Years of Experience"
-            type="number"
-            value={yearsOfExperience}
-            onChange={(e) => setYearsOfExperience(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0"
-            min={0}
-          />
         </div>
-      </div>
-
-      {/* Performance */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Performance</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Input
-            label="Performance Rating (1-5)"
-            type="number"
-            value={performanceRating}
-            onChange={(e) => {
-              const val = Number(e.target.value);
-              if (val >= 1 && val <= 5) setPerformanceRating(val);
-            }}
-            placeholder="4.5"
-            min={1}
-            max={5}
-            step="0.1"
-          />
-          <Input
-            label="Last Review Date"
-            type="date"
-            value={lastReviewDate}
-            onChange={(e) => setLastReviewDate(e.target.value)}
-            max={new Date().toISOString().slice(0, 10)}
-          />
-          <Input
-            label="Next Review Date"
-            type="date"
-            value={nextReviewDate}
-            onChange={(e) => setNextReviewDate(e.target.value)}
-            min={new Date().toISOString().slice(0, 10)}
-          />
-        </div>
-      </div>
-
-      {/* Leave Balance */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-slate-900">Leave Balance</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Input
-            label="Annual Leave Balance"
-            type="number"
-            value={annualLeaveBalance}
-            onChange={(e) => setAnnualLeaveBalance(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0"
-            min={0}
-          />
-          <Input
-            label="Sick Leave Balance"
-            type="number"
-            value={sickLeaveBalance}
-            onChange={(e) => setSickLeaveBalance(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0"
-            min={0}
-          />
-          <Input
-            label="Other Leave Balance"
-            type="number"
-            value={otherLeaveBalance}
-            onChange={(e) => setOtherLeaveBalance(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0"
-            min={0}
-          />
-        </div>
+        <Input
+          label="Years of Experience"
+          type="number"
+          value={yearsOfExperience}
+          onChange={(e) => setYearsOfExperience(e.target.value === '' ? '' : Number(e.target.value))}
+          placeholder="0"
+          min={0}
+        />
       </div>
 
       {/* Notes */}
@@ -705,13 +428,6 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Employee notes"
-          rows={3}
-        />
-        <Textarea
-          label="Internal Notes"
-          value={internalNotes}
-          onChange={(e) => setInternalNotes(e.target.value)}
-          placeholder="Internal notes (confidential)"
           rows={3}
         />
       </div>

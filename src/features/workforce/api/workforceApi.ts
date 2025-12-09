@@ -447,5 +447,232 @@ export async function deleteShift(id: string): Promise<void> {
   }
 }
 
+// Employee interface for dropdown
+export interface EmployeeOption {
+  id: string;
+  employee_id?: string;
+  employee_number?: string;
+  name: string;
+  full_name?: string;
+  first_name?: string;
+  last_name?: string;
+  email: string;
+  department?: string;
+  role?: string;
+}
+
+// Map backend employee response to EmployeeOption
+function mapBackendEmployee(backendEmployee: any): EmployeeOption {
+  const fullName = backendEmployee.full_name || 
+    (backendEmployee.first_name && backendEmployee.last_name 
+      ? `${backendEmployee.first_name} ${backendEmployee.last_name}`.trim()
+      : backendEmployee.name || 'Unknown Employee');
+  
+  return {
+    id: backendEmployee.id?.toString() || backendEmployee.employee_id?.toString() || '',
+    employee_id: backendEmployee.employee_id?.toString() || backendEmployee.id?.toString(),
+    employee_number: backendEmployee.employee_number || backendEmployee.emp_number,
+    name: fullName,
+    full_name: fullName,
+    first_name: backendEmployee.first_name,
+    last_name: backendEmployee.last_name,
+    email: backendEmployee.email || '',
+    department: backendEmployee.department,
+    role: backendEmployee.role || backendEmployee.job_title,
+  };
+}
+
+// List employees from backend API for dropdown
+export async function listEmployees(): Promise<EmployeeOption[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching employees from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { employees: any[] } } | { employees: any[] } | any[]>(
+        '/hr/employees?page=1&limit=1000'
+      );
+
+      console.log('👥 Backend employees response:', response);
+
+      // Handle different response formats
+      let employees = [];
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.employees) {
+          employees = response.data.employees;
+        } else if ('employees' in response) {
+          employees = response.employees;
+        } else if (Array.isArray(response)) {
+          employees = response;
+        }
+      }
+
+      if (employees.length > 0) {
+        const mapped = employees.map(mapBackendEmployee);
+        console.log('✅ Mapped employees:', mapped.length);
+        return mapped;
+      }
+
+      console.log('⚠️ No employees in response');
+      return [];
+    } catch (error) {
+      console.error('❌ Backend API error fetching employees:', error);
+      return [];
+    }
+  }
+
+  // Fallback to empty array if backend API is not available
+  return [];
+}
+
+// User interface for scheduling/approval dropdowns
+export interface UserOption {
+  id: string;
+  user_id?: string;
+  name: string;
+  full_name?: string;
+  email: string;
+  role?: string;
+  erp_role?: string;
+  username?: string;
+}
+
+// Map backend user response to UserOption
+function mapBackendUser(backendUser: any): UserOption {
+  const fullName = backendUser.full_name || 
+    (backendUser.first_name && backendUser.last_name 
+      ? `${backendUser.first_name} ${backendUser.last_name}`.trim()
+      : backendUser.name || backendUser.username || 'Unknown User');
+  
+  return {
+    id: backendUser.id?.toString() || backendUser.user_id?.toString() || '',
+    user_id: backendUser.user_id?.toString() || backendUser.id?.toString(),
+    name: fullName,
+    full_name: fullName,
+    email: backendUser.email || '',
+    role: backendUser.role || backendUser.erp_role,
+    erp_role: backendUser.erp_role || backendUser.role,
+    username: backendUser.username || backendUser.email,
+  };
+}
+
+// Roles suitable for scheduling shifts
+const SCHEDULING_ROLES = [
+  'ADMIN',
+  'HR_MANAGER',
+  'INVENTORY_MANAGER',
+  'PROCUREMENT_OFFICER',
+  'WAREHOUSE_OPERATOR',
+  'OPERATIONS',
+];
+
+// Roles suitable for approving shifts
+const APPROVAL_ROLES = [
+  'ADMIN',
+  'HR_MANAGER',
+  'FINANCE_MANAGER',
+  'SALES_MANAGER',
+  'INVENTORY_MANAGER',
+  'PROCUREMENT_OFFICER',
+  'OPERATIONS',
+];
+
+// List users for scheduling dropdown (filtered by role)
+export async function listUsersForScheduling(): Promise<UserOption[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching users for scheduling from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { users: any[] } } | { users: any[] } | any[]>(
+        '/users?page=1&limit=1000'
+      );
+
+      console.log('👥 Backend users response:', response);
+
+      // Handle different response formats
+      let users = [];
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.users) {
+          users = response.data.users;
+        } else if ('users' in response) {
+          users = response.users;
+        } else if (Array.isArray(response)) {
+          users = response;
+        }
+      }
+
+      if (users.length > 0) {
+        // Filter users by scheduling roles
+        const filteredUsers = users.filter((u: any) => {
+          const userRole = (u.role || u.erp_role || '').toString().toUpperCase().trim();
+          // Also check if role contains any of the scheduling roles (for partial matches)
+          return SCHEDULING_ROLES.some(role => userRole === role || userRole.includes(role));
+        });
+        
+        const mapped = filteredUsers.map(mapBackendUser);
+        console.log('✅ Mapped users for scheduling:', mapped.length);
+        console.log('📋 Scheduling roles filter:', SCHEDULING_ROLES);
+        return mapped;
+      }
+
+      console.log('⚠️ No users in response');
+      return [];
+    } catch (error) {
+      console.error('❌ Backend API error fetching users for scheduling:', error);
+      return [];
+    }
+  }
+
+  return [];
+}
+
+// List users for approval dropdown (filtered by role)
+export async function listUsersForApproval(): Promise<UserOption[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching users for approval from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { users: any[] } } | { users: any[] } | any[]>(
+        '/users?page=1&limit=1000'
+      );
+
+      console.log('👥 Backend users response:', response);
+
+      // Handle different response formats
+      let users = [];
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.users) {
+          users = response.data.users;
+        } else if ('users' in response) {
+          users = response.users;
+        } else if (Array.isArray(response)) {
+          users = response;
+        }
+      }
+
+      if (users.length > 0) {
+        // Filter users by approval roles
+        const filteredUsers = users.filter((u: any) => {
+          const userRole = (u.role || u.erp_role || '').toString().toUpperCase().trim();
+          // Also check if role contains any of the approval roles (for partial matches)
+          return APPROVAL_ROLES.some(role => userRole === role || userRole.includes(role));
+        });
+        
+        const mapped = filteredUsers.map(mapBackendUser);
+        console.log('✅ Mapped users for approval:', mapped.length);
+        console.log('📋 Approval roles filter:', APPROVAL_ROLES);
+        return mapped;
+      }
+
+      console.log('⚠️ No users in response');
+      return [];
+    } catch (error) {
+      console.error('❌ Backend API error fetching users for approval:', error);
+      return [];
+    }
+  }
+
+  return [];
+}
+
 
 

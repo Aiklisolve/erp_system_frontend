@@ -5,6 +5,9 @@ import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import * as workforceApi from '../api/workforceApi';
+import type { EmployeeOption, UserOption } from '../api/workforceApi';
 
 type Props = {
   initial?: Partial<Shift>;
@@ -32,14 +35,7 @@ const erpRoles: ErpRole[] = [
   'VIEWER',
 ];
 
-// Mock employees for dropdown
-const mockEmployees = [
-  { id: 'emp-1', name: 'Alex Rivera', email: 'alex.rivera@erp.local', department: 'WAREHOUSE' },
-  { id: 'emp-2', name: 'Jordan Lee', email: 'jordan.lee@erp.local', department: 'CUSTOMER_SERVICE' },
-  { id: 'emp-3', name: 'Sarah Johnson', email: 'sarah.johnson@erp.local', department: 'SALES' },
-  { id: 'emp-4', name: 'Mike Wilson', email: 'mike.wilson@erp.local', department: 'FINANCE' },
-  { id: 'emp-5', name: 'Lisa Anderson', email: 'lisa.anderson@erp.local', department: 'HR' },
-];
+// Employee search state will be managed in component
 
 const departments: Department[] = [
   'IT',
@@ -60,6 +56,15 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
   const [employeeId, setEmployeeId] = useState(initial?.employee_id ?? '');
   const [employeeName, setEmployeeName] = useState(initial?.employee_name ?? '');
   const [employeeEmail, setEmployeeEmail] = useState(initial?.employee_email ?? '');
+  
+  // Employee dropdown state
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+  
+  // Users dropdown state
+  const [schedulingUsers, setSchedulingUsers] = useState<UserOption[]>([]);
+  const [approvalUsers, setApprovalUsers] = useState<UserOption[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   
   const [date, setDate] = useState(initial?.date ?? new Date().toISOString().slice(0, 10));
   const [startTime, setStartTime] = useState(initial?.start_time ?? '08:00');
@@ -103,67 +108,208 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [internalNotes, setInternalNotes] = useState(initial?.internal_notes ?? '');
 
-  // Calculate total hours
-  useEffect(() => {
-    if (startTime && endTime) {
-      const start = new Date(`2000-01-01T${startTime}`);
-      const end = new Date(`2000-01-01T${endTime}`);
-      if (end < start) {
-        // Handle overnight shifts
-        end.setDate(end.getDate() + 1);
-      }
-      const diffMs = end.getTime() - start.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
-      const breakHours = (Number(breakDuration) || 0) / 60;
-      const total = Math.max(0, diffHours - breakHours);
-      // Don't auto-set if user is editing actual hours
-      if (!actualHours) {
-        // This will be calculated in a separate effect
-      }
-    }
-  }, [startTime, endTime, breakDuration]);
-
-  // Calculate total pay
-  useEffect(() => {
-    const hours = Number(actualHours) || 0;
-    const rate = Number(hourlyRate) || 0;
-    const otHours = Number(overtimeHours) || 0;
-    const otRate = Number(overtimeRate) || rate * 1.5; // Default 1.5x
+  // Calculate total hours from start/end time and break duration
+  const calculateTotalHours = (): number => {
+    if (!startTime || !endTime) return 0;
     
-    if (hours > 0 && rate > 0) {
-      const regularHours = Math.max(0, hours - otHours);
-      const regularPay = regularHours * rate;
-      const overtimePay = otHours * otRate;
-      setTotalPay(regularPay + overtimePay);
+    const start = new Date(`2000-01-01T${startTime}`);
+    const end = new Date(`2000-01-01T${endTime}`);
+    if (end < start) {
+      // Handle overnight shifts
+      end.setDate(end.getDate() + 1);
+    }
+    const diffMs = end.getTime() - start.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const breakHours = (Number(breakDuration) || 0) / 60;
+    return Math.max(0, diffHours - breakHours);
+  };
+
+  // Calculate total pay based on hours and rates
+  const calculateTotalPay = (): number => {
+    const rate = Number(hourlyRate) || 0;
+    if (rate <= 0) return 0;
+
+    // Use actual_hours if available, otherwise use calculated total_hours
+    const totalHoursWorked = Number(actualHours) || calculateTotalHours();
+    const otHours = Number(overtimeHours) || 0;
+    
+    // Calculate regular hours (total hours minus overtime)
+    const regularHours = Math.max(0, totalHoursWorked - otHours);
+    
+    // Calculate overtime rate (use provided rate or default to 1.5x)
+    const otRate = Number(overtimeRate) || (rate * 1.5);
+    
+    // Calculate pay
+    const regularPay = regularHours * rate;
+    const overtimePay = otHours * otRate;
+    
+    return regularPay + overtimePay;
+  };
+
+  // Update total pay when relevant fields change
+  useEffect(() => {
+    const calculatedPay = calculateTotalPay();
+    if (calculatedPay > 0) {
+      setTotalPay(calculatedPay);
     } else {
       setTotalPay('');
     }
-  }, [actualHours, hourlyRate, overtimeHours, overtimeRate]);
+  }, [startTime, endTime, breakDuration, actualHours, hourlyRate, overtimeHours, overtimeRate]);
+
+  // Fetch employees from backend API
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      setEmployeesLoading(true);
+      try {
+        const data = await workforceApi.listEmployees();
+        setEmployees(data);
+        
+        // If editing and employee_id exists, set the employee details
+        if (initial?.employee_id && !employeeId) {
+          const foundEmployee = data.find((e) => e.id === initial.employee_id || e.employee_id === initial.employee_id);
+          if (foundEmployee) {
+            setEmployeeId(foundEmployee.id);
+            setEmployeeName(foundEmployee.full_name || foundEmployee.name || initial.employee_name || '');
+            setEmployeeEmail(foundEmployee.email || initial.employee_email || '');
+            if (foundEmployee.department) {
+              setDepartment(foundEmployee.department as Department);
+            }
+          } else if (initial.employee_name) {
+            // If employee not found in list but we have name, use it
+            setEmployeeName(initial.employee_name);
+            setEmployeeEmail(initial.employee_email || '');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+        setEmployees([]);
+      } finally {
+        setEmployeesLoading(false);
+      }
+    };
+    fetchEmployees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  
+  // Fetch users for scheduling and approval dropdowns
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setUsersLoading(true);
+      try {
+        const [schedulingData, approvalData] = await Promise.all([
+          workforceApi.listUsersForScheduling(),
+          workforceApi.listUsersForApproval(),
+        ]);
+        setSchedulingUsers(schedulingData);
+        setApprovalUsers(approvalData);
+        
+        // If editing and scheduled_by/approved_by exist, try to match with users
+        if (initial?.scheduled_by && !scheduledBy) {
+          const foundUser = schedulingData.find((u) => 
+            u.name === initial.scheduled_by || 
+            u.full_name === initial.scheduled_by ||
+            u.username === initial.scheduled_by
+          );
+          if (foundUser) {
+            setScheduledBy(foundUser.name);
+          } else {
+            setScheduledBy(initial.scheduled_by);
+          }
+        }
+        
+        if (initial?.approved_by && !approvedBy) {
+          const foundUser = approvalData.find((u) => 
+            u.name === initial.approved_by || 
+            u.full_name === initial.approved_by ||
+            u.username === initial.approved_by
+          );
+          if (foundUser) {
+            setApprovedBy(foundUser.name);
+          } else {
+            setApprovedBy(initial.approved_by);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        setSchedulingUsers([]);
+        setApprovalUsers([]);
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+    fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  
+  // Prepare employee options for SearchableSelect
+  const employeeOptions = employees.map((emp) => {
+    const displayName = emp.full_name || emp.name || 'Unknown Employee';
+    const displayInfo = [
+      emp.employee_number,
+      emp.email,
+      emp.department
+    ].filter(Boolean).join(' • ');
+    
+    return {
+      value: emp.id,
+      label: displayInfo ? `${displayName} - ${displayInfo}` : displayName,
+      id: emp.id,
+    };
+  });
+  
+  // Prepare scheduling user options for SearchableSelect
+  const schedulingUserOptions = schedulingUsers.map((user) => {
+    const displayName = user.full_name || user.name || 'Unknown User';
+    const displayInfo = [
+      user.email,
+      user.role || user.erp_role
+    ].filter(Boolean).join(' • ');
+    
+    return {
+      value: user.name || user.full_name || user.id,
+      label: displayInfo ? `${displayName} - ${displayInfo}` : displayName,
+      id: user.id,
+    };
+  });
+  
+  // Prepare approval user options for SearchableSelect
+  const approvalUserOptions = approvalUsers.map((user) => {
+    const displayName = user.full_name || user.name || 'Unknown User';
+    const displayInfo = [
+      user.email,
+      user.role || user.erp_role
+    ].filter(Boolean).join(' • ');
+    
+    return {
+      value: user.name || user.full_name || user.id,
+      label: displayInfo ? `${displayName} - ${displayInfo}` : displayName,
+      id: user.id,
+    };
+  });
 
   // Auto-fill employee details when employee is selected
   useEffect(() => {
     if (employeeId) {
-      const employee = mockEmployees.find((e) => e.id === employeeId);
+      const employee = employees.find((e) => e.id === employeeId || e.employee_id === employeeId);
       if (employee) {
-        setEmployeeName(employee.name);
+        setEmployeeName(employee.full_name || employee.name);
         setEmployeeEmail(employee.email);
-        setDepartment(employee.department || '');
+        if (employee.department) {
+          setDepartment(employee.department as Department);
+        }
       }
     }
-  }, [employeeId]);
+  }, [employeeId, employees]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!employeeName || !date || !startTime || !endTime || !role) return;
     
-    // Calculate total hours
-    const start = new Date(`2000-01-01T${startTime}`);
-    const end = new Date(`2000-01-01T${endTime}`);
-    if (end < start) end.setDate(end.getDate() + 1);
-    const diffMs = end.getTime() - start.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60);
-    const breakHours = (Number(breakDuration) || 0) / 60;
-    const calculatedHours = Math.max(0, diffHours - breakHours);
+    // Calculate total hours from schedule
+    const calculatedHours = calculateTotalHours();
+    
+    // Calculate total pay (recalculate to ensure accuracy)
+    const calculatedPay = calculateTotalPay();
     
     onSubmit({
       shift_number: shiftNumber,
@@ -197,7 +343,7 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
       performance_rating: Number(performanceRating) || undefined,
       quality_score: Number(qualityScore) || undefined,
       hourly_rate: Number(hourlyRate) || undefined,
-      total_pay: Number(totalPay) || undefined,
+      total_pay: calculatedPay > 0 ? calculatedPay : (Number(totalPay) || undefined),
       overtime_hours: Number(overtimeHours) || undefined,
       overtime_rate: Number(overtimeRate) || undefined,
       currency: currency || undefined,
@@ -257,18 +403,50 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Employee Information</h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Select
-            label="Employee"
-            value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-          >
-            <option value="">Select employee</option>
-            {mockEmployees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.name} - {emp.department}
-              </option>
-            ))}
-          </Select>
+          {employeesLoading ? (
+            <div className="space-y-1">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                Employee <span className="text-red-500">*</span>
+              </label>
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                Loading employees...
+              </div>
+            </div>
+          ) : employeeOptions.length === 0 ? (
+            <div className="space-y-1">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                Employee <span className="text-red-500">*</span>
+              </label>
+              <div className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+                No employees available. Please add employees first.
+              </div>
+            </div>
+          ) : (
+            <SearchableSelect
+              label="Employee"
+              value={employeeId}
+              onChange={(value) => {
+                const selectedEmployee = employees.find((e) => e.id === value);
+                if (selectedEmployee) {
+                  setEmployeeId(value);
+                  const displayName = selectedEmployee.full_name || selectedEmployee.name || '';
+                  setEmployeeName(displayName);
+                  setEmployeeEmail(selectedEmployee.email);
+                  if (selectedEmployee.department) {
+                    setDepartment(selectedEmployee.department as Department);
+                  }
+                } else {
+                  setEmployeeId('');
+                  setEmployeeName('');
+                  setEmployeeEmail('');
+                }
+              }}
+              options={employeeOptions}
+              placeholder="Search and select employee..."
+              required
+              maxHeight="200px"
+            />
+          )}
           <Input
             label="Employee Name"
             value={employeeName}
@@ -534,35 +712,95 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
             <option value="INR">INR (₹)</option>
           </Select>
         </div>
-        <Input
-          label="Total Pay"
-          type="number"
-          value={totalPay}
-          onChange={(e) => setTotalPay(e.target.value === '' ? '' : Number(e.target.value))}
-          placeholder="Auto-calculated"
-          min={0}
-          step="0.01"
-          readOnly
-          className="bg-slate-50"
-        />
+        <div>
+          <Input
+            label="Total Pay"
+            type="number"
+            value={totalPay}
+            onChange={(e) => setTotalPay(e.target.value === '' ? '' : Number(e.target.value))}
+            placeholder="Auto-calculated"
+            min={0}
+            step="0.01"
+            readOnly
+            className="bg-slate-50"
+          />
+          {(() => {
+            const totalHrs = Number(actualHours) || calculateTotalHours();
+            const otHrs = Number(overtimeHours) || 0;
+            const regHrs = Math.max(0, totalHrs - otHrs);
+            const rate = Number(hourlyRate) || 0;
+            const otRate = Number(overtimeRate) || (rate * 1.5);
+            if (rate > 0 && totalHrs > 0) {
+              const calcPay = calculateTotalPay();
+              return (
+                <div className="text-[10px] text-slate-500 mt-1">
+                  Formula: (Regular Hours × Hourly Rate) + (Overtime Hours × Overtime Rate)
+                  <br />
+                  = ({regHrs.toFixed(2)}h × ${rate.toFixed(2)}) + ({otHrs.toFixed(2)}h × ${otRate.toFixed(2)}) = ${calcPay.toFixed(2)}
+                </div>
+              );
+            }
+            return null;
+          })()}
+        </div>
       </div>
 
       {/* Approval */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Approval</h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Input
-            label="Scheduled By"
-            value={scheduledBy}
-            onChange={(e) => setScheduledBy(e.target.value)}
-            placeholder="Scheduler name"
-          />
-          <Input
-            label="Approved By"
-            value={approvedBy}
-            onChange={(e) => setApprovedBy(e.target.value)}
-            placeholder="Manager name"
-          />
+          {usersLoading ? (
+            <div className="space-y-1">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                Scheduled By
+              </label>
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                Loading users...
+              </div>
+            </div>
+          ) : schedulingUserOptions.length === 0 ? (
+            <Input
+              label="Scheduled By"
+              value={scheduledBy}
+              onChange={(e) => setScheduledBy(e.target.value)}
+              placeholder="Scheduler name"
+            />
+          ) : (
+            <SearchableSelect
+              label="Scheduled By"
+              value={scheduledBy}
+              onChange={(value) => setScheduledBy(value)}
+              options={schedulingUserOptions}
+              placeholder="Search and select scheduler..."
+              maxHeight="200px"
+            />
+          )}
+          {usersLoading ? (
+            <div className="space-y-1">
+              <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                Approved By
+              </label>
+              <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                Loading users...
+              </div>
+            </div>
+          ) : approvalUserOptions.length === 0 ? (
+            <Input
+              label="Approved By"
+              value={approvedBy}
+              onChange={(e) => setApprovedBy(e.target.value)}
+              placeholder="Manager name"
+            />
+          ) : (
+            <SearchableSelect
+              label="Approved By"
+              value={approvedBy}
+              onChange={(value) => setApprovedBy(value)}
+              options={approvalUserOptions}
+              placeholder="Search and select approver..."
+              maxHeight="200px"
+            />
+          )}
           <Input
             label="Approval Date"
             type="date"
