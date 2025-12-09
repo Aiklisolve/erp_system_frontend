@@ -1,135 +1,148 @@
-import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
-import { handleApiError } from '../../../lib/errorHandler';
 import { apiRequest } from '../../../config/api';
 import type { StockMovement, Warehouse } from '../types';
 
-let useStatic = !hasSupabaseConfig;
+// Backend stock movement structure (matches actual database schema)
+interface BackendStockMovement {
+  id: number;
+  product_id: number;
+  warehouse_id?: number; // single warehouse ID (actual column)
+  from?: number; // warehouse ID (if exists)
+  to?: number; // warehouse ID (if exists)
+  movement_type: string;
+  quantity: number;
+  reference_type?: string;
+  reference_id?: number;
+  movement_date?: string; // timestamp (aliased from created_at if doesn't exist)
+  notes?: string;
+  status?: string; // aliased as 'Pending' if doesn't exist
+  created_by?: number;
+  created_at?: string;
+  item_id?: string;
+  item_name?: string;
+  item_sku?: string;
+  unit?: string;
+  from_location?: string; // warehouse name from JOIN
+  to_location?: string; // warehouse name from JOIN
+  from_warehouse_code?: string;
+  to_warehouse_code?: string;
+}
 
-// Backend API flag - set to true to use backend API
-const USE_BACKEND_API = true;
+interface StockMovementListResponse {
+  success: boolean;
+  data: {
+    movements: BackendStockMovement[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
+}
 
-const mockMovements: StockMovement[] = [
-  {
-    id: 'mv-1',
-    movement_number: 'MV-2025-ABC123',
-    item_id: 'SKU-2005',
-    item_name: 'Barcode Scanner',
-    item_sku: 'SKU-2005',
-    movement_type: 'TRANSFER',
-    status: 'COMPLETED',
-    movement_date: '2025-01-04',
-    completed_date: '2025-01-04',
-    from_location: 'WH-01-A',
-    from_zone: 'STORAGE',
-    from_bin: 'BIN-01',
-    to_location: 'WH-01-B',
-    to_zone: 'PICKING',
-    to_bin: 'BIN-02',
-    quantity: 10,
-    unit: 'pcs',
-    available_quantity: 50,
-    received_quantity: 10,
-    reference_number: 'TRF-001',
-    reference_type: 'TRANSFER_ORDER',
-    assigned_to: 'John Doe',
-    operator_name: 'John Doe',
-    quality_check_required: true,
-    quality_check_passed: true,
-    inspected_by: 'Jane Smith',
-    unit_cost: 25.50,
-    total_cost: 255.00,
-    currency: 'INR',
-    reason: 'Restocking picking area',
-    notes: 'Standard transfer',
-    created_at: '2025-01-04'
-  },
-  {
-    id: 'mv-2',
-    movement_number: 'MV-2025-XYZ789',
-    item_id: 'SKU-1001',
-    item_name: 'Cloud Subscription Seat',
-    item_sku: 'SKU-1001',
-    movement_type: 'RECEIPT',
-    status: 'COMPLETED',
-    movement_date: '2025-01-07',
-    completed_date: '2025-01-07',
-    from_location: 'Supplier',
-    to_location: 'Main DC',
-    to_zone: 'RECEIVING',
-    quantity: 40,
-    unit: 'licenses',
-    received_quantity: 40,
-    reference_number: 'PO-2025-001',
-    reference_type: 'PURCHASE_ORDER',
-    batch_number: 'BATCH-001',
-    carrier: 'FedEx',
-    tracking_number: 'TRK123456789',
-    expected_arrival_date: '2025-01-07',
-    actual_arrival_date: '2025-01-07',
-    assigned_to: 'Mike Wilson',
-    operator_name: 'Mike Wilson',
-    quality_check_required: true,
-    quality_check_passed: true,
-    unit_cost: 100.00,
-    total_cost: 4000.00,
-    currency: 'INR',
-    reason: 'New inventory receipt',
-    notes: 'Received from supplier',
-    created_at: '2025-01-07'
-  },
-  {
-    id: 'mv-3',
-    movement_number: 'MV-2025-DEF456',
-    item_id: 'SKU-3001',
-    item_name: 'Wireless Mouse',
-    item_sku: 'SKU-3001',
-    movement_type: 'SHIPMENT',
-    status: 'IN_PROGRESS',
-    movement_date: '2025-01-08',
-    from_location: 'Main DC',
-    from_zone: 'PACKING',
-    to_location: 'Customer',
-    quantity: 25,
-    unit: 'pcs',
-    reference_number: 'SO-2025-001',
-    reference_type: 'SALES_ORDER',
-    carrier: 'UPS',
-    tracking_number: 'UPS987654321',
-    expected_arrival_date: '2025-01-12',
-    assigned_to: 'Sarah Johnson',
-    operator_name: 'Sarah Johnson',
-    unit_cost: 15.00,
-    total_cost: 375.00,
-    currency: 'INR',
-    reason: 'Customer order fulfillment',
-    notes: 'Express shipping',
-    created_at: '2025-01-08'
-  },
-  {
-    id: 'mv-4',
-    movement_number: 'MV-2025-GHI789',
-    item_id: 'SKU-2005',
-    item_name: 'Barcode Scanner',
-    item_sku: 'SKU-2005',
-    movement_type: 'ADJUSTMENT',
-    status: 'PENDING',
-    movement_date: '2025-01-09',
-    from_location: 'WH-01-A',
-    from_zone: 'STORAGE',
-    to_location: 'WH-01-A',
-    to_zone: 'STORAGE',
-    quantity: -2,
-    unit: 'pcs',
-    reference_number: 'ADJ-001',
-    reference_type: 'ADJUSTMENT',
-    reason: 'Damaged items - write off',
-    notes: 'Physical count adjustment',
-    created_at: '2025-01-09'
+interface StockMovementResponse {
+  success: boolean;
+  data: BackendStockMovement;
+}
+
+// Map backend structure to frontend structure
+function mapBackendToFrontend(backend: BackendStockMovement): StockMovement {
+  // Use movement_date if available, otherwise use created_at
+  const movementDate = backend.movement_date 
+    ? (typeof backend.movement_date === 'string' ? backend.movement_date.split('T')[0] : new Date(backend.movement_date).toISOString().split('T')[0])
+    : (backend.created_at 
+      ? (typeof backend.created_at === 'string' ? backend.created_at.split('T')[0] : new Date(backend.created_at).toISOString().split('T')[0])
+      : new Date().toISOString().split('T')[0]);
+  
+  // Map status from database (e.g., "Pending", "Completed") to frontend format
+  const mapStatus = (status?: string): StockMovement['status'] => {
+    if (!status) return 'PENDING';
+    const upper = status.toUpperCase();
+    if (upper === 'COMPLETED' || upper === 'COMPLETE') return 'COMPLETED';
+    if (upper === 'CANCELLED' || upper === 'CANCEL') return 'CANCELLED';
+    if (upper === 'IN_PROGRESS' || upper === 'IN PROGRESS') return 'IN_PROGRESS';
+    return 'PENDING';
+  };
+
+  // Use warehouse names from JOIN if available, otherwise construct from IDs
+  // Handle both warehouse_id (single) and from/to (if they exist)
+  const warehouseId = backend.warehouse_id || backend.from;
+  const fromLocation = backend.from_location || (warehouseId ? `WH-${warehouseId}` : '');
+  const toLocation = backend.to_location || (backend.to ? `WH-${backend.to}` : fromLocation);
+
+  return {
+    id: backend.id.toString(),
+    movement_number: `MV-${backend.id}`,
+    item_id: backend.item_id || backend.item_sku || `PROD-${backend.product_id}`,
+    item_name: backend.item_name || '',
+    item_sku: backend.item_sku || backend.item_id || `PROD-${backend.product_id}`,
+    movement_type: (backend.movement_type || 'TRANSFER') as StockMovement['movement_type'],
+    status: mapStatus(backend.status),
+    movement_date: movementDate,
+    from_location: fromLocation,
+    to_location: toLocation,
+    quantity: backend.quantity || 0,
+    unit: backend.unit || 'pcs',
+    reference_number: backend.reference_id?.toString(),
+    reference_type: (backend.reference_type || 'OTHER') as StockMovement['reference_type'],
+    notes: backend.notes || undefined,
+    created_at: backend.created_at || backend.movement_date || new Date().toISOString()
+  };
+}
+
+// Map frontend structure to backend structure
+function mapFrontendToBackend(frontend: Partial<StockMovement & { product_id?: number; warehouse_id?: number }>): Partial<BackendStockMovement> {
+  const backend: Partial<BackendStockMovement> = {};
+  
+  if (frontend.movement_type) backend.movement_type = frontend.movement_type;
+  if (frontend.quantity !== undefined) backend.quantity = frontend.quantity;
+  if (frontend.reference_type) backend.reference_type = frontend.reference_type;
+  if (frontend.notes !== undefined) backend.notes = frontend.notes || undefined;
+  
+  // Use product_id directly if provided (from form), otherwise try to extract from item_id
+  if ((frontend as any).product_id) {
+    backend.product_id = (frontend as any).product_id;
+  } else if (frontend.item_id) {
+    // Try to parse as number (assuming it's a product_id)
+    const productId = parseInt(frontend.item_id);
+    if (!isNaN(productId) && productId > 0) {
+      backend.product_id = productId;
+    }
   }
-];
+  
+  // Map from/to locations to warehouse_id
+  // Database uses warehouse_id column (single warehouse)
+  // Use from_location as the primary warehouse
+  if ((frontend as any).warehouse_id !== undefined) {
+    (backend as any).warehouse_id = (frontend as any).warehouse_id;
+  } else if ((frontend as any).from !== undefined) {
+    (backend as any).warehouse_id = (frontend as any).from;
+  } else if (frontend.from_location) {
+    const warehouseMatch = frontend.from_location.match(/WH-(\d+)/);
+    if (warehouseMatch) {
+      (backend as any).warehouse_id = parseInt(warehouseMatch[1]);
+    }
+  }
 
-function nextId() {
-  return `mv-${Math.random().toString(36).slice(2, 8)}`;
+  // Map movement_date
+  if (frontend.movement_date) {
+    (backend as any).movement_date = frontend.movement_date;
+  }
+
+  // Map status
+  if (frontend.status) {
+    (backend as any).status = frontend.status;
+  }
+  
+  // Extract reference_id from reference_number if it's numeric
+  if (frontend.reference_number) {
+    const refId = parseInt(frontend.reference_number);
+    if (!isNaN(refId) && refId > 0) {
+      backend.reference_id = refId;
+    }
+  }
+  
+  return backend;
 }
 
 // Map backend stock movement response to frontend format
@@ -222,52 +235,57 @@ function mapBackendStockMovement(backendMovement: any): StockMovement {
 
 // List all stock movements
 export async function listStockMovements(): Promise<StockMovement[]> {
-  if (USE_BACKEND_API) {
-    try {
-      console.log('🔄 Fetching stock movements from backend API...');
-      const response = await apiRequest<{ success: boolean; data: { stock_movements: any[] } } | { stock_movements: any[] } | any[]>(
-        '/warehouse/stock-movements?page=1&limit=100'
-      );
-
-      console.log('📦 Backend stock movements response:', response);
-
-      // Handle different response formats
-      let movements = [];
-      if (response && typeof response === 'object') {
-        if ('success' in response && response.success && 'data' in response && response.data.stock_movements) {
-          movements = response.data.stock_movements;
-        } else if ('stock_movements' in response) {
-          movements = response.stock_movements;
-        } else if (Array.isArray(response)) {
-          movements = response;
-        }
-      }
-
-      if (movements.length > 0) {
-        const mapped = movements.map(mapBackendStockMovement);
-        console.log('✅ Mapped stock movements:', mapped.length);
-        console.log('📊 Sample movement statuses:', mapped.slice(0, 5).map(m => ({ id: m.id, status: m.status, movement_type: m.movement_type })));
-        return mapped;
-      }
-
-      console.log('⚠️ No stock movements in response, using mock data');
-      return mockMovements;
-    } catch (error) {
-      console.error('❌ Backend API error, falling back to mock data:', error);
-      return mockMovements;
-    }
-  }
-
-  if (useStatic) return mockMovements;
-
   try {
-    const { data, error } = await supabase.from('stock_movements').select('*');
-    if (error) throw error;
-    return (data as StockMovement[]) ?? [];
+    console.log('Fetching stock movements from:', '/inventory/stock/movements');
+    // Request a large limit to get all movements (or implement pagination later)
+    const response = await apiRequest<StockMovementListResponse>('/inventory/stock/movements?limit=1000&page=1');
+    console.log('Stock movements API response:', response);
+    
+    if (!response) {
+      console.warn('No response received');
+      return [];
+    }
+    
+    if (!response.success) {
+      console.warn('API returned success: false', response);
+      return [];
+    }
+    
+    if (!response.data) {
+      console.warn('No data in response:', response);
+      return [];
+    }
+    
+    if (!response.data.movements) {
+      console.warn('No movements array in response.data:', response.data);
+      return [];
+    }
+    
+    if (!Array.isArray(response.data.movements)) {
+      console.warn('Movements is not an array:', typeof response.data.movements, response.data.movements);
+      return [];
+    }
+    
+    console.log('Raw movements from API:', response.data.movements);
+    console.log('Movements count:', response.data.movements.length);
+    
+    if (response.data.movements.length === 0) {
+      console.log('No stock movements found in database');
+      return [];
+    }
+    
+    const mapped = response.data.movements.map(mapBackendToFrontend);
+    console.log('Mapped stock movements:', mapped);
+    return mapped;
   } catch (error) {
-    handleApiError('warehouse.listStockMovements', error);
-    useStatic = true;
-    return mockMovements;
+    console.error('Error fetching stock movements:', error);
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    } else {
+      console.error('Error details:', String(error));
+    }
+    return [];
   }
 }
 
@@ -275,109 +293,16 @@ export async function listStockMovements(): Promise<StockMovement[]> {
 export async function createStockMovement(
   payload: Omit<StockMovement, 'id' | 'created_at' | 'updated_at'>
 ): Promise<StockMovement> {
-  if (USE_BACKEND_API) {
-    try {
-      console.log('🔄 Creating stock movement via backend API:', payload);
-
-      // Map frontend format to backend format
-      const backendPayload: any = {
-        movement_number: payload.movement_number,
-        item_id: payload.item_id,
-        item_name: payload.item_name,
-        item_sku: payload.item_sku,
-        movement_type: payload.movement_type,
-        status: payload.status || 'PENDING',
-        movement_date: payload.movement_date,
-        completed_date: payload.completed_date,
-        from_location: payload.from_location,
-        from_zone: payload.from_zone,
-        from_bin: payload.from_bin,
-        to_location: payload.to_location,
-        to_zone: payload.to_zone,
-        to_bin: payload.to_bin,
-        quantity: payload.quantity,
-        unit: payload.unit || 'pcs',
-        available_quantity: payload.available_quantity,
-        received_quantity: payload.received_quantity,
-        reference_number: payload.reference_number,
-        reference_type: payload.reference_type,
-        batch_number: payload.batch_number,
-        lot_number: payload.lot_number,
-        serial_numbers: payload.serial_numbers,
-        assigned_to: payload.assigned_to,
-        operator_name: payload.operator_name,
-        supervisor: payload.supervisor,
-        quality_check_required: payload.quality_check_required || false,
-        quality_check_passed: payload.quality_check_passed,
-        inspected_by: payload.inspected_by,
-        inspection_date: payload.inspection_date,
-        carrier: payload.carrier,
-        tracking_number: payload.tracking_number,
-        expected_arrival_date: payload.expected_arrival_date,
-        actual_arrival_date: payload.actual_arrival_date,
-        unit_cost: payload.unit_cost,
-        total_cost: payload.total_cost,
-        currency: payload.currency || 'INR',
-        reason: payload.reason,
-        notes: payload.notes,
-        internal_notes: payload.internal_notes,
-        tags: payload.tags,
-      };
-
-      // Remove undefined values
-      Object.keys(backendPayload).forEach(key => {
-        if (backendPayload[key] === undefined) {
-          delete backendPayload[key];
-        }
-      });
-
-      console.log('📤 Backend payload:', backendPayload);
-
-      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
-        '/warehouse/stock-movements',
-        {
-          method: 'POST',
-          body: JSON.stringify(backendPayload),
-        }
-      );
-
-      console.log('📥 Create response:', response);
-
-      if (response.success && response.data) {
-        const created = mapBackendStockMovement(response.data.stock_movement || response.data);
-        console.log('✅ Stock movement created successfully:', created);
-        return created;
-      }
-
-      throw new Error(response.message || 'Failed to create stock movement');
-    } catch (error: any) {
-      console.error('❌ Backend create error:', error);
-      throw new Error(error.message || 'Failed to create stock movement');
-    }
-  }
-
-  if (useStatic) {
-    const mv: StockMovement = {
-      ...payload,
-      id: nextId(),
-      created_at: new Date().toISOString()
-    };
-    mockMovements.unshift(mv);
-    return mv;
-  }
-
   try {
-    const { data, error } = await supabase
-      .from('stock_movements')
-      .insert(payload)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as StockMovement;
+    const backendPayload = mapFrontendToBackend(payload);
+    const response = await apiRequest<StockMovementResponse>('/inventory/stock/movements', {
+      method: 'POST',
+      body: JSON.stringify(backendPayload)
+    });
+    return mapBackendToFrontend(response.data);
   } catch (error) {
-    handleApiError('warehouse.createStockMovement', error);
-    useStatic = true;
-    return createStockMovement(payload);
+    console.error('Error creating stock movement:', error);
+    throw error;
   }
 }
 
@@ -386,117 +311,28 @@ export async function updateStockMovement(
   id: string,
   changes: Partial<StockMovement>
 ): Promise<StockMovement | null> {
-  if (USE_BACKEND_API) {
-    try {
-      console.log('🔄 Updating stock movement via backend API:', { id, changes });
-
-      // Map frontend format to backend format (only include changed fields)
-      const backendPayload: any = {};
-      if (changes.status !== undefined) backendPayload.status = changes.status;
-      if (changes.completed_date !== undefined) backendPayload.completed_date = changes.completed_date;
-      if (changes.received_quantity !== undefined) backendPayload.received_quantity = changes.received_quantity;
-      if (changes.quality_check_passed !== undefined) backendPayload.quality_check_passed = changes.quality_check_passed;
-      if (changes.inspected_by !== undefined) backendPayload.inspected_by = changes.inspected_by;
-      if (changes.inspection_date !== undefined) backendPayload.inspection_date = changes.inspection_date;
-      if (changes.actual_arrival_date !== undefined) backendPayload.actual_arrival_date = changes.actual_arrival_date;
-      if (changes.notes !== undefined) backendPayload.notes = changes.notes;
-      if (changes.internal_notes !== undefined) backendPayload.internal_notes = changes.internal_notes;
-      if (changes.operator_name !== undefined) backendPayload.operator_name = changes.operator_name;
-      if (changes.assigned_to !== undefined) backendPayload.assigned_to = changes.assigned_to;
-      if (changes.tracking_number !== undefined) backendPayload.tracking_number = changes.tracking_number;
-      if (changes.carrier !== undefined) backendPayload.carrier = changes.carrier;
-      if (changes.unit_cost !== undefined) backendPayload.unit_cost = changes.unit_cost;
-      if (changes.total_cost !== undefined) backendPayload.total_cost = changes.total_cost;
-      if (changes.currency !== undefined) backendPayload.currency = changes.currency;
-
-      console.log('📤 Backend update payload:', backendPayload);
-
-      const response = await apiRequest<{ success: boolean; data: any; message?: string }>(
-        `/warehouse/stock-movements/${id}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(backendPayload),
-        }
-      );
-
-      console.log('📥 Update response:', response);
-
-      if (response.success && response.data) {
-        const updated = mapBackendStockMovement(response.data.stock_movement || response.data);
-        console.log('✅ Stock movement updated successfully:', updated);
-        return updated;
-      }
-
-      throw new Error(response.message || 'Failed to update stock movement');
-    } catch (error: any) {
-      console.error('❌ Backend update error:', error);
-      throw new Error(error.message || 'Failed to update stock movement');
-    }
-  }
-
-  if (useStatic) {
-    const index = mockMovements.findIndex((m) => m.id === id);
-    if (index === -1) return null;
-    mockMovements[index] = { ...mockMovements[index], ...changes };
-    return mockMovements[index];
-  }
-
   try {
-    const { data, error } = await supabase
-      .from('stock_movements')
-      .update(changes)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as StockMovement;
+    const backendPayload = mapFrontendToBackend(changes);
+    const response = await apiRequest<StockMovementResponse>(`/inventory/stock/movements/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(backendPayload)
+    });
+    return mapBackendToFrontend(response.data);
   } catch (error) {
-    handleApiError('warehouse.updateStockMovement', error);
-    useStatic = true;
-    return updateStockMovement(id, changes);
+    console.error('Error updating stock movement:', error);
+    throw error;
   }
 }
 
 // Delete a stock movement
 export async function deleteStockMovement(id: string): Promise<void> {
-  if (USE_BACKEND_API) {
-    try {
-      console.log('🔄 Deleting stock movement via backend API:', id);
-
-      const response = await apiRequest<{ success: boolean; message?: string }>(
-        `/warehouse/stock-movements/${id}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      console.log('📥 Delete response:', response);
-
-      if (response.success) {
-        console.log('✅ Stock movement deleted successfully');
-        return;
-      }
-
-      throw new Error(response.message || 'Failed to delete stock movement');
-    } catch (error: any) {
-      console.error('❌ Backend delete error:', error);
-      throw new Error(error.message || 'Failed to delete stock movement');
-    }
-  }
-
-  if (useStatic) {
-    const index = mockMovements.findIndex((m) => m.id === id);
-    if (index !== -1) mockMovements.splice(index, 1);
-    return;
-  }
-
   try {
-    const { error } = await supabase.from('stock_movements').delete().eq('id', id);
-    if (error) throw error;
+    await apiRequest<{ success: boolean }>(`/inventory/stock/movements/${id}`, {
+      method: 'DELETE'
+    });
   } catch (error) {
-    handleApiError('warehouse.deleteStockMovement', error);
-    useStatic = true;
-    await deleteStockMovement(id);
+    console.error('Error deleting stock movement:', error);
+    throw error;
   }
 }
 

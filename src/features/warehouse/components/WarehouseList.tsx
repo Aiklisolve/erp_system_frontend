@@ -32,26 +32,30 @@ export function WarehouseList() {
   const [warehouseCurrentPage, setWarehouseCurrentPage] = useState(1);
   const [warehouseItemsPerPage, setWarehouseItemsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Filter movements based on search, type, status, and active tab
   const filteredMovements = movements.filter((movement) => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch =
-      (movement.item_id && movement.item_id.toLowerCase().includes(searchLower)) ||
-      (movement.item_name && movement.item_name.toLowerCase().includes(searchLower)) ||
-      (movement.item_sku && movement.item_sku.toLowerCase().includes(searchLower)) ||
-      (movement.movement_number && movement.movement_number.toLowerCase().includes(searchLower)) ||
-      (movement.reference_number && movement.reference_number.toLowerCase().includes(searchLower)) ||
-      (movement.tracking_number && movement.tracking_number.toLowerCase().includes(searchLower)) ||
-      (movement.from_location && movement.from_location.toLowerCase().includes(searchLower)) ||
-      (movement.to_location && movement.to_location.toLowerCase().includes(searchLower)) ||
-      (movement.movement_date && movement.movement_date.includes(searchTerm));
+    if (!searchTerm) {
+      // No search term, check other filters
+    } else {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch =
+        (movement.item_id?.toLowerCase() || '').includes(searchLower) ||
+        (movement.item_name?.toLowerCase() || '').includes(searchLower) ||
+        (movement.item_sku?.toLowerCase() || '').includes(searchLower) ||
+        (movement.movement_number?.toLowerCase() || '').includes(searchLower) ||
+        (movement.reference_number?.toLowerCase() || '').includes(searchLower) ||
+        (movement.tracking_number?.toLowerCase() || '').includes(searchLower) ||
+        (movement.from_location?.toLowerCase() || '').includes(searchLower) ||
+        (movement.to_location?.toLowerCase() || '').includes(searchLower) ||
+        (movement.movement_date || '').includes(searchTerm);
+      
+      if (!matchesSearch) return false;
+    }
     
-    const matchesType = typeFilter === 'all' || movement.movement_type === typeFilter;
     const matchesStatus = statusFilter === 'all' || movement.status === statusFilter;
     
     const matchesTab =
@@ -61,7 +65,7 @@ export function WarehouseList() {
       (activeTab === 'shipments' && movement.movement_type === 'SHIPMENT') ||
       (activeTab === 'adjustments' && movement.movement_type === 'ADJUSTMENT');
     
-    return matchesSearch && matchesType && matchesStatus && matchesTab;
+    return matchesStatus && matchesTab;
   });
 
   // Pagination
@@ -473,21 +477,6 @@ export function WarehouseList() {
             />
           </div>
           <Select
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full sm:w-48"
-          >
-            <option value="all">All Types</option>
-            {movementTypes.map((type) => (
-              <option key={type} value={type}>
-                {type ? type.replace('_', ' ') : 'N/A'}
-              </option>
-            ))}
-          </Select>
-          <Select
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
@@ -601,7 +590,7 @@ export function WarehouseList() {
           <EmptyState
             title="No stock movements found"
             description={
-              searchTerm || typeFilter !== 'all' || statusFilter !== 'all' || activeTab !== 'all'
+              searchTerm || statusFilter !== 'all' || activeTab !== 'all'
                 ? 'Try adjusting your filters to see more results.'
                 : 'Create your first stock movement to get started.'
             }
