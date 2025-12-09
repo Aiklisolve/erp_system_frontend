@@ -189,7 +189,7 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
       clock_in_time: clockInTime || undefined,
       clock_out_time: clockOutTime || undefined,
       actual_hours: Number(actualHours) || undefined,
-      attendance_status: attendanceStatus as any,
+      attendance_status: attendanceStatus ? (attendanceStatus as 'PRESENT' | 'ABSENT' | 'LATE' | 'EARLY_LEAVE' | 'ON_TIME') : undefined,
       late_minutes: Number(lateMinutes) || undefined,
       early_leave_minutes: Number(earlyLeaveMinutes) || undefined,
       assigned_tasks: assignedTasks ? assignedTasks.split(',').map(t => t.trim()).filter(t => t) : undefined,
@@ -408,41 +408,39 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
       )}
 
       {/* Attendance */}
-      {status === 'COMPLETED' && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-900">Attendance</h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Select
-              label="Attendance Status"
-              value={attendanceStatus}
-              onChange={(e) => setAttendanceStatus(e.target.value)}
-            >
-              <option value="">Select status</option>
-              <option value="PRESENT">Present</option>
-              <option value="ABSENT">Absent</option>
-              <option value="LATE">Late</option>
-              <option value="EARLY_LEAVE">Early Leave</option>
-              <option value="ON_TIME">On Time</option>
-            </Select>
-            <Input
-              label="Late Minutes"
-              type="number"
-              value={lateMinutes}
-              onChange={(e) => setLateMinutes(e.target.value === '' ? '' : Number(e.target.value))}
-              placeholder="0"
-              min={0}
-            />
-            <Input
-              label="Early Leave Minutes"
-              type="number"
-              value={earlyLeaveMinutes}
-              onChange={(e) => setEarlyLeaveMinutes(e.target.value === '' ? '' : Number(e.target.value))}
-              placeholder="0"
-              min={0}
-            />
-          </div>
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Attendance</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Select
+            label="Attendance Status"
+            value={attendanceStatus}
+            onChange={(e) => setAttendanceStatus(e.target.value)}
+          >
+            <option value="">Select status</option>
+            <option value="PRESENT">Present</option>
+            <option value="ABSENT">Absent</option>
+            <option value="LATE">Late</option>
+            <option value="EARLY_LEAVE">Early Leave</option>
+            <option value="ON_TIME">On Time</option>
+          </Select>
+          <Input
+            label="Late Minutes"
+            type="number"
+            value={lateMinutes}
+            onChange={(e) => setLateMinutes(e.target.value === '' ? '' : Number(e.target.value))}
+            placeholder="0"
+            min={0}
+          />
+          <Input
+            label="Early Leave Minutes"
+            type="number"
+            value={earlyLeaveMinutes}
+            onChange={(e) => setEarlyLeaveMinutes(e.target.value === '' ? '' : Number(e.target.value))}
+            placeholder="0"
+            min={0}
+          />
         </div>
-      )}
+      </div>
 
       {/* Tasks & Performance */}
       <div className="space-y-3">
