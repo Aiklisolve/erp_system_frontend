@@ -91,7 +91,7 @@ export interface Task extends BaseEntity {
   status: TaskStatus;
   
   // Assignment
-  assigned_to_id: string;
+  assigned_to?: string;
   assigned_to_name: string;
   assigned_to_email?: string;
   assigned_to_role?: ErpUserRole;

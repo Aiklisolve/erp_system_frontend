@@ -1,7 +1,9 @@
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import { handleApiError } from '../../../lib/errorHandler';
+import { apiRequest } from '../../../config/api';
 import type { Customer, ErpUser, Leave, Task } from '../types';
 
+const USE_BACKEND_API = true; // Use backend API by default
 let useStatic = !hasSupabaseConfig;
 
 const mockCustomers: Customer[] = [
@@ -107,10 +109,6 @@ function nextLeaveId() {
   return `leave-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function nextTaskId() {
-  return `task-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 // Mock Leaves
 const mockLeaves: Leave[] = [
   {
@@ -188,12 +186,11 @@ const mockTasks: Task[] = [
     task_type: 'DOCUMENTATION',
     priority: 'MEDIUM',
     status: 'IN_PROGRESS',
-    assigned_to_id: 'user-002',
+    assigned_to: 'user-002',
     assigned_to_name: 'Mike Wilson',
     assigned_to_email: 'mike.wilson@orbitrp.com',
     assigned_to_role: 'FINANCE_MANAGER',
-    assigned_by: 'Sarah Johnson',
-    assigned_by_id: 'user-001',
+    assigned_by: 'user-001',
     assigned_date: '2025-01-10',
     start_date: '2025-01-10',
     due_date: '2025-01-25',
@@ -212,12 +209,11 @@ const mockTasks: Task[] = [
     task_type: 'BUG',
     priority: 'HIGH',
     status: 'NEW',
-    assigned_to_id: 'user-003',
+    assigned_to: 'user-003',
     assigned_to_name: 'Lisa Anderson',
     assigned_to_email: 'lisa.anderson@orbitrp.com',
     assigned_to_role: 'INVENTORY_MANAGER',
-    assigned_by: 'Sarah Johnson',
-    assigned_by_id: 'user-001',
+    assigned_by: 'user-001',
     assigned_date: '2025-01-18',
     start_date: '2025-01-20',
     due_date: '2025-01-22',
@@ -235,7 +231,7 @@ const mockTasks: Task[] = [
     task_type: 'FEATURE',
     priority: 'MEDIUM',
     status: 'COMPLETED',
-    assigned_to_id: 'user-001',
+    assigned_to: 'user-001',
     assigned_to_name: 'Sarah Johnson',
     assigned_to_email: 'sarah.johnson@orbitrp.com',
     assigned_to_role: 'ADMIN',
@@ -523,7 +519,124 @@ export async function deleteLeave(id: string): Promise<void> {
 // TASK MANAGEMENT API
 // ============================================
 
+function nextTaskId() {
+  return `task-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Map backend task response to frontend Task type
+function mapBackendTask(backendTask: any): Task {
+  const formatDate = (date: string | Date | null | undefined): string => {
+    if (!date) return '';
+    if (typeof date === 'string') return date.split('T')[0];
+    if (date instanceof Date) return date.toISOString().split('T')[0];
+    return '';
+  };
+
+  const formatArray = (value: any): string[] => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return value.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
+    return [];
+  };
+
+  return {
+    id: backendTask.id?.toString() || backendTask.task_id?.toString() || nextTaskId(),
+    task_number: backendTask.task_number || backendTask.task_id?.toString() || null,
+    title: backendTask.title || '',
+    description: backendTask.description || undefined,
+    task_type: backendTask.task_type || backendTask.type || 'OTHER',
+    priority: backendTask.priority || 'MEDIUM',
+    status: backendTask.status || 'NEW',
+    
+    // Assignment
+    assigned_to: backendTask.assigned_to?.toString() || backendTask.assigned_to_id?.toString() || '',
+    assigned_to_name: backendTask.assigned_to_name || 
+      backendTask.assigned_to_user?.full_name || 
+      backendTask.assigned_to_user?.name ||
+      (backendTask.assigned_to_user?.first_name && backendTask.assigned_to_user?.last_name
+        ? `${backendTask.assigned_to_user.first_name} ${backendTask.assigned_to_user.last_name}`.trim()
+        : undefined) ||
+      '',
+    assigned_to_email: backendTask.assigned_to_email || backendTask.assigned_to_user?.email || undefined,
+    assigned_to_role: backendTask.assigned_to_role || backendTask.assigned_to_user?.role || undefined,
+    assigned_by: backendTask.assigned_by?.toString() || backendTask.assigned_by_id?.toString() || backendTask.assigned_by_user?.id?.toString() || backendTask.assigned_by_user?.full_name || undefined,
+    assigned_date: formatDate(backendTask.assigned_date || backendTask.assigned_at),
+    
+    // Approval (optional fields - may not exist in Task type)
+    ...(backendTask.approved_by_id || backendTask.approved_by_user?.id ? {
+      approved_by_id: backendTask.approved_by_id?.toString() || backendTask.approved_by_user?.id?.toString()
+    } : {}),
+    ...(backendTask.approved_by || backendTask.approved_by_user?.full_name ? {
+      approved_by: backendTask.approved_by || backendTask.approved_by_user?.full_name
+    } : {}),
+    ...(backendTask.approved_date || backendTask.approved_at ? {
+      approved_date: formatDate(backendTask.approved_date || backendTask.approved_at)
+    } : {}),
+    
+    // Dates
+    start_date: formatDate(backendTask.start_date),
+    due_date: formatDate(backendTask.due_date),
+    completed_date: formatDate(backendTask.completed_date || backendTask.completed_at),
+    
+    // Progress
+    progress_percentage: backendTask.progress_percentage ? parseFloat(backendTask.progress_percentage) : undefined,
+    estimated_hours: backendTask.estimated_hours ? parseFloat(backendTask.estimated_hours) : undefined,
+    actual_hours: backendTask.actual_hours ? parseFloat(backendTask.actual_hours) : undefined,
+    
+    // Additional
+    tags: formatArray(backendTask.tags),
+    notes: backendTask.notes || undefined,
+    attachments: formatArray(backendTask.attachments),
+    
+    created_at: backendTask.created_at || new Date().toISOString(),
+    updated_at: backendTask.updated_at || new Date().toISOString(),
+  };
+}
+
 export async function listTasks(): Promise<Task[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching tasks from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { tasks: any[]; pagination?: any } } | { tasks: any[] } | any[]>(
+        '/tasks?page=1&limit=1000'
+      );
+
+      console.log('📋 Backend tasks response:', response);
+
+      // Handle different response formats
+      let tasks = [];
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.tasks) {
+          tasks = response.data.tasks;
+        } else if ('tasks' in response) {
+          tasks = response.tasks;
+        } else if (Array.isArray(response)) {
+          tasks = response;
+        }
+      }
+
+      if (tasks.length > 0) {
+        const mapped = tasks.map(mapBackendTask);
+        console.log('✅ Mapped tasks:', mapped.length);
+        return mapped;
+      }
+
+      console.log('⚠️ No tasks in response, falling back to mock data');
+      return mockTasks;
+    } catch (error) {
+      console.error('❌ Backend API error fetching tasks:', error);
+      return mockTasks;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) return mockTasks;
 
   try {
@@ -540,6 +653,72 @@ export async function listTasks(): Promise<Task[]> {
 export async function createTask(
   payload: Omit<Task, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Task> {
+  if (USE_BACKEND_API) {
+    try {
+      // Transform payload for backend: convert assigned_to_id to assigned_to and assigned_by_id to assigned_by
+      const backendPayload: any = { ...payload };
+      if (backendPayload.assigned_to_id && !backendPayload.assigned_to) {
+        backendPayload.assigned_to = backendPayload.assigned_to_id;
+        delete backendPayload.assigned_to_id;
+      }
+      // Ensure assigned_to is set (use assigned_to_id if assigned_to doesn't exist)
+      if (!backendPayload.assigned_to && (payload as any).assigned_to_id) {
+        backendPayload.assigned_to = (payload as any).assigned_to_id;
+      }
+      // Convert assigned_by_id to assigned_by
+      if (backendPayload.assigned_by_id && !backendPayload.assigned_by) {
+        backendPayload.assigned_by = backendPayload.assigned_by_id;
+        delete backendPayload.assigned_by_id;
+      }
+      // Ensure assigned_by is set (use assigned_by_id if assigned_by doesn't exist)
+      if (!backendPayload.assigned_by && (payload as any).assigned_by_id) {
+        backendPayload.assigned_by = (payload as any).assigned_by_id;
+      }
+      
+      console.log('🔄 Creating task via backend API...', backendPayload);
+      
+      const response = await apiRequest<{ success: boolean; data: { task: any } } | { task: any } | any>(
+        '/tasks',
+        {
+          method: 'POST',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+
+      console.log('✅ Backend create task response:', response);
+
+      let task = null;
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.task) {
+          task = response.data.task;
+        } else if ('task' in response) {
+          task = response.task;
+        } else if (!('success' in response)) {
+          task = response;
+        }
+      }
+
+      if (task) {
+        const mapped = mapBackendTask(task);
+        console.log('✅ Created task:', mapped.id);
+        return mapped;
+      }
+
+      throw new Error('Invalid response format from backend');
+    } catch (error) {
+      console.error('❌ Backend API error creating task:', error);
+      // Fallback to mock
+      const task: Task = {
+        ...payload,
+        id: nextTaskId(),
+        created_at: new Date().toISOString()
+      };
+      mockTasks.unshift(task);
+      return task;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const task: Task = {
       ...payload,
@@ -569,6 +748,69 @@ export async function updateTask(
   id: string,
   changes: Partial<Task>
 ): Promise<Task | null> {
+  if (USE_BACKEND_API) {
+    try {
+      // Transform payload for backend: convert assigned_to_id to assigned_to and assigned_by_id to assigned_by
+      const backendPayload: any = { ...changes };
+      if (backendPayload.assigned_to_id && !backendPayload.assigned_to) {
+        backendPayload.assigned_to = backendPayload.assigned_to_id;
+        delete backendPayload.assigned_to_id;
+      }
+      // Ensure assigned_to is set (use assigned_to_id if assigned_to doesn't exist)
+      if (!backendPayload.assigned_to && (changes as any).assigned_to_id) {
+        backendPayload.assigned_to = (changes as any).assigned_to_id;
+      }
+      // Convert assigned_by_id to assigned_by
+      if (backendPayload.assigned_by_id && !backendPayload.assigned_by) {
+        backendPayload.assigned_by = backendPayload.assigned_by_id;
+        delete backendPayload.assigned_by_id;
+      }
+      // Ensure assigned_by is set (use assigned_by_id if assigned_by doesn't exist)
+      if (!backendPayload.assigned_by && (changes as any).assigned_by_id) {
+        backendPayload.assigned_by = (changes as any).assigned_by_id;
+      }
+      
+      console.log('🔄 Updating task via backend API...', id, backendPayload);
+      
+      const response = await apiRequest<{ success: boolean; data: { task: any } } | { task: any } | any>(
+        `/tasks/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(backendPayload),
+        }
+      );
+
+      console.log('✅ Backend update task response:', response);
+
+      let task = null;
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.task) {
+          task = response.data.task;
+        } else if ('task' in response) {
+          task = response.task;
+        } else if (!('success' in response)) {
+          task = response;
+        }
+      }
+
+      if (task) {
+        const mapped = mapBackendTask(task);
+        console.log('✅ Updated task:', mapped.id);
+        return mapped;
+      }
+
+      throw new Error('Invalid response format from backend');
+    } catch (error) {
+      console.error('❌ Backend API error updating task:', error);
+      // Fallback to mock
+      const index = mockTasks.findIndex((t) => t.id === id);
+      if (index === -1) return null;
+      mockTasks[index] = { ...mockTasks[index], ...changes };
+      return mockTasks[index];
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const index = mockTasks.findIndex((t) => t.id === id);
     if (index === -1) return null;
@@ -593,6 +835,29 @@ export async function updateTask(
 }
 
 export async function deleteTask(id: string): Promise<void> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Deleting task via backend API...', id);
+      
+      await apiRequest(
+        `/tasks/${id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      console.log('✅ Deleted task:', id);
+      return;
+    } catch (error) {
+      console.error('❌ Backend API error deleting task:', error);
+      // Fallback to mock
+      const index = mockTasks.findIndex((t) => t.id === id);
+      if (index !== -1) mockTasks.splice(index, 1);
+      return;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const index = mockTasks.findIndex((t) => t.id === id);
     if (index !== -1) mockTasks.splice(index, 1);
