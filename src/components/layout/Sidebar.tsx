@@ -18,13 +18,19 @@ const menuIcons: Record<string, string> = {
   'Ecommerce': '🛒',
   'Marketing': '📣',
   'Projects': '📋',
+  'Reports': '📄',
+  'Invoices': '🧾',
   'Internal Tasks': '✅'
 };
 
 const allGroups = [
   {
     label: 'Overview',
-    items: [{ to: '/dashboard', label: 'Dashboard' }]
+    items: [
+      { to: '/dashboard', label: 'Dashboard' },
+      { to: '/reports', label: 'Reports' },
+      { to: '/invoices', label: 'Invoices' }
+    ]
   },
   {
     label: 'Core Operations',

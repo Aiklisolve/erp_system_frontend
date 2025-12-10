@@ -16,7 +16,9 @@ export type ModuleRoute =
   | '/hr'
   | '/ecommerce'
   | '/marketing'
-  | '/internal-tasks';
+  | '/internal-tasks'
+  | '/reports'
+  | '/invoices';
 
 export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
   ADMIN: [
@@ -35,7 +37,9 @@ export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
     '/hr',
     '/ecommerce',
     '/marketing',
-    '/internal-tasks'
+    '/internal-tasks',
+    '/reports',
+    '/invoices'
   ],
   FINANCE_MANAGER: [
     '/dashboard',
@@ -43,7 +47,9 @@ export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
     '/procurement',
     '/orders',
     '/crm',
-    '/projects'
+    '/projects',
+    '/reports',
+    '/invoices'
   ],
   INVENTORY_MANAGER: [
     '/dashboard',
@@ -51,21 +57,27 @@ export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
     '/warehouse',
     '/manufacturing',
     '/supply-chain',
-    '/orders'
+    '/orders',
+    '/reports',
+    '/invoices'
   ],
   PROCUREMENT_OFFICER: [
     '/dashboard',
     '/procurement',
     '/supply-chain',
     '/warehouse',
-    '/inventory'
+    '/inventory',
+    '/reports',
+    '/invoices'
   ],
   HR_MANAGER: [
     '/dashboard',
     '/hr',
     '/workforce',
     '/projects',
-    '/internal-tasks'
+    '/internal-tasks',
+    '/reports',
+    '/invoices'
   ],
   SALES_MANAGER: [
     '/dashboard',
@@ -74,13 +86,17 @@ export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
     '/ecommerce',
     '/marketing',
     '/projects',
-    '/internal-tasks'
+    '/internal-tasks',
+    '/reports',
+    '/invoices'
   ],
   WAREHOUSE_OPERATOR: [
     '/dashboard',
     '/warehouse',
     '/inventory',
-    '/orders'
+    '/orders',
+    '/reports',
+    '/invoices'
   ],
   VIEWER: [
     '/dashboard',
@@ -94,7 +110,9 @@ export const roleModulePermissions: Record<ErpRole, ModuleRoute[]> = {
     '/workforce',
     '/hr',
     '/ecommerce',
-    '/marketing'
+    '/marketing',
+    '/reports',
+    '/invoices'
   ]
 };
 

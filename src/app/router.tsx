@@ -23,6 +23,8 @@ import { WorkforceList } from '../features/workforce/components/WorkforceList';
 import { EmployeeList } from '../features/hr/components/EmployeeList';
 import { EcommerceProductsList } from '../features/ecommerce/components/EcommerceProductsList';
 import { CampaignList } from '../features/marketing/components/CampaignList';
+import { ReportsList } from '../features/reports/components/ReportsList';
+import { InvoiceList } from '../features/invoices/components/InvoiceList';
 import { InternalTasksPage } from '../pages/InternalTasksPage';
 import { ProtectedRoute } from './protectedRoute';
 import { ModuleProtectedRoute } from './moduleProtectedRoute';
@@ -183,6 +185,22 @@ export const router = createBrowserRouter(
           element: (
             <ModuleProtectedRoute>
               <InternalTasksPage />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/reports',
+          element: (
+            <ModuleProtectedRoute>
+              <ReportsList />
+            </ModuleProtectedRoute>
+          )
+        },
+        {
+          path: '/invoices',
+          element: (
+            <ModuleProtectedRoute>
+              <InvoiceList />
             </ModuleProtectedRoute>
           )
         }
