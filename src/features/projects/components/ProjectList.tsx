@@ -60,9 +60,9 @@ export function ProjectList() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedProjects = filteredProjects.slice(startIndex, startIndex + itemsPerPage);
 
-  // Get unique values for filters
-  const statuses = Array.from(new Set(projects.map((p) => p.status)));
-  const types = Array.from(new Set(projects.map((p) => p.project_type)));
+  // Get unique values for filters (filter out undefined/null values)
+  const statuses = Array.from(new Set(projects.map((p) => p.status).filter(Boolean)));
+  const types = Array.from(new Set(projects.map((p) => p.project_type).filter(Boolean)));
   const priorities = Array.from(new Set(projects.map((p) => p.priority).filter(Boolean)));
 
   // Calculate metrics
@@ -71,11 +71,12 @@ export function ProjectList() {
       if (p.status === 'IN_PROGRESS') acc.inProgress += 1;
       if (p.status === 'COMPLETED') acc.completed += 1;
       if (p.status === 'ON_HOLD') acc.onHold += 1;
+      if (p.status === 'PLANNING') acc.planning += 1;
       if (p.priority === 'HIGH' || p.priority === 'CRITICAL') acc.highPriority += 1;
       if (p.risk_level === 'HIGH' || p.risk_level === 'CRITICAL') acc.highRisk += 1;
       return acc;
     },
-    { inProgress: 0, completed: 0, onHold: 0, highPriority: 0, highRisk: 0 }
+    { inProgress: 0, completed: 0, onHold: 0, planning: 0, highPriority: 0, highRisk: 0 }
   );
 
   const columns: TableColumn<Project>[] = [
@@ -124,7 +125,7 @@ export function ProjectList() {
         const color = typeColors[row.project_type] || 'bg-slate-50 text-slate-700';
         return (
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${color} border`}>
-            {row.project_type.replace('_', ' ')}
+            {row.project_type ? String(row.project_type).replace('_', ' ') : '-'}
           </span>
         );
       },
@@ -143,7 +144,7 @@ export function ProjectList() {
             : row.status === 'CANCELLED'
             ? 'danger'
             : 'neutral';
-        return <Badge tone={statusTone}>{row.status.replace('_', ' ')}</Badge>;
+        return <Badge tone={statusTone}>{row.status ? String(row.status).replace('_', ' ') : '-'}</Badge>;
       },
     },
     {
@@ -188,7 +189,7 @@ export function ProjectList() {
         return (
           <div className="space-y-0.5">
             <div className="text-slate-900">
-              {budget.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'INR' })}
+              ₹{budget.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
             </div>
             {spent > 0 && (
               <div className={`text-[10px] ${isOverBudget ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
@@ -305,72 +306,74 @@ export function ProjectList() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         <StatCard
           label="Total Projects"
           value={metrics.totalProjects.toString()}
           helper="All projects in system."
           trend="up"
-          variant="teal"
+          variant="indigo"
         />
         <StatCard
           label="In Progress"
           value={metrics.activeProjects.toString()}
           helper="Currently active."
           trend="up"
-          variant="blue"
+          variant="cyan"
         />
         <StatCard
           label="Completed"
           value={metrics.completedProjects.toString()}
           helper="Successfully delivered."
           trend="up"
-          variant="purple"
+          variant="green"
         />
         <StatCard
           label="Total Budget"
-          value={metrics.totalBudget.toLocaleString(undefined, {
-            style: 'currency',
-            currency: 'INR'
-          })}
+          value={`₹${metrics.totalBudget.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
           helper="Across all projects."
           trend="up"
           variant="yellow"
         />
         <StatCard
           label="Active Budget"
-          value={metrics.activeBudget.toLocaleString(undefined, {
-            style: 'currency',
-            currency: 'INR'
-          })}
+          value={`₹${metrics.activeBudget.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
           helper="Planning & in progress."
           trend="flat"
-          variant="yellow"
+          variant="orange"
         />
       </div>
 
       {/* Additional Metrics */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card className="space-y-2">
-          <p className="text-xs font-semibold text-slate-600">On Hold</p>
-          <p className="text-2xl font-bold text-slate-900">
+        <Card className="space-y-2 bg-gradient-to-br from-orange-50 via-white to-orange-100 border-orange-200">
+          <p className="text-xs font-semibold text-orange-700">On Hold</p>
+          <p className="text-2xl font-bold text-orange-700">
             {metrics.onHoldProjects.toString()}
           </p>
-          <p className="text-[11px] text-slate-500">Projects temporarily paused</p>
+          <p className="text-[11px] text-orange-600">Projects temporarily paused</p>
         </Card>
-        <Card className="space-y-2">
-          <p className="text-xs font-semibold text-slate-600">High Priority</p>
-          <p className="text-2xl font-bold text-slate-900">
+        <Card className="space-y-2 bg-gradient-to-br from-red-50 via-white to-red-100 border-red-200">
+          <p className="text-xs font-semibold text-red-700">High Priority</p>
+          <p className="text-2xl font-bold text-red-700">
             {metricsByStatus.highPriority}
           </p>
-          <p className="text-[11px] text-slate-500">High/Critical priority projects</p>
+          <p className="text-[11px] text-red-600">High/Critical priority projects</p>
         </Card>
-        <Card className="space-y-2">
-          <p className="text-xs font-semibold text-slate-600">High Risk</p>
-          <p className="text-2xl font-bold text-slate-900">
-            {metricsByStatus.highRisk}
+        <Card className={`space-y-2 ${metricsByStatus.highRisk > 0 
+          ? 'bg-gradient-to-br from-red-50 via-white to-red-100 border-red-200' 
+          : 'bg-gradient-to-br from-purple-50 via-white to-purple-100 border-purple-200'}`}>
+          <p className={`text-xs font-semibold ${metricsByStatus.highRisk > 0 ? 'text-red-700' : 'text-purple-700'}`}>
+            {metricsByStatus.highRisk > 0 ? 'High Risk' : 'Planning'}
           </p>
-          <p className="text-[11px] text-slate-500">Projects requiring attention</p>
+          <p className={`text-2xl font-bold ${metricsByStatus.highRisk > 0 ? 'text-red-700' : 'text-purple-700'}`}>
+            {metricsByStatus.highRisk > 0 ? metricsByStatus.highRisk : metricsByStatus.planning}
+          </p>
+          <p className={`text-[11px] ${metricsByStatus.highRisk > 0 ? 'text-red-600' : 'text-purple-600'}`}>
+            {metricsByStatus.highRisk > 0 
+              ? 'Projects requiring attention' 
+              : 'Projects in planning phase'}
+          </p>
         </Card>
       </div>
 
@@ -391,8 +394,8 @@ export function ProjectList() {
         />
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
+        <div className="flex flex-col gap-3">
+          <div className="w-full">
             <Input
               placeholder="Search by project name, code, client, manager, contract #, or description..."
               value={searchTerm}
@@ -402,51 +405,53 @@ export function ProjectList() {
               }}
             />
           </div>
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full sm:w-48"
-          >
-            <option value="all">All Statuses</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {status.replace('_', ' ')}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full sm:w-48"
-          >
-            <option value="all">All Types</option>
-            {types.map((type) => (
-              <option key={type} value={type}>
-                {type.replace('_', ' ')}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={priorityFilter}
-            onChange={(e) => {
-              setPriorityFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full sm:w-48"
-          >
-            <option value="all">All Priorities</option>
-            {priorities.map((priority) => (
-              <option key={priority} value={priority}>
-                {priority}
-              </option>
-            ))}
-          </Select>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full"
+            >
+              <option value="all">All Statuses</option>
+              {statuses.map((status) => (
+                <option key={status} value={status}>
+                  {status ? String(status).replace('_', ' ') : '-'}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full"
+            >
+              <option value="all">All Types</option>
+              {types.map((type) => (
+                <option key={type} value={type}>
+                  {type ? String(type).replace(/_/g, ' ') : '-'}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={priorityFilter}
+              onChange={(e) => {
+                setPriorityFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full"
+            >
+              <option value="all">All Priorities</option>
+              {priorities.map((priority) => (
+                <option key={priority} value={priority}>
+                  {priority}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
 
         {/* Table */}
@@ -471,10 +476,10 @@ export function ProjectList() {
               />
             </div>
             {/* Pagination */}
-            <div className="px-4 py-3 border-t border-slate-200">
-              <div className="flex items-center justify-between gap-4">
+            <div className="px-3 sm:px-4 py-3 border-t border-slate-200">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                 {/* Left: Page size selector */}
-                <div className="flex items-center gap-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2 text-xs text-slate-600 w-full sm:w-auto justify-center sm:justify-start">
                   <span>Show</span>
                   <select
                     value={itemsPerPage}
@@ -494,7 +499,7 @@ export function ProjectList() {
                 </div>
 
                 {/* Center: Page numbers */}
-                <div className="flex-1 flex justify-center">
+                <div className="flex-1 flex justify-center w-full sm:w-auto">
                   <Pagination
                     page={currentPage}
                     totalPages={totalPages}
@@ -503,7 +508,7 @@ export function ProjectList() {
                 </div>
 
                 {/* Right: Showing info */}
-                <div className="text-xs text-slate-600 whitespace-nowrap">
+                <div className="text-xs text-slate-600 whitespace-nowrap text-center sm:text-left">
                   Showing <span className="font-medium text-slate-900">{startIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(startIndex + itemsPerPage, filteredProjects.length)}</span> of <span className="font-medium text-slate-900">{filteredProjects.length}</span>
                 </div>
               </div>
@@ -523,6 +528,7 @@ export function ProjectList() {
         hideCloseButton
       >
         <ProjectForm
+          key={editingProject?.id || 'new-project'}
           initial={editingProject || undefined}
           onSubmit={handleFormSubmit}
           onCancel={() => {

@@ -53,6 +53,7 @@ export interface Project extends BaseEntity {
   
   // Resource Management
   project_manager?: string;
+  project_manager_id?: string; // Link to user ID
   assigned_team?: string[];
   team_members?: string[]; // Employee IDs or names
   resource_allocation?: number; // Percentage of resources allocated

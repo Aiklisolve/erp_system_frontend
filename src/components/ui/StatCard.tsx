@@ -2,7 +2,7 @@ import { Card } from './Card';
 import { Badge } from './Badge';
 
 type Trend = 'up' | 'down' | 'flat';
-type StatVariant = 'teal' | 'blue' | 'yellow' | 'purple' | 'neutral';
+type StatVariant = 'teal' | 'blue' | 'yellow' | 'purple' | 'neutral' | 'green' | 'orange' | 'red' | 'indigo' | 'cyan';
 
 type StatCardProps = {
   label: string;
@@ -27,20 +27,40 @@ export function StatCard({
 }: StatCardProps) {
   const palette: Record<StatVariant, { bg: string; value: string }> = {
     teal: {
-      bg: 'bg-gradient-to-br from-emerald-50 via-white to-emerald-100',
-      value: 'text-emerald-700'
+      bg: 'bg-gradient-to-br from-teal-50 via-white to-teal-100',
+      value: 'text-teal-700'
     },
     blue: {
-      bg: 'bg-gradient-to-br from-sky-50 via-white to-sky-100',
-      value: 'text-sky-700'
+      bg: 'bg-gradient-to-br from-blue-50 via-white to-blue-100',
+      value: 'text-blue-700'
     },
     yellow: {
-      bg: 'bg-gradient-to-br from-amber-50 via-white to-amber-100',
-      value: 'text-amber-700'
+      bg: 'bg-gradient-to-br from-yellow-50 via-white to-yellow-100',
+      value: 'text-yellow-700'
     },
     purple: {
-      bg: 'bg-gradient-to-br from-violet-50 via-white to-violet-100',
-      value: 'text-violet-700'
+      bg: 'bg-gradient-to-br from-purple-50 via-white to-purple-100',
+      value: 'text-purple-700'
+    },
+    green: {
+      bg: 'bg-gradient-to-br from-green-50 via-white to-green-100',
+      value: 'text-green-700'
+    },
+    orange: {
+      bg: 'bg-gradient-to-br from-orange-50 via-white to-orange-100',
+      value: 'text-orange-700'
+    },
+    red: {
+      bg: 'bg-gradient-to-br from-red-50 via-white to-red-100',
+      value: 'text-red-700'
+    },
+    indigo: {
+      bg: 'bg-gradient-to-br from-indigo-50 via-white to-indigo-100',
+      value: 'text-indigo-700'
+    },
+    cyan: {
+      bg: 'bg-gradient-to-br from-cyan-50 via-white to-cyan-100',
+      value: 'text-cyan-700'
     },
     neutral: {
       bg: 'bg-gradient-to-br from-slate-50 via-white to-slate-100',
@@ -51,19 +71,19 @@ export function StatCard({
   const colors = palette[variant];
 
   return (
-    <Card className={`space-y-2 border-none shadow-sm ${colors.bg}`}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-slate-600">{label}</p>
+    <Card className={`space-y-2 border-none shadow-sm ${colors.bg} min-w-0`}>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <p className="text-xs font-medium text-slate-600 truncate flex-1">{label}</p>
         <Badge
           variant="solid"
           tone={trend === 'down' ? 'neutral' : 'brand'}
-          className="uppercase tracking-wide"
+          className="uppercase tracking-wide flex-shrink-0 text-[9px] sm:text-[10px]"
         >
           {TREND_LABEL[trend]}
         </Badge>
       </div>
-      <p className={`text-2xl md:text-3xl font-semibold ${colors.value}`}>{value}</p>
-      {helper && <p className="text-[11px] text-slate-500">{helper}</p>}
+      <p className={`text-xl sm:text-2xl md:text-3xl font-semibold ${colors.value} break-words`}>{value}</p>
+      {helper && <p className="text-[10px] sm:text-[11px] text-slate-500">{helper}</p>}
     </Card>
   );
 }
