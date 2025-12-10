@@ -16,7 +16,7 @@ import { ManufacturingList } from '../features/manufacturing/components/Manufact
 import { InventoryList } from '../features/inventory/components/InventoryList';
 import { OrdersList } from '../features/orders/components/OrdersList';
 import { WarehouseList } from '../features/warehouse/components/WarehouseList';
-import { SupplyChainList } from '../features/supplyChain/components/SupplyChainList';
+import { SupplyChainDeliveryList } from '../features/supplyChain/components/SupplyChainDeliveryList';
 import { CustomerList } from '../features/crm/components/CustomerList';
 import { ProjectList } from '../features/projects/components/ProjectList';
 import { WorkforceList } from '../features/workforce/components/WorkforceList';
@@ -128,7 +128,7 @@ export const router = createBrowserRouter(
           path: '/supply-chain',
           element: (
             <ModuleProtectedRoute>
-              <SupplyChainList />
+              <SupplyChainDeliveryList />
             </ModuleProtectedRoute>
           )
         },

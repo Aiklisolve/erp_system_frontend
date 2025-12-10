@@ -105,3 +105,46 @@ export interface SupplierPerformance extends BaseEntity {
   issues_count?: number;
   notes?: string;
 }
+
+// Supply Chain Delivery Status Types
+export type DeliveryStatus = 'PENDING' | 'IN_TRANSIT' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'DELAYED' | 'CANCELLED';
+export type QualityStatus = 'PENDING_INSPECTION' | 'PASSED' | 'FAILED' | 'PARTIAL';
+export type PaymentStatus = 'PENDING' | 'PAID' | 'PARTIAL' | 'OVERDUE';
+
+// Supply Chain Delivery
+export interface SupplyChainDelivery extends BaseEntity {
+  // Core Information
+  delivery_number: string;
+  purchase_order_id: number;
+  purchase_order_number?: string; // From join
+  supplier_id: number;
+  supplier_name?: string; // From join
+  warehouse_id?: number;
+  warehouse_name?: string; // From join
+  delivery_date?: string;
+  expected_delivery_date?: string;
+  
+  // Status & Tracking
+  delivery_status: DeliveryStatus;
+  tracking_number?: string;
+  
+  // Quantity & Quality
+  ordered_quantity: number;
+  received_quantity: number;
+  accepted_quantity: number;
+  rejected_quantity: number;
+  quality_status: QualityStatus;
+  quality_score?: number; // 1-5 rating
+  inspection_notes?: string;
+  
+  // Financial
+  invoice_number?: string;
+  invoice_amount?: number;
+  payment_status: PaymentStatus;
+  payment_date?: string;
+  
+  // Additional
+  received_by?: string;
+  inspected_by?: string;
+  notes?: string;
+}

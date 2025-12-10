@@ -210,11 +210,21 @@ const mockVendors: Vendor[] = [
 ];
 
 export async function listVendors(): Promise<Vendor[]> {
+  console.log('🔄 Fetching vendors from backend API...');
   try {
     const response = await apiRequest<VendorListResponse>('/inventory/vendors');
-    return response.data.vendors;
+    console.log('🏢 Backend vendors response:', response);
+    console.log('🏢 Response structure:', {
+      hasData: !!response.data,
+      hasVendors: !!response.data?.vendors,
+      vendorsCount: response.data?.vendors?.length || 0
+    });
+    const vendors = response.data.vendors || [];
+    console.log('✅ Returning vendors:', vendors.length);
+    return vendors;
   } catch (error) {
-    console.error('Error fetching vendors:', error);
+    console.error('❌ Error fetching vendors:', error);
+    console.log('⚠️ Falling back to mock vendors');
     return mockVendors;
   }
 }

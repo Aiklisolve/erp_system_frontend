@@ -125,7 +125,7 @@ export interface Lead extends BaseEntity {
   company?: string;
   job_title?: string;
   status?: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'CONVERTED' | 'LOST';
-  score?: number; // Lead score
+  score?: number; // Lead score (default: 0)
   notes?: string;
 }
 
