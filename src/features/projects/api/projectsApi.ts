@@ -1,8 +1,11 @@
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import { handleApiError } from '../../../lib/errorHandler';
+import { apiRequest } from '../../../config/api';
 import type { Project } from '../types';
 
-let useStatic = !hasSupabaseConfig;
+// Toggle to use backend API
+const USE_BACKEND_API = true;
+let useStatic = !hasSupabaseConfig && !USE_BACKEND_API;
 
 const mockProjects: Project[] = [
   {
@@ -392,7 +395,74 @@ function nextId() {
   return `proj-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Map backend project response to frontend Project type
+function mapBackendProject(backendProject: any): Project {
+  return {
+    id: String(backendProject.id || backendProject.project_id || ''),
+    project_code: backendProject.project_code || backendProject.projectCode || '',
+    name: backendProject.name || '',
+    description: backendProject.description || '',
+    client: backendProject.client || '',
+    client_id: backendProject.client_id || backendProject.clientId || '',
+    client_contact_person: backendProject.client_contact_person || backendProject.clientContactPerson || '',
+    client_email: backendProject.client_email || backendProject.clientEmail || '',
+    client_phone: backendProject.client_phone || backendProject.clientPhone || '',
+    project_type: backendProject.project_type || backendProject.projectType || 'OTHER',
+    status: backendProject.status || 'PLANNING',
+    priority: backendProject.priority || undefined,
+    start_date: backendProject.start_date || backendProject.startDate || '',
+    end_date: backendProject.end_date || backendProject.endDate || undefined,
+    budget: Number(backendProject.budget || 0),
+    currency: backendProject.currency || 'INR',
+    project_manager: backendProject.project_manager || backendProject.projectManager || '',
+    project_manager_id: backendProject.project_manager_id || backendProject.projectManagerId || undefined,
+    contract_number: backendProject.manager_mobile || backendProject.contract_number || backendProject.contractNumber || '',
+    progress_percentage: backendProject.progress_percentage !== undefined && backendProject.progress_percentage !== null 
+      ? Number(backendProject.progress_percentage) 
+      : undefined,
+    created_at: backendProject.created_at || backendProject.createdAt || new Date().toISOString(),
+    updated_at: backendProject.updated_at || backendProject.updatedAt || new Date().toISOString(),
+  };
+}
+
 export async function listProjects(): Promise<Project[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching projects from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { projects: any[]; pagination?: any } } | { projects: any[] } | any[]>(
+        '/projects?page=1&limit=1000'
+      );
+
+      console.log('📋 Backend projects response:', response);
+
+      // Handle different response formats
+      let projects = [];
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.projects) {
+          projects = response.data.projects;
+        } else if ('projects' in response) {
+          projects = response.projects;
+        } else if (Array.isArray(response)) {
+          projects = response;
+        }
+      }
+
+      if (projects.length > 0) {
+        const mapped = projects.map(mapBackendProject);
+        console.log('✅ Mapped projects:', mapped.length);
+        return mapped;
+      }
+
+      console.log('⚠️ No projects in response, falling back to mock data');
+      return mockProjects;
+    } catch (error) {
+      console.error('❌ Backend API error fetching projects:', error);
+      return mockProjects;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) return mockProjects;
 
   try {
@@ -409,6 +479,52 @@ export async function listProjects(): Promise<Project[]> {
 export async function createProject(
   payload: Omit<Project, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Project> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Creating project via backend API...', payload);
+      
+      const response = await apiRequest<{ success: boolean; data: { project: any } } | { project: any } | any>(
+        '/projects',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        }
+      );
+
+      console.log('✅ Backend create project response:', response);
+
+      let project = null;
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.project) {
+          project = response.data.project;
+        } else if ('project' in response) {
+          project = response.project;
+        } else if (!('success' in response)) {
+          project = response;
+        }
+      }
+
+      if (project) {
+        const mapped = mapBackendProject(project);
+        console.log('✅ Project created successfully:', mapped.id);
+        return mapped;
+      }
+
+      throw new Error('Invalid response format from backend');
+    } catch (error) {
+      console.error('❌ Backend API error creating project:', error);
+      // Fallback to mock
+      const project: Project = {
+        ...payload,
+        id: nextId(),
+        created_at: new Date().toISOString()
+      };
+      mockProjects.unshift(project);
+      return project;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const project: Project = {
       ...payload,
@@ -438,6 +554,49 @@ export async function updateProject(
   id: string,
   changes: Partial<Project>
 ): Promise<Project | null> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Updating project via backend API...', id, changes);
+      
+      const response = await apiRequest<{ success: boolean; data: { project: any } } | { project: any } | any>(
+        `/projects/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(changes)
+        }
+      );
+
+      console.log('✅ Backend update project response:', response);
+
+      let project = null;
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.project) {
+          project = response.data.project;
+        } else if ('project' in response) {
+          project = response.project;
+        } else if (!('success' in response)) {
+          project = response;
+        }
+      }
+
+      if (project) {
+        const mapped = mapBackendProject(project);
+        console.log('✅ Project updated successfully:', mapped.id);
+        return mapped;
+      }
+
+      throw new Error('Invalid response format from backend');
+    } catch (error) {
+      console.error('❌ Backend API error updating project:', error);
+      // Fallback to mock
+      const index = mockProjects.findIndex((p) => p.id === id);
+      if (index === -1) return null;
+      mockProjects[index] = { ...mockProjects[index], ...changes };
+      return mockProjects[index];
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const index = mockProjects.findIndex((p) => p.id === id);
     if (index === -1) return null;
@@ -462,6 +621,26 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string): Promise<void> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Deleting project via backend API...', id);
+      
+      await apiRequest(`/projects/${id}`, {
+        method: 'DELETE'
+      });
+
+      console.log('✅ Project deleted successfully:', id);
+      return;
+    } catch (error) {
+      console.error('❌ Backend API error deleting project:', error);
+      // Fallback to mock
+      const index = mockProjects.findIndex((p) => p.id === id);
+      if (index !== -1) mockProjects.splice(index, 1);
+      return;
+    }
+  }
+
+  // Fallback to Supabase or mock
   if (useStatic) {
     const index = mockProjects.findIndex((p) => p.id === id);
     if (index !== -1) mockProjects.splice(index, 1);
@@ -476,5 +655,102 @@ export async function deleteProject(id: string): Promise<void> {
     useStatic = true;
     await deleteProject(id);
   }
+}
+
+// ============================================
+// PROJECT MANAGER USERS API
+// ============================================
+
+export interface ProjectManagerOption {
+  id: string;
+  user_id?: string;
+  name: string;
+  full_name?: string;
+  email: string;
+  role?: string;
+  erp_role?: string;
+  username?: string;
+}
+
+// Map backend user response to ProjectManagerOption
+function mapBackendProjectManager(backendUser: any): ProjectManagerOption {
+  const fullName = backendUser.full_name || 
+    (backendUser.first_name && backendUser.last_name 
+      ? `${backendUser.first_name} ${backendUser.last_name}`.trim()
+      : backendUser.name || backendUser.username || 'Unknown User');
+  
+  return {
+    id: backendUser.id?.toString() || backendUser.user_id?.toString() || '',
+    user_id: backendUser.user_id?.toString() || backendUser.id?.toString(),
+    name: fullName,
+    full_name: fullName,
+    email: backendUser.email || '',
+    role: backendUser.role || backendUser.erp_role,
+    erp_role: backendUser.erp_role || backendUser.role,
+    username: backendUser.username || backendUser.email,
+  };
+}
+
+// Roles suitable for project management
+const PROJECT_MANAGER_ROLES = [
+  'ADMIN',
+  'PROJECT_MANAGER',
+  'SALES_MANAGER',
+  'OPERATIONS',
+  'MANAGER',
+];
+
+// List users for project manager dropdown (filtered by role)
+export async function listProjectManagers(): Promise<ProjectManagerOption[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching project managers from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { users: any[] } } | { users: any[] } | any[]>(
+        '/users?page=1&limit=1000'
+      );
+
+      console.log('👥 Backend users response:', response);
+
+      // Handle different response formats
+      let users = [];
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.users) {
+          users = response.data.users;
+        } else if ('users' in response) {
+          users = response.users;
+        } else if (Array.isArray(response)) {
+          users = response;
+        }
+      }
+
+      if (users.length > 0) {
+        // Filter users by project manager roles
+        const filteredUsers = users.filter((u: any) => {
+          const userRole = (u.role || u.erp_role || '').toString().toUpperCase().trim();
+          // Check if role matches any of the project manager roles (exact match or contains)
+          return PROJECT_MANAGER_ROLES.some(role => 
+            userRole === role || 
+            userRole.includes(role) ||
+            userRole.includes('PROJECT') ||
+            userRole.includes('MANAGER')
+          );
+        });
+        
+        const mapped = filteredUsers.map(mapBackendProjectManager);
+        console.log('✅ Mapped project managers:', mapped.length);
+        console.log('📋 Project manager roles filter:', PROJECT_MANAGER_ROLES);
+        return mapped;
+      }
+
+      console.log('⚠️ No project managers found in response');
+      return [];
+    } catch (error) {
+      console.error('❌ Backend API error fetching project managers:', error);
+      return [];
+    }
+  }
+
+  return [];
 }
 

@@ -5,6 +5,7 @@ import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Table, type TableColumn } from '../../../components/ui/Table';
 import { Modal } from '../../../components/ui/Modal';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { LoadingState } from '../../../components/ui/LoadingState';
 import { StatCard } from '../../../components/ui/StatCard';
@@ -18,7 +19,7 @@ import { toast } from '../../../lib/toast';
 import * as crmApi from '../api/crmApi';
 
 export function CustomerList() {
-  const { customers, loading: customersLoading, create: createCustomer, remove: removeCustomer, metrics } = useCrm();
+  const { customers, loading: customersLoading, create: createCustomer, remove: removeCustomer, refresh: refreshCustomers, metrics } = useCrm();
   
   // Users state
   const [users, setUsers] = useState<ErpUser[]>([]);
@@ -32,9 +33,15 @@ export function CustomerList() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [editingUser, setEditingUser] = useState<ErpUser | null>(null);
   
+  // Delete confirmation states
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
+  const [userToDelete, setUserToDelete] = useState<ErpUser | null>(null);
+  
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [usersCurrentPage, setUsersCurrentPage] = useState(1);
+  const [customersCurrentPage, setCustomersCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Load users
@@ -57,35 +64,58 @@ export function CustomerList() {
 
   // Filter users
   const filteredUsers = users.filter((user) => {
+    if (!searchTerm || searchTerm === '') return true;
+    
+    const searchLower = (searchTerm || '').toLowerCase();
     return (
-      searchTerm === '' ||
-      user.employee_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.mobile.toLowerCase().includes(searchTerm.toLowerCase())
+      (user.employee_number?.toLowerCase() || '').includes(searchLower) ||
+      (user.username?.toLowerCase() || '').includes(searchLower) ||
+      (user.email?.toLowerCase() || '').includes(searchLower) ||
+      (user.full_name?.toLowerCase() || '').includes(searchLower) ||
+      (user.mobile?.toLowerCase() || '').includes(searchLower)
     );
   });
 
   // Filter customers
   const filteredCustomers = customers.filter((customer) => {
+    if (!searchTerm || searchTerm === '') return true;
+    
+    const searchLower = (searchTerm || '').toLowerCase();
     return (
-      searchTerm === '' ||
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone.toLowerCase().includes(searchTerm.toLowerCase())
+      (customer.name?.toLowerCase() || '').includes(searchLower) ||
+      (customer.customer_number?.toLowerCase() || '').includes(searchLower) ||
+      (customer.email?.toLowerCase() || '').includes(searchLower) ||
+      (customer.phone?.toLowerCase() || '').includes(searchLower) ||
+      (customer.segment?.toLowerCase() || '').includes(searchLower) ||
+      (customer.company_name?.toLowerCase() || '').includes(searchLower) ||
+      (customer.city?.toLowerCase() || '').includes(searchLower) ||
+      (customer.contact_person?.toLowerCase() || '').includes(searchLower)
     );
   });
 
   // Pagination for users
-  const usersTotalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const usersStartIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedUsers = filteredUsers.slice(usersStartIndex, usersStartIndex + itemsPerPage);
+  const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+  const usersStartIndex = (usersCurrentPage - 1) * itemsPerPage;
+  const usersEndIndex = usersStartIndex + itemsPerPage;
+  const paginatedUsers = filteredUsers.slice(usersStartIndex, usersEndIndex);
 
   // Pagination for customers
-  const customersTotalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
-  const customersStartIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedCustomers = filteredCustomers.slice(customersStartIndex, customersStartIndex + itemsPerPage);
+  const customersTotalPages = Math.max(1, Math.ceil(filteredCustomers.length / itemsPerPage));
+  const customersStartIndex = (customersCurrentPage - 1) * itemsPerPage;
+  const customersEndIndex = customersStartIndex + itemsPerPage;
+  const paginatedCustomers = filteredCustomers.slice(customersStartIndex, customersEndIndex);
+
+  // Reset pagination when switching tabs
+  useEffect(() => {
+    setUsersCurrentPage(1);
+    setCustomersCurrentPage(1);
+  }, [activeTab]);
+
+  // Reset pagination when search term changes
+  useEffect(() => {
+    setUsersCurrentPage(1);
+    setCustomersCurrentPage(1);
+  }, [searchTerm]);
 
   // User columns
   const userColumns: TableColumn<ErpUser>[] = [
@@ -154,28 +184,36 @@ export function CustomerList() {
       header: '',
       render: (row) => (
         <div className="flex items-center gap-2 justify-end">
+            <button
+              type="button"
+              onClick={async () => {
+                // Fetch full user data including employee data
+                try {
+                  const fullUserData = await crmApi.getErpUserWithEmployeeData(row.id);
+                  if (fullUserData) {
+                    setEditingUser(fullUserData);
+                    setModalOpen(true);
+                  } else {
+                    // Fallback to row data if fetch fails
+                    setEditingUser(row);
+                    setModalOpen(true);
+                  }
+                } catch (error) {
+                  console.error('Error fetching user data:', error);
+                  // Fallback to row data
+                  setEditingUser(row);
+                  setModalOpen(true);
+                }
+              }}
+              className="text-[11px] text-primary hover:text-primary-light font-medium"
+            >
+              Edit
+            </button>
           <button
             type="button"
             onClick={() => {
-              setEditingUser(row);
-              setModalOpen(true);
-            }}
-            className="text-[11px] text-primary hover:text-primary-light font-medium"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              if (window.confirm('Are you sure you want to delete this user?')) {
-                try {
-                  await crmApi.deleteErpUser(row.id);
-                  await loadUsers();
-                  toast.success('User deleted successfully!');
-                } catch (error) {
-                  toast.error('Failed to delete user');
-                }
-              }
+              setUserToDelete(row);
+              setDeleteConfirmOpen(true);
             }}
             className="text-[11px] text-red-600 hover:text-red-700 font-medium"
           >
@@ -189,31 +227,52 @@ export function CustomerList() {
   // Customer columns
   const customerColumns: TableColumn<Customer>[] = [
     {
+      key: 'customer_number',
+      header: 'Customer #',
+      render: (row) => (
+        <div className="font-medium text-slate-900 text-xs">{row.customer_number || '—'}</div>
+      )
+    },
+    {
       key: 'name',
       header: 'Name',
       render: (row) => (
-        <div className="font-medium text-slate-900">{row.name}</div>
+        <div className="font-medium text-slate-900">{row.name || '—'}</div>
+      )
+    },
+    {
+      key: 'company_name',
+      header: 'Company',
+      render: (row) => (
+        <div className="text-xs text-slate-700">{row.company_name || '—'}</div>
       )
     },
     {
       key: 'email',
       header: 'Email',
       render: (row) => (
-        <div className="text-xs text-slate-900">{row.email}</div>
+        <div className="text-xs text-slate-900">{row.email || '—'}</div>
       )
     },
     {
       key: 'phone',
       header: 'Phone',
       render: (row) => (
-        <div className="text-xs text-slate-600">{row.phone}</div>
+        <div className="text-xs text-slate-600">{row.phone || '—'}</div>
+      )
+    },
+    {
+      key: 'city',
+      header: 'City',
+      render: (row) => (
+        <div className="text-xs text-slate-600">{row.city || '—'}</div>
       )
     },
     {
       key: 'segment',
       header: 'Segment',
       render: (row) => (
-        <Badge tone="brand">{row.segment}</Badge>
+        <Badge tone="brand">{row.segment || '—'}</Badge>
       )
     },
     {
@@ -233,15 +292,9 @@ export function CustomerList() {
           </button>
           <button
             type="button"
-            onClick={async () => {
-              if (window.confirm('Are you sure you want to delete this customer?')) {
-                try {
-                  await removeCustomer(row.id);
-                  toast.success('Customer deleted successfully!');
-                } catch (error) {
-                  toast.error('Failed to delete customer');
-                }
-              }
+            onClick={() => {
+              setCustomerToDelete(row);
+              setDeleteConfirmOpen(true);
             }}
             className="text-[11px] text-red-600 hover:text-red-700 font-medium"
           >
@@ -252,7 +305,7 @@ export function CustomerList() {
     }
   ];
 
-  const handleCreateUser = async (data: Omit<ErpUser, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleCreateUser = async (data: Omit<ErpUser, 'id' | 'created_at' | 'updated_at' | 'password_hash'>) => {
     try {
       await crmApi.createErpUser(data);
       setModalOpen(false);
@@ -264,7 +317,7 @@ export function CustomerList() {
     }
   };
 
-  const handleUpdateUser = async (data: Omit<ErpUser, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleUpdateUser = async (data: Omit<ErpUser, 'id' | 'created_at' | 'updated_at' | 'password_hash'>) => {
     if (editingUser) {
       try {
         await crmApi.updateErpUser(editingUser.id, data);
@@ -295,8 +348,9 @@ export function CustomerList() {
         await crmApi.updateCustomer(editingCustomer.id, data);
         setModalOpen(false);
         setEditingCustomer(null);
+        // Refresh the customer list
+        await refreshCustomers();
         toast.success('Customer updated successfully!');
-        window.location.reload();
       } catch (error) {
         toast.error('Failed to update customer');
       }
@@ -389,7 +443,7 @@ export function CustomerList() {
         activeId={activeTab}
         onChange={(id) => {
           setActiveTab(id as any);
-          setCurrentPage(1);
+          // Page reset is handled by useEffect
           setSearchTerm('');
         }}
       />
@@ -407,7 +461,7 @@ export function CustomerList() {
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setCurrentPage(1);
+                  // Page reset is handled by useEffect
                 }}
               />
             </div>
@@ -453,8 +507,9 @@ export function CustomerList() {
                       <select
                         value={itemsPerPage}
                         onChange={(e) => {
-                          setItemsPerPage(Number(e.target.value));
-                          setCurrentPage(1);
+                          const newItemsPerPage = Number(e.target.value);
+                          setItemsPerPage(newItemsPerPage);
+                          setUsersCurrentPage(1);
                         }}
                         className="border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                       >
@@ -470,15 +525,21 @@ export function CustomerList() {
                     {/* Center: Page numbers */}
                     <div className="flex-1 flex justify-center">
                       <Pagination
-                        page={currentPage}
+                        page={usersCurrentPage}
                         totalPages={usersTotalPages}
-                        onChange={setCurrentPage}
+                        onChange={(page) => {
+                          setUsersCurrentPage(Math.max(1, Math.min(page, usersTotalPages)));
+                        }}
                       />
                     </div>
 
                     {/* Right: Showing info */}
                     <div className="text-xs text-slate-600 whitespace-nowrap">
-                      Showing <span className="font-medium text-slate-900">{usersStartIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(usersStartIndex + itemsPerPage, filteredUsers.length)}</span> of <span className="font-medium text-slate-900">{filteredUsers.length}</span>
+                      Showing <span className="font-medium text-slate-900">
+                        {filteredUsers.length === 0 ? 0 : usersStartIndex + 1}
+                      </span> to <span className="font-medium text-slate-900">
+                        {Math.min(usersEndIndex, filteredUsers.length)}
+                      </span> of <span className="font-medium text-slate-900">{filteredUsers.length}</span>
                     </div>
                   </div>
                 </div>
@@ -526,8 +587,9 @@ export function CustomerList() {
                       <select
                         value={itemsPerPage}
                         onChange={(e) => {
-                          setItemsPerPage(Number(e.target.value));
-                          setCurrentPage(1);
+                          const newItemsPerPage = Number(e.target.value);
+                          setItemsPerPage(newItemsPerPage);
+                          setCustomersCurrentPage(1);
                         }}
                         className="border border-slate-200 rounded px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
                       >
@@ -543,15 +605,21 @@ export function CustomerList() {
                     {/* Center: Page numbers */}
                     <div className="flex-1 flex justify-center">
                       <Pagination
-                        page={currentPage}
+                        page={customersCurrentPage}
                         totalPages={customersTotalPages}
-                        onChange={setCurrentPage}
+                        onChange={(page) => {
+                          setCustomersCurrentPage(Math.max(1, Math.min(page, customersTotalPages)));
+                        }}
                       />
                     </div>
 
                     {/* Right: Showing info */}
                     <div className="text-xs text-slate-600 whitespace-nowrap">
-                      Showing <span className="font-medium text-slate-900">{customersStartIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(customersStartIndex + itemsPerPage, filteredCustomers.length)}</span> of <span className="font-medium text-slate-900">{filteredCustomers.length}</span>
+                      Showing <span className="font-medium text-slate-900">
+                        {filteredCustomers.length === 0 ? 0 : customersStartIndex + 1}
+                      </span> to <span className="font-medium text-slate-900">
+                        {Math.min(customersEndIndex, filteredCustomers.length)}
+                      </span> of <span className="font-medium text-slate-900">{filteredCustomers.length}</span>
                     </div>
                   </div>
                 </div>
@@ -603,6 +671,45 @@ export function CustomerList() {
           />
         </Modal>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title={customerToDelete ? 'Delete Customer' : 'Delete User'}
+        message={
+          customerToDelete
+            ? `Are you sure you want to delete "${customerToDelete.name}"? This action cannot be undone.`
+            : userToDelete
+            ? `Are you sure you want to delete "${userToDelete.full_name || userToDelete.username}"? This action cannot be undone.`
+            : ''
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={async () => {
+          try {
+            if (customerToDelete) {
+              await removeCustomer(customerToDelete.id);
+              await refreshCustomers();
+              toast.success('Customer deleted successfully!');
+            } else if (userToDelete) {
+              await crmApi.deleteErpUser(userToDelete.id);
+              await loadUsers();
+              toast.success('User deleted successfully!');
+            }
+          } catch (error) {
+            toast.error(`Failed to delete ${customerToDelete ? 'customer' : 'user'}`);
+          } finally {
+            setCustomerToDelete(null);
+            setUserToDelete(null);
+          }
+        }}
+        onCancel={() => {
+          setDeleteConfirmOpen(false);
+          setCustomerToDelete(null);
+          setUserToDelete(null);
+        }}
+      />
     </div>
   );
 }

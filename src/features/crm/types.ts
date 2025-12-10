@@ -1,10 +1,41 @@
 import type { BaseEntity } from '../../types/common';
 
 export interface Customer extends BaseEntity {
+  // Basic Information
+  customer_number?: string;
   name: string;
-  email: string;
-  phone: string;
-  segment: string;
+  email?: string;
+  phone?: string;
+  segment?: string;
+  
+  // Company Information
+  company_name?: string;
+  industry?: string;
+  annual_revenue?: number;
+  employee_count?: number;
+  website?: string;
+  
+  // Address Information
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+  
+  // Tax & Legal Information
+  gstin?: string;
+  pan_number?: string;
+  
+  // Contact Information
+  contact_person?: string;
+  contact_designation?: string;
+  
+  // Financial Information
+  credit_limit?: number;
+  payment_terms?: string;
+  
+  // Additional
+  notes?: string;
 }
 
 // User Registration types for ERP employees
@@ -14,29 +45,42 @@ export type EmploymentStatus = 'ACTIVE' | 'INACTIVE' | 'ON_LEAVE' | 'TERMINATED'
 
 export interface ErpUser extends BaseEntity {
   // Basic Information
-  employee_number?: string;
+  employee_number: string;
   email: string;
-  password?: string; // Only for creation, not stored in display
-  mobile: string;
+  password?: string; // Only for creation, backend will hash it
+  password_hash?: string; // From backend, read-only
+  mobile?: string;
   first_name: string;
   last_name: string;
-  full_name?: string;
   username: string;
   
   // Personal Details
   gender?: Gender;
-  age?: number;
+  date_of_birth?: string; // Date in YYYY-MM-DD format from backend, dd/mm/yyyy in form
   address?: string;
-  emergency_contact?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
   
   // Employment Details
   role: ErpUserRole;
-  employment_status: EmploymentStatus;
-  joining_date?: string;
+  employment_status?: EmploymentStatus;
+  joining_date: string; // Date in YYYY-MM-DD format from backend, dd/mm/yyyy in form
   designation?: string;
   department?: string;
-  manager_name?: string;
-  work_phonenumber?: string;
+  manager_name?: string; // Display name (read-only from backend)
+  manager_erp_user_id?: number; // For form submission - erp_users.id
+  work_phone?: string; // Note: database uses work_phone, not work_phonenumber
+  salary?: number;
+  
+  // Emergency Contact
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  
+  // Bank Details
+  bank_account_number?: string;
+  bank_name?: string;
+  bank_ifsc?: string;
   
   // Identification
   pan_number?: string;
@@ -44,7 +88,6 @@ export interface ErpUser extends BaseEntity {
   
   // Additional
   notes?: string;
-  is_active?: boolean;
 }
 
 // Leave Management Types
@@ -91,7 +134,7 @@ export interface Task extends BaseEntity {
   status: TaskStatus;
   
   // Assignment
-  assigned_to_id: string;
+  assigned_to?: string;
   assigned_to_name: string;
   assigned_to_email?: string;
   assigned_to_role?: ErpUserRole;
