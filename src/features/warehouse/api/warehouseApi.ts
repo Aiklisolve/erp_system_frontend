@@ -1,6 +1,8 @@
 import { apiRequest } from '../../../config/api';
 import type { StockMovement, Warehouse } from '../types';
 
+const USE_BACKEND_API = true;
+
 // Backend stock movement structure (matches actual database schema)
 interface BackendStockMovement {
   id: number;

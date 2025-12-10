@@ -353,30 +353,50 @@ export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
       );
       
       console.log('📦 Backend purchase orders response:', response);
+      console.log('📦 Response type:', typeof response);
+      console.log('📦 Response keys:', response && typeof response === 'object' ? Object.keys(response) : 'N/A');
       
       // Handle different response formats
-      let purchaseOrders = null;
+      let purchaseOrders = [];
       
       if (response && typeof response === 'object') {
         // If wrapped in success/data
-        if ('success' in response && response.success && 'data' in response && response.data.purchase_orders) {
-          purchaseOrders = response.data.purchase_orders;
+        if ('success' in response && response.success && 'data' in response) {
+          console.log('📦 Response has success and data');
+          console.log('📦 Response.data keys:', Object.keys(response.data || {}));
+          if (response.data.purchase_orders && Array.isArray(response.data.purchase_orders)) {
+            purchaseOrders = response.data.purchase_orders;
+            console.log('📦 Found purchase_orders in response.data:', purchaseOrders.length);
+            console.log('📦 First PO before mapping:', purchaseOrders[0]);
+          } else if (Array.isArray(response.data)) {
+            purchaseOrders = response.data;
+            console.log('📦 Response.data is array:', purchaseOrders.length);
+          }
         }
         // If direct purchase_orders array
-        else if ('purchase_orders' in response) {
+        else if ('purchase_orders' in response && Array.isArray(response.purchase_orders)) {
           purchaseOrders = response.purchase_orders;
+          console.log('📦 Found purchase_orders in response root:', purchaseOrders.length);
         }
         // If direct array
         else if (Array.isArray(response)) {
           purchaseOrders = response;
+          console.log('📦 Response is direct array:', purchaseOrders.length);
         }
       }
       
-      if (purchaseOrders && Array.isArray(purchaseOrders) && purchaseOrders.length > 0) {
+      console.log('📦 Extracted purchaseOrders:', purchaseOrders.length, 'items');
+      console.log('📦 purchaseOrders sample:', purchaseOrders.slice(0, 2));
+      
+      if (purchaseOrders.length > 0) {
+        console.log('📦 About to map purchase orders...');
         const mapped = purchaseOrders.map(mapBackendPurchaseOrder);
         console.log('✅ Mapped purchase orders:', mapped.length);
+        console.log('✅ First mapped PO:', mapped[0]);
         return mapped;
       }
+      
+      console.log('⚠️ No purchase orders found in response');
       
       console.log('⚠️ No purchase orders in response, using mock data');
       return mockPurchaseOrders;
