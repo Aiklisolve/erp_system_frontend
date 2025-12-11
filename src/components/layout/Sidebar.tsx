@@ -18,8 +18,8 @@ const menuIcons: Record<string, string> = {
   'Ecommerce': '🛒',
   'Marketing': '📣',
   'Projects': '📋',
-  'Reports': '📄',
-  'Invoices': '🧾',
+  'Reports': '📈',
+  'Invoices': '💰',
   'Internal Tasks': '✅'
 };
 
