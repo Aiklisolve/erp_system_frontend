@@ -1,6 +1,6 @@
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import { handleApiError } from '../../../lib/errorHandler';
-import type { Campaign } from '../types';
+import type { Campaign, MarketingAsset, Lead } from '../types';
 
 let useStatic = !hasSupabaseConfig;
 
@@ -258,6 +258,282 @@ export async function deleteCampaign(id: string): Promise<void> {
     handleApiError('marketing.deleteCampaign', error);
     useStatic = true;
     await deleteCampaign(id);
+  }
+}
+
+// ============================================
+// MARKETING ASSETS API
+// ============================================
+
+const mockAssets: MarketingAsset[] = [
+  {
+    id: 'asset-1',
+    asset_code: 'ASSET-2025-000001',
+    name: 'Q1 Launch Banner',
+    type: 'IMAGE',
+    url: 'https://example.com/assets/banner.jpg',
+    file_size: 245760,
+    campaign_id: 'camp-1',
+    tags: ['banner', 'launch', 'q1'],
+    created_at: '2025-01-01T10:00:00.000Z',
+    updated_at: '2025-01-01T10:00:00.000Z'
+  },
+  {
+    id: 'asset-2',
+    asset_code: 'ASSET-2025-000002',
+    name: 'Product Demo Video',
+    type: 'VIDEO',
+    url: 'https://example.com/assets/demo.mp4',
+    file_size: 5242880,
+    campaign_id: 'camp-1',
+    tags: ['video', 'demo', 'product'],
+    created_at: '2025-01-02T10:00:00.000Z',
+    updated_at: '2025-01-02T10:00:00.000Z'
+  }
+];
+
+function nextAssetId() {
+  return `asset-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export async function listAssets(campaignId?: string): Promise<MarketingAsset[]> {
+  if (useStatic) {
+    let assets = mockAssets;
+    if (campaignId) {
+      assets = assets.filter((a) => a.campaign_id === campaignId);
+    }
+    return assets;
+  }
+
+  try {
+    let query = supabase.from('marketing_assets').select('*');
+    if (campaignId) {
+      query = query.eq('campaign_id', campaignId);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data as MarketingAsset[]) ?? [];
+  } catch (error) {
+    handleApiError('marketing.listAssets', error);
+    useStatic = true;
+    return campaignId ? mockAssets.filter((a) => a.campaign_id === campaignId) : mockAssets;
+  }
+}
+
+export async function createAsset(
+  payload: Omit<MarketingAsset, 'id' | 'created_at' | 'updated_at'>
+): Promise<MarketingAsset> {
+  if (useStatic) {
+    const asset: MarketingAsset = {
+      ...payload,
+      id: nextAssetId(),
+      created_at: new Date().toISOString()
+    };
+    mockAssets.unshift(asset);
+    return asset;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('marketing_assets')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as MarketingAsset;
+  } catch (error) {
+    handleApiError('marketing.createAsset', error);
+    useStatic = true;
+    return createAsset(payload);
+  }
+}
+
+export async function updateAsset(
+  id: string,
+  changes: Partial<MarketingAsset>
+): Promise<MarketingAsset | null> {
+  if (useStatic) {
+    const index = mockAssets.findIndex((a) => a.id === id);
+    if (index === -1) return null;
+    mockAssets[index] = { ...mockAssets[index], ...changes };
+    return mockAssets[index];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('marketing_assets')
+      .update(changes)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as MarketingAsset;
+  } catch (error) {
+    handleApiError('marketing.updateAsset', error);
+    useStatic = true;
+    return updateAsset(id, changes);
+  }
+}
+
+export async function deleteAsset(id: string): Promise<void> {
+  if (useStatic) {
+    const index = mockAssets.findIndex((a) => a.id === id);
+    if (index !== -1) mockAssets.splice(index, 1);
+    return;
+  }
+
+  try {
+    const { error } = await supabase.from('marketing_assets').delete().eq('id', id);
+    if (error) throw error;
+  } catch (error) {
+    handleApiError('marketing.deleteAsset', error);
+    useStatic = true;
+    await deleteAsset(id);
+  }
+}
+
+// ============================================
+// MARKETING LEADS API
+// ============================================
+
+const mockLeads: Lead[] = [
+  {
+    id: 'lead-1',
+    lead_code: 'LEAD-2025-000001',
+    campaign_id: 'camp-1',
+    campaign_name: 'Q1 Product Launch',
+    source: 'Website Form',
+    first_name: 'John',
+    last_name: 'Doe',
+    email: 'john.doe@example.com',
+    phone: '+1-555-0101',
+    company: 'Acme Corp',
+    job_title: 'CTO',
+    status: 'NEW',
+    score: 75,
+    notes: 'Interested in enterprise features',
+    created_at: '2025-01-05T10:00:00.000Z',
+    updated_at: '2025-01-05T10:00:00.000Z'
+  },
+  {
+    id: 'lead-2',
+    lead_code: 'LEAD-2025-000002',
+    campaign_id: 'camp-1',
+    campaign_name: 'Q1 Product Launch',
+    source: 'Social Media',
+    first_name: 'Jane',
+    last_name: 'Smith',
+    email: 'jane.smith@example.com',
+    phone: '+1-555-0102',
+    company: 'Tech Solutions Inc',
+    job_title: 'Marketing Manager',
+    status: 'CONTACTED',
+    score: 60,
+    notes: 'Follow up scheduled',
+    created_at: '2025-01-06T10:00:00.000Z',
+    updated_at: '2025-01-07T10:00:00.000Z'
+  }
+];
+
+function nextLeadId() {
+  return `lead-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export async function listLeads(campaignId?: string): Promise<Lead[]> {
+  if (useStatic) {
+    let leads = mockLeads;
+    if (campaignId) {
+      leads = leads.filter((l) => l.campaign_id === campaignId);
+    }
+    return leads;
+  }
+
+  try {
+    let query = supabase.from('marketing_leads').select('*');
+    if (campaignId) {
+      query = query.eq('campaign_id', campaignId);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data as Lead[]) ?? [];
+  } catch (error) {
+    handleApiError('marketing.listLeads', error);
+    useStatic = true;
+    return campaignId ? mockLeads.filter((l) => l.campaign_id === campaignId) : mockLeads;
+  }
+}
+
+export async function createLead(
+  payload: Omit<Lead, 'id' | 'created_at' | 'updated_at'>
+): Promise<Lead> {
+  if (useStatic) {
+    const lead: Lead = {
+      ...payload,
+      id: nextLeadId(),
+      status: payload.status || 'NEW',
+      score: payload.score ?? 0,
+      created_at: new Date().toISOString()
+    };
+    mockLeads.unshift(lead);
+    return lead;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('marketing_leads')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Lead;
+  } catch (error) {
+    handleApiError('marketing.createLead', error);
+    useStatic = true;
+    return createLead(payload);
+  }
+}
+
+export async function updateLead(
+  id: string,
+  changes: Partial<Lead>
+): Promise<Lead | null> {
+  if (useStatic) {
+    const index = mockLeads.findIndex((l) => l.id === id);
+    if (index === -1) return null;
+    mockLeads[index] = { ...mockLeads[index], ...changes };
+    return mockLeads[index];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('marketing_leads')
+      .update(changes)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Lead;
+  } catch (error) {
+    handleApiError('marketing.updateLead', error);
+    useStatic = true;
+    return updateLead(id, changes);
+  }
+}
+
+export async function deleteLead(id: string): Promise<void> {
+  if (useStatic) {
+    const index = mockLeads.findIndex((l) => l.id === id);
+    if (index !== -1) mockLeads.splice(index, 1);
+    return;
+  }
+
+  try {
+    const { error } = await supabase.from('marketing_leads').delete().eq('id', id);
+    if (error) throw error;
+  } catch (error) {
+    handleApiError('marketing.deleteLead', error);
+    useStatic = true;
+    await deleteLead(id);
   }
 }
 

@@ -11,7 +11,7 @@ export interface SessionData {
 }
 
 const SESSION_KEY = 'erp_session';
-const SESSION_EXPIRY_MINUTES = 15; // 15 minutes session expiry
+const SESSION_EXPIRY_MINUTES = 180; // 3 hours session expiry
 
 export function createSession(
   user: StaticUser,
@@ -19,7 +19,7 @@ export function createSession(
   sessionId?: string,
   expiresAt?: number
 ): SessionData {
-  // Use provided expiresAt or calculate 15 minutes from now
+  // Use provided expiresAt or calculate 3 hours from now
   const sessionExpiresAt = expiresAt || Date.now() + SESSION_EXPIRY_MINUTES * 60 * 1000;
   
   const session: SessionData = {
@@ -108,7 +108,7 @@ export function refreshSession(): SessionData | null {
   const session = getSession();
   if (!session) return null;
   
-  // Extend session by another 15 minutes
+  // Extend session by another 3 hours
   const newExpiresAt = Date.now() + SESSION_EXPIRY_MINUTES * 60 * 1000;
   const newSession: SessionData = {
     ...session,

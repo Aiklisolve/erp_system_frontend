@@ -127,14 +127,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Inactivity timeout handler - redirects to login after 15 minutes of no activity
+  // Inactivity timeout handler - redirects to login after 3 hours of no activity
   useEffect(() => {
     // Only set up inactivity tracking if user is authenticated
     if (!user) {
       return;
     }
 
-    const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+    const INACTIVITY_TIMEOUT = 3 * 60 * 60 * 1000; // 3 hours
     let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Function to reset the inactivity timer

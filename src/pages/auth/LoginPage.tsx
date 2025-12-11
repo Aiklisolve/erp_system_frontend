@@ -154,8 +154,8 @@ export function LoginPage() {
       if (response.ok && data.success && data.data) {
         const { user: backendUser, token, session_id, refresh_token, expires_in } = data.data;
         
-        // Calculate token expiry
-        const expiresIn = expires_in ? expires_in * 1000 : 60 * 60 * 1000;
+        // Calculate token expiry (use expires_in from backend or default to 3 hours)
+        const expiresIn = expires_in ? expires_in * 1000 : 3 * 60 * 60 * 1000;
         const expiresAt = Date.now() + expiresIn;
         
         // Store all authentication data

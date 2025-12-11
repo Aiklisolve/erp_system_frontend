@@ -92,7 +92,7 @@ export function generateToken(userId: string, email: string): string {
       sub: userId,
       email: email,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 15 * 60 // 15 minutes
+      exp: Math.floor(Date.now() / 1000) + 3 * 60 * 60 // 3 hours
     })
   );
   // In production, this would include a signature
