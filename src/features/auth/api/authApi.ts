@@ -69,8 +69,8 @@ export async function login(email: string, password: string): Promise<User | nul
       if (response.ok && data.success && data.data) {
         const { user: backendUser, token, session_id, refresh_token, expires_in } = data.data;
         
-        // Calculate token expiry (use expires_in from backend or default to 1 hour)
-        const expiresIn = expires_in ? expires_in * 1000 : 60 * 60 * 1000; // Convert seconds to ms
+        // Calculate token expiry (use expires_in from backend or default to 3 hours)
+        const expiresIn = expires_in ? expires_in * 1000 : 3 * 60 * 60 * 1000; // Convert seconds to ms
         const expiresAt = Date.now() + expiresIn;
         
         // Store all authentication data in localStorage
@@ -375,8 +375,8 @@ export async function verifyOTPAndLogin(
   const token = generateToken(user.id, user.email);
   const sessionId = generateSessionId();
   
-  // Calculate expiry time (15 minutes from now)
-  const expiresAt = Date.now() + 15 * 60 * 1000;
+  // Calculate expiry time (3 hours from now)
+  const expiresAt = Date.now() + 3 * 60 * 60 * 1000;
 
   // Create session with JWT token and session ID
   createSession(user, token, sessionId, expiresAt);

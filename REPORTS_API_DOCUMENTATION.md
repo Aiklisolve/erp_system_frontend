@@ -265,6 +265,16 @@ curl -X GET "http://localhost:3000/api/v1/reports/101" \
 4. The backend MUST generate professional, company-branded reports with proper formatting, headers, footers, and styling
 5. Files MUST be readable by standard applications (Adobe Reader for PDF, Excel for XLSX, etc.)
 
+**PDF FORMATTING REQUIREMENTS** (See `REPORT_PDF_FORMATTING_GUIDE.md` for details):
+- **Column Widths**: Calculate proper column widths to prevent text truncation
+- **Text Wrapping**: Use ellipsis for long text, ensure text doesn't overflow columns
+- **Date Formatting**: Format all dates as MM/DD/YYYY (e.g., "12/11/2025")
+- **Alignment**: Right-align numbers/amounts, left-align text
+- **Font Sizes**: Use 7-8pt for table data, 9pt for headers
+- **Page Breaks**: Handle page breaks properly, redraw headers on new pages
+- **No Overlapping**: Ensure proper spacing between columns and rows
+- **No Truncation**: Column headers must be fully visible (use shorter labels if needed)
+
 **cURL Request**:
 ```bash
 curl -X GET "http://localhost:3000/api/v1/reports/23/download" \

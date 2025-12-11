@@ -382,32 +382,284 @@ export async function downloadInvoicePDF(id: string): Promise<{ blob: Blob; file
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('❌ Download failed:', response.status, errorText);
         throw new Error(`Failed to download invoice: ${response.status} ${errorText}`);
       }
 
+      // Get Content-Type to validate response
       const contentType = response.headers.get('Content-Type') || '';
-      const contentDisposition = response.headers.get('Content-Disposition');
+      console.log('📄 Content-Type:', contentType);
       
+      // Validate Content-Type is PDF
+      if (contentType && !contentType.includes('pdf') && !contentType.includes('application/octet-stream')) {
+        console.warn('⚠️ Unexpected Content-Type:', contentType, '- Expected application/pdf');
+      }
+
+      const contentDisposition = response.headers.get('Content-Disposition');
       let filename = `invoice-${id}.pdf`;
+      
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          filename = filenameMatch[1].replace(/['"]/g, '');
+        // Try UTF-8 filename first
+        const utf8Match = contentDisposition.match(/filename\*=UTF-8''(.+)/);
+        if (utf8Match) {
+          filename = decodeURIComponent(utf8Match[1]);
+        } else {
+          // Fallback to regular filename
+          const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1].replace(/['"]/g, '');
+          }
         }
+      }
+
+      // Ensure filename has .pdf extension
+      if (!filename.toLowerCase().endsWith('.pdf')) {
+        filename = `${filename}.pdf`;
       }
 
       const blob = await response.blob();
       
+      // Validate blob size
       if (blob.size === 0) {
-        throw new Error('Downloaded file is empty');
+        throw new Error('Downloaded file is empty or corrupted');
       }
 
-      return { blob, filename };
+      // Check if response is actually a JSON error message (common backend mistake)
+      const firstBytes = await blob.slice(0, 500).text();
+      const firstBytesTrimmed = firstBytes.trim();
+      
+      console.log('🔍 First 500 bytes of response:', firstBytesTrimmed.substring(0, 200));
+      
+      // Check for JSON error responses OR JSON success responses (backend returning JSON instead of file)
+      if (firstBytesTrimmed.startsWith('{') || firstBytesTrimmed.startsWith('[')) {
+        try {
+          const jsonData = JSON.parse(firstBytesTrimmed);
+          console.error('❌ Backend returned JSON instead of PDF file:', jsonData);
+          
+          // Check if it's an error response
+          if (jsonData.error || jsonData.message || jsonData.success === false) {
+            const errorMsg = jsonData.error || jsonData.message || 'Unknown error';
+            throw new Error(`Backend returned JSON error instead of PDF: ${errorMsg}`);
+          }
+          
+          // Check if it's a success response with invoice data (backend mistake - returning invoice metadata instead of file)
+          if (jsonData.success === true && jsonData.data && jsonData.data.invoice) {
+            throw new Error(`Backend returned invoice metadata JSON instead of the actual PDF file. The download endpoint should return binary PDF content, not JSON.`);
+          }
+          
+          // Generic JSON response
+          throw new Error(`Backend returned JSON response instead of PDF file. Expected PDF but got JSON. Check backend download endpoint implementation.`);
+        } catch (e) {
+          // If it's our custom error, re-throw it
+          if (e instanceof Error && e.message.includes('Backend returned')) {
+            throw e;
+          }
+          // Not JSON, continue
+        }
+      }
+      
+      // Check for HTML error pages (common backend mistake)
+      if (firstBytesTrimmed.toLowerCase().startsWith('<!doctype') || 
+          firstBytesTrimmed.toLowerCase().startsWith('<html') ||
+          firstBytesTrimmed.includes('<body>') ||
+          (firstBytesTrimmed.includes('Error') && firstBytesTrimmed.includes('</html>'))) {
+        throw new Error('Backend returned HTML error page instead of PDF file. Check backend logs for errors.');
+      }
+
+      // Validate PDF by checking magic bytes
+      const arrayBuffer = await blob.slice(0, 8).arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      // PDF magic bytes: %PDF
+      const pdfMagic = [0x25, 0x50, 0x44, 0x46]; // %PDF
+      const isPDF = uint8Array.length >= 4 && 
+        uint8Array[0] === pdfMagic[0] && 
+        uint8Array[1] === pdfMagic[1] && 
+        uint8Array[2] === pdfMagic[2] && 
+        uint8Array[3] === pdfMagic[3];
+      
+      if (!isPDF) {
+        const firstBytesHex = Array.from(uint8Array.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+        const firstBytesText = String.fromCharCode(...uint8Array.slice(0, Math.min(8, uint8Array.length)))
+          .replace(/[^\x20-\x7E]/g, '.'); // Replace non-printable chars with dots
+        
+        console.error('❌ PDF validation failed:', {
+          firstBytesHex,
+          firstBytesText,
+          expected: '%PDF',
+          actual: firstBytesText.substring(0, 4)
+        });
+        
+        throw new Error(`Invalid PDF file: File does not have PDF magic bytes (should start with %PDF). First bytes: ${firstBytesHex}. Please check backend PDF generation.`);
+      }
+
+      // Create blob with correct MIME type if not set
+      const blobType = contentType && contentType.includes('pdf') 
+        ? contentType 
+        : 'application/pdf';
+      const typedBlob = blob.type ? blob : new Blob([blob], { type: blobType });
+
+      // Log detailed information for debugging
+      const firstBytesHex = Array.from(uint8Array.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+      const firstBytesText = String.fromCharCode(...uint8Array.slice(0, Math.min(8, uint8Array.length)))
+        .replace(/[^\x20-\x7E]/g, '.'); // Replace non-printable chars with dots
+      
+      console.log('✅ Invoice PDF downloaded successfully:', {
+        filename,
+        size: blob.size,
+        type: typedBlob.type,
+        contentType,
+        firstBytesHex,
+        firstBytesText,
+      });
+
+      // Additional diagnostic info for backend team
+      if (process.env.NODE_ENV === 'development') {
+        console.group('🔍 Invoice PDF Download Diagnostics');
+        console.log('Invoice ID:', id);
+        console.log('Content-Type Header:', contentType);
+        console.log('File Size:', blob.size, 'bytes');
+        console.log('First 8 bytes (hex):', firstBytesHex);
+        console.log('First 8 bytes (text):', firstBytesText);
+        console.log('Validation Result:', isPDF ? '✅ Valid PDF' : '❌ Invalid');
+        console.groupEnd();
+      }
+
+      return { blob: typedBlob, filename };
     } catch (error) {
       console.error(`❌ Error downloading invoice PDF ${id}:`, error);
       throw error;
     }
   }
   throw new Error('Backend API not enabled');
+}
+
+// List items/products for invoice items selection
+export interface InvoiceItemOption {
+  id: string;
+  item_name: string;
+  product_code?: string;
+  description?: string;
+  unit_price?: number;
+  tax_rate?: number;
+  unit_of_measure?: string;
+}
+
+export async function listInvoiceItems(params?: {
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<InvoiceItemOption[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching invoice items from backend API...');
+      
+      const queryParams = new URLSearchParams();
+      if (params?.search) queryParams.append('search', params.search);
+      if (params?.page) queryParams.append('page', String(params.page));
+      if (params?.limit) queryParams.append('limit', String(params.limit || 1000));
+      
+      // Try invoices/items endpoint first, fallback to inventory/products
+      let response;
+      try {
+        response = await apiRequest<{ success: boolean; data: { items: any[] } } | { items: any[] } | any[]>(
+          `/invoices/items?${queryParams.toString()}`
+        );
+      } catch (error) {
+        // Fallback to inventory products if invoices/items doesn't exist
+        console.log('⚠️ invoices/items endpoint not found, using inventory/products');
+        // Use dynamic import to avoid circular dependencies
+        const { listProducts } = await import('../../inventory/api/inventoryApi');
+        const products = await listProducts();
+        
+        return products.map((p: any) => ({
+          id: String(p.id || p.product_id || ''),
+          item_name: p.name || p.product_name || '',
+          product_code: p.product_code || p.code || '',
+          description: p.description || '',
+          unit_price: p.unit_price || p.price || undefined,
+          tax_rate: p.tax_rate || undefined,
+          unit_of_measure: p.unit_of_measure || p.unit || undefined,
+        }));
+      }
+      
+      let items = [];
+      if (Array.isArray(response)) {
+        items = response;
+      } else if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.items) {
+          items = response.data.items;
+        } else if ('items' in response) {
+          items = (response as any).items;
+        }
+      }
+      
+      if (items.length > 0) {
+        const mapped = items.map((item: any) => ({
+          id: String(item.id || item.item_id || item.product_id || ''),
+          item_name: item.item_name || item.name || item.product_name || '',
+          product_code: item.product_code || item.code || '',
+          description: item.description || '',
+          unit_price: item.unit_price || item.price || undefined,
+          tax_rate: item.tax_rate || undefined,
+          unit_of_measure: item.unit_of_measure || item.unit || undefined,
+        }));
+        console.log('✅ Mapped invoice items:', mapped.length);
+        return mapped;
+      }
+      
+      // Fallback to inventory products
+      console.log('⚠️ No items in response, using inventory/products as fallback');
+      const { listProducts: listInventoryProducts } = await import('../../inventory/api/inventoryApi');
+      const products = await listInventoryProducts();
+      
+      return products.map((p) => ({
+        id: String(p.id),
+        item_name: p.name,
+        product_code: p.product_code,
+        description: p.description,
+        unit_price: undefined,
+        tax_rate: undefined,
+        unit_of_measure: p.unit_of_measure,
+      }));
+    } catch (error) {
+      console.error('❌ Backend API error fetching invoice items:', error);
+      // Fallback to inventory products
+      try {
+        const { listProducts: listInventoryProducts } = await import('../../inventory/api/inventoryApi');
+        const products = await listInventoryProducts();
+        return products.map((p) => ({
+          id: String(p.id),
+          item_name: p.name,
+          product_code: p.product_code,
+          description: p.description,
+          unit_price: undefined,
+          tax_rate: undefined,
+          unit_of_measure: p.unit_of_measure,
+        }));
+      } catch (fallbackError) {
+        console.error('❌ Fallback to inventory products also failed:', fallbackError);
+        return [];
+      }
+    }
+  }
+  
+  // Fallback to inventory products if backend API is not enabled
+  try {
+    const { listProducts: listInventoryProducts } = await import('../../inventory/api/inventoryApi');
+    const products = await listInventoryProducts();
+    return products.map((p) => ({
+      id: String(p.id),
+      item_name: p.name,
+      product_code: p.product_code,
+      description: p.description,
+      unit_price: undefined,
+      tax_rate: undefined,
+      unit_of_measure: p.unit_of_measure,
+    }));
+  } catch (error) {
+    console.error('❌ Error fetching products:', error);
+    return [];
+  }
 }
 

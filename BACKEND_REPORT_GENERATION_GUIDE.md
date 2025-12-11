@@ -4,6 +4,11 @@
 
 If you're seeing "Invalid File Format" errors when downloading reports, this means the backend is not generating valid files. This guide will help you fix the issue.
 
+## ⚠️ NEW: PDF Formatting Issues
+
+If you're seeing **overlapping data, truncated text, garbled dates, or alignment issues** in report PDFs, see:
+- **`REPORT_PDF_FORMATTING_GUIDE.md`** - Complete guide for fixing column widths, text wrapping, date formatting, and table layout
+
 ## Common Issues and Solutions
 
 ### 1. Backend Returning JSON Instead of File

@@ -4,6 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { ModuleGrid } from '../../features/erp/components/ModuleGrid';
 import { Pagination } from '../../components/ui/Pagination';
 import { apiRequest } from '../../config/api';
+import { useSupabaseHealthCheck } from '../../hooks/useSupabaseHealthCheck';
 
 const MINI_BARS = [60, 90, 40, 75, 55]; // Fallback default values
 
@@ -42,6 +43,7 @@ interface ProductionStatus {
 }
 
 export function OverviewPage() {
+  const { status: systemStatus } = useSupabaseHealthCheck();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]); // Store all fetched transactions
   const [loading, setLoading] = useState(true);
@@ -669,25 +671,45 @@ export function OverviewPage() {
             Real-time insights to drive your business forward.
           </p>
         </div>
-        <Card className="flex w-full sm:max-w-sm flex-col gap-3 sm:gap-4 p-4 sm:p-5 border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md">
+        <Card className={`flex w-full sm:max-w-sm flex-col gap-3 sm:gap-4 p-4 sm:p-5 border-2 shadow-md ${
+          systemStatus === 'connected' 
+            ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50' 
+            : 'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50'
+        }`}>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-emerald-800">
+            <p className={`text-sm font-semibold ${
+              systemStatus === 'connected' ? 'text-emerald-800' : 'text-amber-800'
+            }`}>
               System Status
             </p>
-            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className={`flex h-2 w-2 rounded-full animate-pulse ${
+              systemStatus === 'connected' ? 'bg-emerald-500' : 'bg-amber-500'
+            }`} />
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-slate-700">
               <span>Data Source</span>
-              <span className="font-semibold text-emerald-700 px-2 py-1 rounded bg-emerald-100">
-                Demo Mode
+              <span className={`font-semibold px-2 py-1 rounded ${
+                systemStatus === 'connected'
+                  ? 'text-emerald-700 bg-emerald-100'
+                  : 'text-amber-700 bg-amber-100'
+              }`}>
+                {systemStatus === 'connected' ? 'Live Mode' : 'Demo Mode'}
               </span>
             </div>
-            <div className="relative h-2 w-full overflow-hidden rounded-full bg-emerald-100">
-              <div className="absolute inset-y-0 left-0 w-3/4 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600" />
+            <div className={`relative h-2 w-full overflow-hidden rounded-full ${
+              systemStatus === 'connected' ? 'bg-emerald-100' : 'bg-amber-100'
+            }`}>
+              <div className={`absolute inset-y-0 left-0 rounded-full bg-gradient-to-r ${
+                systemStatus === 'connected'
+                  ? 'w-full from-emerald-400 to-emerald-600'
+                  : 'w-3/4 from-amber-400 to-amber-600'
+              }`} />
             </div>
             <p className="text-[11px] text-slate-600">
-              Connect Supabase for production data integration.
+              {systemStatus === 'connected' 
+                ? 'Connected to backend API. All data is synced in real-time.'
+                : 'Using demo data. Backend API connection required for live data.'}
             </p>
           </div>
         </Card>
@@ -705,17 +727,17 @@ export function OverviewPage() {
                   const revenueRaw = dashboardSummary.revenue_mtd || dashboardSummary.total_revenue || 0;
                   // Convert to number if string
                   const revenue = typeof revenueRaw === 'string' ? parseFloat(revenueRaw) : revenueRaw;
-                  if (isNaN(revenue)) return '$0';
+                  if (isNaN(revenue)) return '₹0';
                   
                   if (revenue >= 1000000) {
-                    return `$${(revenue / 1000000).toFixed(1)}M`;
+                    return `₹${(revenue / 1000000).toFixed(1)}M`;
                   } else if (revenue >= 1000) {
-                    return `$${(revenue / 1000).toFixed(1)}K`;
+                    return `₹${(revenue / 1000).toFixed(1)}K`;
                   } else {
-                    return `$${revenue.toLocaleString()}`;
+                    return `₹${revenue.toLocaleString()}`;
                   }
                 })()
-              : '$248.4K'
+              : '₹248.4K'
           }
           trend="up"
           variant="teal"

@@ -11,6 +11,10 @@ import * as ordersApi from '../../orders/api/ordersApi';
 import type { SalesOrder } from '../../orders/types';
 import * as projectsApi from '../../projects/api/projectsApi';
 import type { Project } from '../../projects/types';
+import * as invoicesApi from '../api/invoicesApi';
+import type { InvoiceItemOption } from '../api/invoicesApi';
+import * as manufacturingApi from '../../manufacturing/api/manufacturingApi';
+import type { ProductionOrder } from '../../manufacturing/types';
 
 type Props = {
   initial?: Partial<Invoice>;
@@ -58,6 +62,14 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(initial?.project_id ?? '');
+  
+  // Production Orders dropdown (for PO Number)
+  const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
+  const [productionOrdersLoading, setProductionOrdersLoading] = useState(false);
+  
+  // Invoice Items dropdown
+  const [invoiceItems, setInvoiceItems] = useState<InvoiceItemOption[]>([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
   
   // Invoice Dates
   const [invoiceDate, setInvoiceDate] = useState(
@@ -130,11 +142,13 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
     setTotalAmount(newSubtotal - newDiscountAmount + newTaxAmount + (shippingAmount || 0));
   }, [items, shippingAmount]);
   
-  // Fetch customers, orders, and projects on mount
+  // Fetch customers, orders, projects, production orders, and items on mount
   useEffect(() => {
     fetchCustomers();
     fetchOrders();
     fetchProjects();
+    fetchProductionOrders();
+    fetchInvoiceItems();
   }, []);
   
   // Sync form when initial changes
@@ -217,6 +231,33 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
     }
   };
   
+  const fetchProductionOrders = async () => {
+    setProductionOrdersLoading(true);
+    try {
+      const productionOrdersList = await manufacturingApi.listProductionOrders();
+      setProductionOrders(productionOrdersList);
+    } catch (error) {
+      console.error('Failed to fetch production orders:', error);
+    } finally {
+      setProductionOrdersLoading(false);
+    }
+  };
+  
+  const fetchInvoiceItems = async (search?: string) => {
+    setItemsLoading(true);
+    try {
+      const itemsList = await invoicesApi.listInvoiceItems({
+        search: search,
+        limit: 1000,
+      });
+      setInvoiceItems(itemsList);
+    } catch (error) {
+      console.error('Failed to fetch invoice items:', error);
+    } finally {
+      setItemsLoading(false);
+    }
+  };
+  
   const handleCustomerSelect = (customerId: string) => {
     const customer = customers.find((c) => String(c.id) === customerId);
     if (customer) {
@@ -237,6 +278,21 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     setItems(newItems);
+  };
+  
+  const handleItemSelect = (index: number, itemId: string) => {
+    const selectedItem = invoiceItems.find((item) => item.id === itemId);
+    if (selectedItem) {
+      const newItems = [...items];
+      newItems[index] = {
+        ...newItems[index],
+        item_name: selectedItem.item_name,
+        unit_price: selectedItem.unit_price || newItems[index].unit_price || 0,
+        tax_rate: selectedItem.tax_rate || newItems[index].tax_rate || 0,
+        description: selectedItem.description || newItems[index].description,
+      };
+      setItems(newItems);
+    }
   };
   
   const addItem = () => {
@@ -264,6 +320,9 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     
+    // Ensure po_number is included if it has a value (convert to string to match dropdown format)
+    const poNumberValue = poNumber && String(poNumber).trim() !== '' ? String(poNumber) : undefined;
+    
     const invoiceData: Partial<Invoice> = {
       invoice_number: invoiceNumber,
       invoice_type: invoiceType,
@@ -289,11 +348,13 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
       currency,
       notes: notes || undefined,
       terms: terms || undefined,
-      po_number: poNumber || undefined,
+      po_number: poNumberValue,
       reference_number: referenceNumber || undefined,
       order_id: selectedOrderId || undefined,
       project_id: selectedProjectId || undefined,
     };
+    
+    console.log('📝 Invoice form submit - po_number:', poNumberValue, 'poNumber state:', poNumber);
     
     onSubmit(invoiceData);
   };
@@ -311,6 +372,11 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
   const projectOptions = projects.map((project) => ({
     value: String(project.id),
     label: `${project.project_code || project.id} - ${project.name}${project.client ? ` (${project.client})` : ''}`,
+  }));
+  
+  const productionOrderOptions = productionOrders.map((po) => ({
+    value: String(po.id),
+    label: `${po.production_order_number}${po.product ? ` - ${po.product}` : ''}${po.status ? ` (${po.status})` : ''}`,
   }));
   
   return (
@@ -448,15 +514,30 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
           </Button>
         </div>
         <div className="space-y-2">
-          {items.map((item, index) => (
+          {items.map((item, index) => {
+            const itemOptions = invoiceItems.map((invItem) => ({
+              value: invItem.id,
+              label: `${invItem.item_name}${invItem.product_code ? ` (${invItem.product_code})` : ''}${invItem.unit_price ? ` - ${currency} ${invItem.unit_price.toFixed(2)}` : ''}`,
+            }));
+            
+            return (
             <div key={index} className="grid gap-2 sm:grid-cols-12 p-2 border border-slate-200 rounded">
               <div className="sm:col-span-4">
-                <Input
-                  placeholder="Item name"
-                  value={item.item_name}
-                  onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
-                  required
+                <SearchableSelect
+                  value={invoiceItems.find((invItem) => invItem.item_name === item.item_name)?.id || ''}
+                  onChange={(value) => handleItemSelect(index, value)}
+                  options={itemOptions}
+                  placeholder="Search and select item..."
+                  disabled={itemsLoading}
                 />
+                {!invoiceItems.find((invItem) => invItem.item_name === item.item_name) && item.item_name && (
+                  <Input
+                    placeholder="Or enter item name manually"
+                    value={item.item_name}
+                    onChange={(e) => handleItemChange(index, 'item_name', e.target.value)}
+                    className="mt-1"
+                  />
+                )}
               </div>
               <div className="sm:col-span-2">
                 <Input
@@ -510,7 +591,8 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       
@@ -562,10 +644,16 @@ export function InvoiceForm({ initial, onSubmit, onCancel }: Props) {
       
       {/* Additional Information */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input
+        <SearchableSelect
           label="PO Number"
           value={poNumber}
-          onChange={(e) => setPoNumber(e.target.value)}
+          onChange={(value) => {
+            console.log('🔍 PO Number selected:', value);
+            setPoNumber(value);
+          }}
+          options={productionOrderOptions}
+          placeholder="Search and select production order..."
+          disabled={productionOrdersLoading}
         />
         <Input
           label="Reference Number"

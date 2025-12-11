@@ -584,14 +584,124 @@ curl -X GET "http://localhost:3000/api/v1/invoices/101/download" \
 - **Body**: Valid PDF binary content
 
 **PDF Requirements**:
-- Company logo in header
-- Invoice number, date, due date prominently displayed
-- Customer billing information
-- Itemized list of products/services with quantities, prices, taxes
-- Subtotal, tax, discount, shipping, and total amounts clearly shown
-- Payment terms and notes
-- Professional formatting and styling
-- Page numbers (if multi-page)
+
+**Layout & Structure:**
+1. **Header Section** (Top of page):
+   - Company logo (centered or left-aligned)
+   - Company name and address
+   - "INVOICE" title prominently displayed
+   - Invoice number: `{invoice_number}` (and `{invoice_code}` if available)
+   - Format: "Invoice #: {invoice_number} ({invoice_code})" if both exist
+
+2. **Invoice Details Section** (Left column or top section):
+   - **Invoice Date**: `{invoice_date}` (formatted as MM/DD/YYYY)
+   - **Due Date**: `{due_date}` (formatted as MM/DD/YYYY)
+   - **Status**: `{status}` (DRAFT, PENDING, SENT, PAID, etc.)
+   - **Type**: `{invoice_type}` (SALES, PURCHASE, SERVICE, PRODUCT, RECURRING)
+   - **Project**: `{project_id}` (if available, show project name/code)
+   - **PO Number**: `{po_number}` (if available)
+   - **Reference Number**: `{reference_number}` (if available)
+
+3. **Bill To Section** (Right column or below invoice details):
+   - **Customer Name**: `{customer_name}`
+   - **Address**: `{customer_address}` (if available)
+   - **City, State, Postal Code**: `{customer_city}, {customer_state}, {customer_postal_code}`
+   - **Country**: `{customer_country}`
+   - **Email**: `{customer_email}` (if available)
+   - **Phone**: `{customer_phone}` (if available)
+   - **Tax ID/GSTIN**: `{customer_tax_id}` (if available, label as "GSTIN:" or "Tax ID:")
+
+4. **Items Table** (Main section):
+   - **Table Headers**: Item | Qty | Unit Price | Tax % | Total
+   - **For each item in `{items}` array**:
+     - Item name: `{item.item_name}`
+     - Description: `{item.description}` (if available, below item name)
+     - Quantity: `{item.quantity}` (formatted with 2 decimal places)
+     - Unit Price: `{currency} {item.unit_price}` (formatted with 2 decimal places, e.g., "INR 1,970.00")
+     - Tax %: `{item.tax_rate}%` (if available)
+     - Total: `{currency} {item.total_amount}` (formatted with 2 decimal places)
+   - **Items Summary** (below table):
+     - List all item names
+     - Total Items: Count of items
+     - Total Quantity: Sum of all quantities
+
+5. **Amount Summary Section** (Right side or bottom):
+   - **Subtotal**: `{currency} {subtotal}` (formatted with 2 decimal places)
+   - **Discount**: `{currency} {discount_amount}` (if `discount_amount > 0`, show with minus sign)
+   - **Tax**: `{currency} {tax_amount}` (formatted with 2 decimal places)
+   - **Shipping**: `{currency} {shipping_amount}` (if `shipping_amount > 0`)
+   - **Total Amount**: `{currency} {total_amount}` (formatted with 2 decimal places, bold/larger font)
+   - **Paid Amount**: `{currency} {paid_amount}` (if `paid_amount > 0`)
+   - **Balance Amount**: `{currency} {balance_amount}` (if `balance_amount > 0`)
+
+6. **Notes & Terms Section** (Bottom):
+   - **Notes**: `{notes}` (if available)
+   - **Payment Terms**: `{terms}` (if available)
+
+**Design Requirements:**
+- **Professional Layout**: Use a clean, modern design with proper spacing
+- **Typography**: Use readable fonts (Arial, Helvetica, or similar sans-serif)
+- **Colors**: Use black text on white background for printing
+- **Borders**: Use subtle borders/separators between sections
+- **Alignment**: Left-align text, right-align numbers
+- **Currency Formatting**: Format all amounts with 2 decimal places and thousand separators (e.g., "INR 1,970.00")
+- **Date Formatting**: Use MM/DD/YYYY format (e.g., "12/11/2025")
+- **Page Numbers**: Include page numbers if invoice spans multiple pages
+- **Margins**: Use standard margins (0.5-1 inch) for printing
+- **Table Styling**: Use alternating row colors or clear borders for readability
+
+**Common Design Issues to Avoid:**
+1. ❌ Missing fields (PO Number, Reference Number, Project, etc.)
+2. ❌ Incorrect currency formatting (missing decimals, no thousand separators)
+3. ❌ Poor alignment (numbers not right-aligned)
+4. ❌ Missing borders/separators between sections
+5. ❌ Overlapping text or sections
+6. ❌ Incorrect date formatting
+7. ❌ Missing item descriptions or details
+8. ❌ Amount calculations not matching (subtotal + tax - discount + shipping should equal total)
+9. ❌ Poor spacing or cramped layout
+10. ❌ Missing company logo or branding
+
+**Example PDF Structure:**
+```
+┌─────────────────────────────────────────────────────────┐
+│  [LOGO]  Company Name                                    │
+│          123 Business St, City, State, ZIP               │
+│                                                          │
+│                    INVOICE                               │
+│          Invoice #: INV-202512-DX55A5                    │
+│                                                          │
+├──────────────────────┬──────────────────────────────────┤
+│ Invoice Details:     │ Bill To:                         │
+│ Date: 12/11/2025      │ Customer Name                     │
+│ Due: 12/18/2025      │ Address                          │
+│ Status: DRAFT         │ City, State, ZIP                 │
+│ Type: SALES          │ Country                          │
+│ Project: Project Name │ Email: customer@example.com      │
+│ PO #: PO-123         │ Phone: +1-555-0123               │
+│                      │ GSTIN: 29GST0000003Z5            │
+├──────────────────────┴──────────────────────────────────┤
+│ Items Table:                                             │
+│ ┌──────────┬──────┬───────────┬───────┬──────────┐    │
+│ │ Item     │ Qty  │ Unit Price│ Tax % │ Total    │    │
+│ ├──────────┼──────┼───────────┼───────┼──────────┤    │
+│ │ Item 1   │  1   │ INR 1,970 │  18%  │ INR 2,325│    │
+│ └──────────┴──────┴───────────┴───────┴──────────┘    │
+│                                                          │
+├─────────────────────────────────────────────────────────┤
+│ Amount Summary:                                          │
+│ Subtotal:        INR 1,970.00                           │
+│ Tax:             INR 354.60                             │
+│ Shipping:        INR 46.00                              │
+│ ─────────────────────────────────────                  │
+│ Total Amount:    INR 2,370.60                           │
+│                                                          │
+├─────────────────────────────────────────────────────────┤
+│ Notes & Terms:                                           │
+│ Notes: Payment terms and additional information         │
+│ Payment Terms: Net 30                                    │
+└─────────────────────────────────────────────────────────┘
+```
 
 ---
 
