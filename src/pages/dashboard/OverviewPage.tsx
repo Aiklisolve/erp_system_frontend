@@ -42,6 +42,13 @@ interface ProductionStatus {
   items?: ProductionStatusItem[];
 }
 
+interface MonthlyTransactionItem {
+  month?: string;
+  income?: number | string;
+  expense?: number | string;
+  profit?: number | string;
+}
+
 export function OverviewPage() {
   const { status: systemStatus } = useSupabaseHealthCheck();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -62,6 +69,8 @@ export function OverviewPage() {
   const [productionStatus, setProductionStatus] = useState<ProductionStatusItem[]>([]);
   const [productionStatusLoading, setProductionStatusLoading] = useState(true);
   const [productionStatusTotal, setProductionStatusTotal] = useState<number>(0);
+  const [monthlyTransactions, setMonthlyTransactions] = useState<MonthlyTransactionItem[]>([]);
+  const [monthlyTransactionsLoading, setMonthlyTransactionsLoading] = useState(true);
 
   useEffect(() => {
     fetchTransactions();
@@ -72,6 +81,7 @@ export function OverviewPage() {
     fetchWeeklyOrders();
     fetchSlaHitRate();
     fetchProductionStatus();
+    fetchMonthlyTransactions();
   }, []);
 
   const fetchDashboardSummary = async () => {
@@ -329,6 +339,93 @@ export function OverviewPage() {
       setSlaHitRate(96);
     } finally {
       setSlaLoading(false);
+    }
+  };
+
+  const fetchMonthlyTransactions = async () => {
+    try {
+      setMonthlyTransactionsLoading(true);
+      console.log('🔄 Fetching monthly transactions from API...');
+      
+      const response = await apiRequest<{ 
+        success: boolean;
+        highestProfitMonth?: string;
+        highestProfitValue?: number;
+        data?: MonthlyTransactionItem[];
+      } | MonthlyTransactionItem[]>(
+        '/dashboard/monthly-transactions'
+      );
+
+      console.log('📊 Monthly transactions response:', response);
+
+      let transactionsData: MonthlyTransactionItem[] = [];
+      
+      // Helper function to parse numeric value
+      const parseValue = (val: any): number => {
+        if (val === null || val === undefined) return 0;
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') {
+          const cleaned = val.replace(/[₹,\s]/g, '');
+          const parsed = parseFloat(cleaned);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        return 0;
+      };
+
+      if (Array.isArray(response)) {
+        // Direct array response
+        transactionsData = response.map((item: any) => ({
+          month: item.month || item.label || '',
+          income: parseValue(item.income),
+          expense: parseValue(item.expense),
+          profit: parseValue(item.profit),
+        }));
+      } else if (response && typeof response === 'object') {
+        // If wrapped in success/data
+        if ('success' in response && response.success && 'data' in response) {
+          const data = response.data;
+          if (Array.isArray(data)) {
+            transactionsData = data.map((item: any) => ({
+              month: item.month || item.label || '',
+              income: parseValue(item.income),
+              expense: parseValue(item.expense),
+              profit: parseValue(item.profit),
+            }));
+          }
+        } else if ('data' in response) {
+          const data = (response as any).data;
+          if (Array.isArray(data)) {
+            transactionsData = data.map((item: any) => ({
+              month: item.month || item.label || '',
+              income: parseValue(item.income),
+              expense: parseValue(item.expense),
+              profit: parseValue(item.profit),
+            }));
+          }
+        }
+      }
+
+      // Sort by month (ascending) and take only the last 5 months
+      if (transactionsData.length > 0) {
+        // Sort by month string (YYYY-MM format sorts correctly as strings)
+        transactionsData.sort((a, b) => {
+          const monthA = a.month || '';
+          const monthB = b.month || '';
+          return monthA.localeCompare(monthB);
+        });
+        
+        // Take only the last 5 months (most recent)
+        transactionsData = transactionsData.slice(-5);
+      }
+
+      console.log('✅ Monthly transactions loaded successfully:', transactionsData);
+      console.log('📊 Showing last 5 months:', transactionsData.map(t => t.month));
+      setMonthlyTransactions(transactionsData);
+    } catch (err: any) {
+      console.error('❌ Error fetching monthly transactions:', err);
+      setMonthlyTransactions([]);
+    } finally {
+      setMonthlyTransactionsLoading(false);
     }
   };
 
@@ -809,6 +906,190 @@ export function OverviewPage() {
           trend="up"
           variant="purple"
         />
+      </section>
+
+      {/* Monthly Transactions Bar Chart */}
+      <section>
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">
+              Monthly Transactions
+            </h2>
+            <p className="text-[11px] text-slate-500">Income, Expense & Profit by month</p>
+          </div>
+
+          {monthlyTransactionsLoading ? (
+            <div className="h-64 flex items-center justify-center text-xs text-slate-500">
+              Loading monthly transactions...
+            </div>
+          ) : monthlyTransactions.length === 0 ? (
+            <div className="h-64 flex items-center justify-center text-xs text-slate-500">
+              No monthly transaction data available
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Stacked Bar Chart */}
+              <div className="h-64 flex items-end gap-2 sm:gap-3 pb-8">
+                {monthlyTransactions.map((item, index) => {
+                  // Parse values
+                  const income = typeof item.income === 'number' ? item.income : parseFloat(String(item.income || 0)) || 0;
+                  const expense = typeof item.expense === 'number' ? item.expense : parseFloat(String(item.expense || 0)) || 0;
+                  const profit = typeof item.profit === 'number' ? item.profit : parseFloat(String(item.profit || 0)) || 0;
+                  
+                  // Calculate max value for normalization (use income + expense for bar height)
+                  const allTotals = monthlyTransactions.map(i => {
+                    const inc = typeof i.income === 'number' ? i.income : parseFloat(String(i.income || 0)) || 0;
+                    const exp = typeof i.expense === 'number' ? i.expense : parseFloat(String(i.expense || 0)) || 0;
+                    return inc + exp;
+                  });
+                  const maxValue = Math.max(...allTotals, 1);
+                  
+                  // Calculate heights as percentages
+                  const total = income + expense;
+                  const totalHeightPercent = maxValue > 0 ? (total / maxValue) * 100 : 0;
+                  
+                  // Calculate individual segment heights within the bar
+                  const incomeHeightPercent = total > 0 ? (income / total) * totalHeightPercent : 0;
+                  const expenseHeightPercent = total > 0 ? (expense / total) * totalHeightPercent : 0;
+                  
+                  // Ensure minimum height for visibility (at least 5% if has data)
+                  const minBarHeight = total > 0 ? Math.max(totalHeightPercent, 5) : 0;
+                  
+                  // Format month label (e.g., "2025-08" -> "Aug 2025")
+                  const monthLabel = item.month 
+                    ? (() => {
+                        const [year, month] = item.month.split('-');
+                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        const monthIndex = parseInt(month, 10) - 1;
+                        return monthIndex >= 0 && monthIndex < 12 
+                          ? `${monthNames[monthIndex]} ${year}`
+                          : item.month;
+                      })()
+                    : `Month ${index + 1}`;
+                  
+                  return (
+                    <div
+                      key={`${item.month || index}-${index}`}
+                      className="flex-1 flex flex-col items-center group relative min-w-0"
+                    >
+                      {/* Tooltip on hover */}
+                      <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
+                        <div className="bg-slate-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                          <div className="font-semibold">{monthLabel}</div>
+                          <div className="border-t border-slate-700 mt-1 pt-1">
+                            <div className="text-emerald-300">Income: ₹{income.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div className="text-amber-300">Expense: ₹{expense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            <div className={profit >= 0 ? "text-emerald-300" : "text-red-300"}>
+                              Profit: ₹{profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          </div>
+                          <div className="border-t border-slate-700 mt-1 pt-1 font-semibold">
+                            Total: ₹{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                      </div>
+                      
+                      {/* Stacked Bar Container */}
+                      <div
+                        className="w-full rounded-t-lg relative transition-all duration-300 cursor-pointer"
+                        style={{ 
+                          height: `${minBarHeight}%`,
+                          minHeight: total > 0 ? '8px' : '2px'
+                        }}
+                      >
+                        {/* Income segment (bottom, green) */}
+                        {income > 0 && (
+                          <div
+                            className="absolute bottom-0 left-0 right-0 rounded-t-lg bg-gradient-to-t from-emerald-600 to-emerald-400 hover:from-emerald-700 hover:to-emerald-500 transition-all border border-emerald-700/20"
+                            style={{ 
+                              height: `${incomeHeightPercent}%`,
+                              minHeight: incomeHeightPercent > 0 ? '4px' : '0px'
+                            }}
+                            title={`Income: ₹${income.toLocaleString()}`}
+                          />
+                        )}
+                        
+                        {/* Expense segment (top, orange/amber) */}
+                        {expense > 0 && (
+                          <div
+                            className="absolute left-0 right-0 rounded-t-lg bg-gradient-to-t from-amber-600 to-amber-400 hover:from-amber-700 hover:to-amber-500 transition-all border border-amber-700/20"
+                            style={{ 
+                              bottom: `${incomeHeightPercent}%`,
+                              height: `${expenseHeightPercent}%`,
+                              minHeight: expenseHeightPercent > 0 ? '4px' : '0px'
+                            }}
+                            title={`Expense: ₹${expense.toLocaleString()}`}
+                          />
+                        )}
+                        
+                        {/* Profit indicator line (if positive, show as green line at top) */}
+                        {profit !== 0 && (
+                          <div
+                            className={`absolute left-0 right-0 rounded-t-lg transition-all ${
+                              profit > 0 
+                                ? 'bg-gradient-to-t from-emerald-500 to-emerald-300 border border-emerald-600/30' 
+                                : 'bg-gradient-to-t from-red-500 to-red-300 border border-red-600/30'
+                            }`}
+                            style={{ 
+                              top: '-2px',
+                              height: '3px',
+                            }}
+                            title={`Profit: ₹${profit.toLocaleString()}`}
+                          />
+                        )}
+                        
+                        {/* Value label on bar */}
+                        {minBarHeight > 8 && total > 0 && (
+                          <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 text-[10px] font-medium text-slate-600 whitespace-nowrap">
+                            {total >= 1000000
+                              ? `₹${(total / 1000000).toFixed(1)}M`
+                              : total >= 1000 
+                              ? `₹${(total / 1000).toFixed(1)}K`
+                              : `₹${total.toFixed(0)}`
+                            }
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Month label */}
+                      <div className="mt-2 text-[10px] text-slate-600 font-medium text-center w-full truncate">
+                        {monthLabel}
+                      </div>
+                      
+                      {/* Profit indicator below bar */}
+                      {profit !== 0 && (
+                        <div className={`mt-1 text-[9px] font-semibold ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {profit >= 0 ? '↑' : '↓'} {profit >= 0 ? '₹' : '-₹'}{Math.abs(profit).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="flex items-center justify-center gap-4 text-xs pt-2 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-gradient-to-br from-emerald-600 to-emerald-400" />
+                  <span className="text-slate-600 font-medium">Income</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded bg-gradient-to-br from-amber-600 to-amber-400" />
+                  <span className="text-slate-600 font-medium">Expense</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded border-2 border-emerald-500 bg-emerald-50" />
+                  <span className="text-slate-600 font-medium">Profit</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded border-2 border-red-500 bg-red-50" />
+                  <span className="text-slate-600 font-medium">Loss</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
       </section>
 
       {/* Charts & activity */}

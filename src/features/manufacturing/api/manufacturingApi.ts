@@ -650,6 +650,11 @@ export async function updateProductionOrder(
       if (changes.end_date) backendChanges.end_date = changes.end_date;
       if (changes.cost !== undefined) backendChanges.cost = changes.cost;
       if (changes.notes) backendChanges.notes = changes.notes;
+      if (changes.quality_status) backendChanges.quality_status = changes.quality_status;
+      if (changes.quality_check_required !== undefined) backendChanges.quality_check_required = changes.quality_check_required;
+      if (changes.inspected_by) backendChanges.inspected_by = changes.inspected_by;
+      if (changes.inspection_date) backendChanges.inspection_date = changes.inspection_date;
+      if (changes.inspection_notes) backendChanges.inspection_notes = changes.inspection_notes;
       
       const response = await apiRequest<{ success: boolean; data: any }>(
         `/manufacturing/production-orders/${id}`,
