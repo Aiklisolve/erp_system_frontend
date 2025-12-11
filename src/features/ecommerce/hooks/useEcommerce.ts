@@ -13,13 +13,32 @@ export function useEcommerce() {
 
   const refresh = async () => {
     setLoading(true);
-    const [productsData, ordersData] = await Promise.all([
-      api.listProducts(),
-      api.listOnlineOrders()
-    ]);
-    setProducts(productsData);
-    setOrders(ordersData);
-    setLoading(false);
+    try {
+      const [productsData, ordersData] = await Promise.allSettled([
+        api.listProducts(),
+        api.listOnlineOrders()
+      ]);
+      
+      if (productsData.status === 'fulfilled') {
+        setProducts(productsData.value);
+      } else {
+        console.error('Error loading products:', productsData.reason);
+        setProducts([]);
+      }
+      
+      if (ordersData.status === 'fulfilled') {
+        setOrders(ordersData.value);
+      } else {
+        console.error('Error loading orders:', ordersData.reason);
+        setOrders([]);
+      }
+    } catch (error) {
+      console.error('Error refreshing ecommerce data:', error);
+      setProducts([]);
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Products

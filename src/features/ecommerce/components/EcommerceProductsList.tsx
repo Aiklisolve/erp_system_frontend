@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useEcommerce } from '../hooks/useEcommerce';
 import { useToast } from '../../../hooks/useToast';
 import { Card } from '../../../components/ui/Card';
@@ -15,6 +15,7 @@ import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
 import type { Product } from '../types';
 import { ProductForm } from './ProductForm';
+import { getProductById } from '../api/ecommerceApi';
 
 export function EcommerceProductsList() {
   const { products, loading, createProduct, updateProduct, removeProduct, refresh, metrics } = useEcommerce();
@@ -22,11 +23,32 @@ export function EcommerceProductsList() {
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'out_of_stock' | 'inactive'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [loadingProduct, setLoadingProduct] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Fetch product details when editing
+  useEffect(() => {
+    const fetchProductForEdit = async () => {
+      if (editingProduct && modalOpen) {
+        setLoadingProduct(true);
+        try {
+          const fullProduct = await getProductById(editingProduct.id);
+          if (fullProduct) {
+            setEditingProduct(fullProduct);
+          }
+        } catch (error) {
+          console.error('Error fetching product details:', error);
+        } finally {
+          setLoadingProduct(false);
+        }
+      }
+    };
+    fetchProductForEdit();
+  }, [editingProduct?.id, modalOpen]);
 
   // Filter products based on search, status, category, and active tab
   const filteredProducts = products.filter((product) => {
@@ -76,77 +98,67 @@ export function EcommerceProductsList() {
   const columns: TableColumn<Product>[] = [
     {
       key: 'product_code',
-      header: 'Code/SKU',
+      header: 'Product Code',
       render: (row) => (
-        <div className="space-y-0.5">
-          <div className="text-slate-900">{row.product_code || row.sku || row.id}</div>
-          {row.sku && row.sku !== row.product_code && (
-            <div className="text-[10px] text-slate-500">SKU: {row.sku}</div>
-          )}
-        </div>
+        <div className="text-slate-900">{row.product_code || row.sku || '-'}</div>
       ),
     },
     {
       key: 'name',
-      header: 'Product',
+      header: 'Name',
       render: (row) => (
-        <div className="space-y-0.5">
-          <div className="font-medium text-slate-900">{row.name}</div>
-          {row.short_description && (
-            <div className="text-[10px] text-slate-500 line-clamp-1">{row.short_description}</div>
-          )}
-        </div>
+        <div className="font-medium text-slate-900">{row.name}</div>
       ),
     },
     {
       key: 'category',
       header: 'Category',
-      render: (row) => {
-        if (!row.category) return <span className="text-[11px] text-slate-400">-</span>;
-        return (
-          <div className="space-y-0.5">
-            <span className="text-[11px] text-slate-600">{row.category}</span>
-            {row.subcategory && (
-              <div className="text-[10px] text-slate-400">{row.subcategory}</div>
-            )}
-          </div>
-        );
-      },
+      render: (row) => (
+        <div className="text-slate-600">{row.category || '-'}</div>
+      ),
     },
     {
-      key: 'price',
-      header: 'Price',
-      render: (row) => {
-        const displayPrice = row.sale_price || row.price;
-        const hasSale = row.on_sale && row.sale_price && row.sale_price < row.price;
-        return (
-          <div className="space-y-0.5">
-            <div className={`font-medium ${hasSale ? 'text-red-600' : 'text-slate-900'}`}>
-              {displayPrice.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'INR' })}
-            </div>
-            {hasSale && (
-              <div className="text-[10px] text-slate-500 line-through">
-                {row.price.toLocaleString(undefined, { style: 'currency', currency: row.currency || 'INR' })}
-              </div>
-            )}
-          </div>
-        );
-      },
+      key: 'subcategory',
+      header: 'Subcategory',
+      render: (row) => (
+        <div className="text-slate-600">{row.subcategory || '-'}</div>
+      ),
     },
     {
-      key: 'stock',
-      header: 'Stock',
+      key: 'unit_of_measure',
+      header: 'Unit of Measurement',
+      render: (row) => (
+        <div className="text-slate-600">{(row as any).unit_of_measure || '-'}</div>
+      ),
+    },
+    {
+      key: 'cost_price',
+      header: 'Cost Price',
+      render: (row) => (
+        <div className="text-slate-900">
+          {row.cost_price ? row.cost_price.toLocaleString(undefined, { style: 'currency', currency: 'INR' }) : '-'}
+        </div>
+      ),
+    },
+    {
+      key: 'selling_price',
+      header: 'Selling Price',
+      render: (row) => (
+        <div className="text-slate-900">
+          {row.selling_price || row.price ? (row.selling_price || row.price).toLocaleString(undefined, { style: 'currency', currency: 'INR' }) : '-'}
+        </div>
+      ),
+    },
+    {
+      key: 'quantity_available',
+      header: 'Quantity Available',
       render: (row) => {
-        const stock = row.stock || row.stock_quantity || 0;
-        const isLowStock = row.low_stock_threshold && stock <= row.low_stock_threshold;
-        const stockColor = stock === 0 ? 'text-red-600' : isLowStock ? 'text-amber-600' : 'text-slate-900';
+        const qty = (row as any).quantity_available !== undefined 
+          ? (row as any).quantity_available 
+          : (row.stock || row.stock_quantity || 0);
+        const stockColor = qty === 0 ? 'text-red-600' : 'text-slate-900';
         return (
-          <div className="space-y-0.5">
-            <span className={`font-medium ${stockColor}`}>{stock}</span>
-            {row.low_stock_threshold && (
-              <div className="text-[10px] text-slate-500">Threshold: {row.low_stock_threshold}</div>
-            )}
-          </div>
+          <div className={`font-medium ${stockColor}`}>{qty}</div>
         );
       },
     },
@@ -163,25 +175,6 @@ export function EcommerceProductsList() {
             ? 'danger'
             : 'neutral';
         return <Badge tone={statusTone}>{row.status.replace('_', ' ')}</Badge>;
-      },
-    },
-    {
-      key: 'product_type',
-      header: 'Type',
-      render: (row) => {
-        const typeColors = {
-          SIMPLE: 'bg-blue-50 text-blue-700',
-          VARIABLE: 'bg-purple-50 text-purple-700',
-          BUNDLE: 'bg-amber-50 text-amber-700',
-          DIGITAL: 'bg-green-50 text-green-700',
-          SERVICE: 'bg-indigo-50 text-indigo-700',
-        };
-        const color = typeColors[row.product_type] || 'bg-slate-50 text-slate-700';
-        return (
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${color} border`}>
-            {row.product_type}
-          </span>
-        );
       },
     },
     {
@@ -222,6 +215,7 @@ export function EcommerceProductsList() {
       }
       setModalOpen(false);
       setEditingProduct(null);
+      await refresh();
     } catch (error) {
       showToast('error', 'Operation Failed', 'Failed to save product. Please try again.');
     }
@@ -437,14 +431,18 @@ export function EcommerceProductsList() {
         }}
         hideCloseButton
       >
-        <ProductForm
-          initial={editingProduct || undefined}
-          onSubmit={handleFormSubmit}
-          onCancel={() => {
-            setModalOpen(false);
-            setEditingProduct(null);
-          }}
-        />
+        {loadingProduct ? (
+          <LoadingState label="Loading product details..." />
+        ) : (
+          <ProductForm
+            initial={editingProduct || undefined}
+            onSubmit={handleFormSubmit}
+            onCancel={() => {
+              setModalOpen(false);
+              setEditingProduct(null);
+            }}
+          />
+        )}
       </Modal>
     </div>
   );

@@ -1,8 +1,8 @@
-import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
+import { apiRequest } from '../../../config/api';
 import { handleApiError } from '../../../lib/errorHandler';
 import type { Product, OnlineOrder } from '../types';
 
-let useStatic = !hasSupabaseConfig;
+const USE_BACKEND_API = true;
 
 // Mock Products
 const mockProducts: Product[] = [
@@ -173,15 +173,76 @@ function nextOrderId() {
 
 // Product CRUD
 export async function listProducts(): Promise<Product[]> {
-  if (useStatic) return mockProducts;
+  if (!USE_BACKEND_API) return mockProducts;
 
   try {
-    const { data, error } = await supabase.from('ecommerce_products').select('*');
-    if (error) throw error;
-    return (data as Product[]) ?? [];
+    console.log('🔄 Fetching products from backend API...');
+    const response = await apiRequest<{
+      success: boolean;
+      data: {
+        products: Array<{
+          id: number;
+          product_code?: string;
+          name: string;
+          description?: string;
+          category?: string;
+          subcategory?: string;
+          unit_of_measure?: string;
+          cost_price?: number;
+          selling_price?: number;
+          tax_rate?: number;
+          hsn_code?: string;
+          barcode?: string;
+          sku?: string;
+          reorder_level?: number;
+          reorder_quantity?: number;
+          supplier_id?: number;
+          is_active?: boolean;
+          quantity_available?: number;
+          created_at?: string;
+          updated_at?: string;
+        }>;
+        pagination: any;
+      };
+    }>('/products?limit=1000');
+    
+    console.log('✅ Products API response:', response);
+    console.log('📦 Products count:', response.data?.products?.length || 0);
+    
+    if (!response.data || !response.data.products) {
+      console.error('❌ Invalid response structure:', response);
+      return mockProducts;
+    }
+    
+    const mappedProducts = response.data.products.map(p => ({
+      id: String(p.id),
+      product_code: p.product_code,
+      sku: p.sku || p.product_code,
+      name: p.name,
+      description: p.description,
+      category: p.category,
+      subcategory: p.subcategory,
+      unit_of_measure: p.unit_of_measure,
+      cost_price: p.cost_price,
+      price: p.selling_price || p.cost_price || 0,
+      selling_price: p.selling_price,
+      tax_rate: p.tax_rate,
+      stock: p.quantity_available || 0,
+      stock_quantity: p.quantity_available || 0,
+      quantity_available: p.quantity_available || 0,
+      status: p.is_active ? 'ACTIVE' : 'INACTIVE',
+      stock_status: p.quantity_available && p.quantity_available > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+      product_type: 'SIMPLE',
+      currency: 'INR',
+      created_at: p.created_at,
+      updated_at: p.updated_at
+    } as any));
+    
+    console.log('✅ Mapped products:', mappedProducts.length);
+    return mappedProducts;
   } catch (error) {
+    console.error('❌ Error fetching products:', error);
     handleApiError('ecommerce.listProducts', error);
-    useStatic = true;
     return mockProducts;
   }
 }
@@ -189,7 +250,7 @@ export async function listProducts(): Promise<Product[]> {
 export async function createProduct(
   payload: Omit<Product, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Product> {
-  if (useStatic) {
+  if (!USE_BACKEND_API) {
     const product: Product = {
       ...payload,
       id: nextProductId(),
@@ -200,17 +261,75 @@ export async function createProduct(
   }
 
   try {
-    const { data, error } = await supabase
-      .from('ecommerce_products')
-      .insert(payload)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as Product;
+    const response = await apiRequest<{
+      success: boolean;
+      data: {
+        id: number;
+        product_code?: string;
+        name: string;
+        description?: string;
+        category?: string;
+        subcategory?: string;
+        unit_of_measure?: string;
+        cost_price?: number;
+        selling_price?: number;
+        tax_rate?: number;
+        hsn_code?: string;
+        barcode?: string;
+        sku?: string;
+        reorder_level?: number;
+        reorder_quantity?: number;
+        supplier_id?: number;
+        is_active?: boolean;
+        created_at?: string;
+        updated_at?: string;
+      };
+    }>('/products', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description,
+        category: payload.category,
+        subcategory: payload.subcategory,
+        unit_of_measure: (payload as any).unit_of_measure,
+        cost_price: payload.cost_price,
+        selling_price: payload.selling_price || payload.price,
+        tax_rate: (payload as any).tax_rate,
+        reorder_level: (payload as any).reorder_level,
+        reorder_quantity: (payload as any).reorder_quantity,
+        supplier_id: (payload as any).supplier_id,
+        is_active: payload.status === 'ACTIVE',
+        quantity_on_hand: payload.stock || payload.stock_quantity || 0,
+        warehouse_id: (payload as any).warehouse_id
+      })
+    });
+    
+    const p = response.data;
+    return {
+      id: String(p.id),
+      product_code: p.product_code,
+      sku: p.sku || p.product_code,
+      name: p.name,
+      description: p.description,
+      category: p.category,
+      subcategory: p.subcategory,
+      unit_of_measure: p.unit_of_measure,
+      cost_price: p.cost_price,
+      price: p.selling_price || p.cost_price || 0,
+      selling_price: p.selling_price,
+      tax_rate: p.tax_rate,
+      stock: 0,
+      stock_quantity: 0,
+      status: p.is_active ? 'ACTIVE' : 'INACTIVE',
+      stock_status: 'IN_STOCK',
+      product_type: 'SIMPLE',
+      currency: 'INR',
+      created_at: p.created_at,
+      updated_at: p.updated_at
+    };
   } catch (error) {
     handleApiError('ecommerce.createProduct', error);
-    useStatic = true;
-    return createProduct(payload);
+    throw error;
   }
 }
 
@@ -218,7 +337,7 @@ export async function updateProduct(
   id: string,
   changes: Partial<Product>
 ): Promise<Product | null> {
-  if (useStatic) {
+  if (!USE_BACKEND_API) {
     const index = mockProducts.findIndex((p) => p.id === id);
     if (index === -1) return null;
     mockProducts[index] = { ...mockProducts[index], ...changes };
@@ -226,122 +345,214 @@ export async function updateProduct(
   }
 
   try {
-    const { data, error } = await supabase
-      .from('ecommerce_products')
-      .update(changes)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as Product;
+    const response = await apiRequest<{
+      success: boolean;
+      data: {
+        id: number;
+        product_code?: string;
+        name: string;
+        description?: string;
+        category?: string;
+        subcategory?: string;
+        unit_of_measure?: string;
+        cost_price?: number;
+        selling_price?: number;
+        tax_rate?: number;
+        hsn_code?: string;
+        barcode?: string;
+        sku?: string;
+        reorder_level?: number;
+        reorder_quantity?: number;
+        supplier_id?: number;
+        is_active?: boolean;
+        created_at?: string;
+        updated_at?: string;
+      };
+    }>(`/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: changes.name,
+        description: changes.description,
+        category: changes.category,
+        subcategory: changes.subcategory,
+        unit_of_measure: (changes as any).unit_of_measure,
+        cost_price: changes.cost_price,
+        selling_price: changes.selling_price || changes.price,
+        tax_rate: (changes as any).tax_rate,
+        reorder_level: (changes as any).reorder_level,
+        reorder_quantity: (changes as any).reorder_quantity,
+        supplier_id: (changes as any).supplier_id,
+        is_active: changes.status === 'ACTIVE',
+        quantity_on_hand: changes.stock || changes.stock_quantity,
+        warehouse_id: (changes as any).warehouse_id
+      })
+    });
+    
+    const p = response.data;
+    return {
+      id: String(p.id),
+      product_code: p.product_code,
+      sku: p.sku || p.product_code,
+      name: p.name,
+      description: p.description,
+      category: p.category,
+      subcategory: p.subcategory,
+      unit_of_measure: p.unit_of_measure,
+      cost_price: p.cost_price,
+      price: p.selling_price || p.cost_price || 0,
+      selling_price: p.selling_price,
+      tax_rate: p.tax_rate,
+      stock: 0,
+      stock_quantity: 0,
+      status: p.is_active ? 'ACTIVE' : 'INACTIVE',
+      stock_status: 'IN_STOCK',
+      product_type: 'SIMPLE',
+      currency: 'INR',
+      created_at: p.created_at,
+      updated_at: p.updated_at
+    };
   } catch (error) {
     handleApiError('ecommerce.updateProduct', error);
-    useStatic = true;
-    return updateProduct(id, changes);
+    throw error;
+  }
+}
+
+export async function getProductById(id: string): Promise<Product | null> {
+  if (!USE_BACKEND_API) {
+    return mockProducts.find(p => p.id === id) || null;
+  }
+
+  try {
+    const response = await apiRequest<{
+      success: boolean;
+      data: {
+        id: number;
+        product_code?: string;
+        name: string;
+        description?: string;
+        category?: string;
+        subcategory?: string;
+        unit_of_measure?: string;
+        cost_price?: number;
+        selling_price?: number;
+        tax_rate?: number;
+        hsn_code?: string;
+        barcode?: string;
+        sku?: string;
+        reorder_level?: number;
+        reorder_quantity?: number;
+        supplier_id?: number;
+        is_active?: boolean;
+        quantity_available?: number;
+        warehouse_id?: number;
+        quantity_on_hand?: number;
+        created_at?: string;
+        updated_at?: string;
+      };
+    }>(`/products/${id}`);
+    
+    const p = response.data;
+    return {
+      id: String(p.id),
+      product_code: p.product_code,
+      sku: p.sku || p.product_code,
+      name: p.name,
+      description: p.description,
+      category: p.category,
+      subcategory: p.subcategory,
+      unit_of_measure: p.unit_of_measure,
+      cost_price: p.cost_price,
+      price: p.selling_price || p.cost_price || 0,
+      selling_price: p.selling_price,
+      tax_rate: p.tax_rate,
+      stock: p.quantity_on_hand || p.quantity_available || 0,
+      stock_quantity: p.quantity_on_hand || p.quantity_available || 0,
+      status: p.is_active ? 'ACTIVE' : 'INACTIVE',
+      stock_status: (p.quantity_on_hand || p.quantity_available) && (p.quantity_on_hand || p.quantity_available) > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
+      product_type: 'SIMPLE',
+      currency: 'INR',
+      supplier_id: p.supplier_id,
+      warehouse_id: p.warehouse_id,
+      reorder_level: p.reorder_level,
+      reorder_quantity: p.reorder_quantity,
+      created_at: p.created_at,
+      updated_at: p.updated_at
+    } as any;
+  } catch (error) {
+    handleApiError('ecommerce.getProductById', error);
+    return null;
   }
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  if (useStatic) {
+  if (!USE_BACKEND_API) {
     const index = mockProducts.findIndex((p) => p.id === id);
     if (index !== -1) mockProducts.splice(index, 1);
     return;
   }
 
   try {
-    const { error } = await supabase.from('ecommerce_products').delete().eq('id', id);
-    if (error) throw error;
+    await apiRequest<{ success: boolean }>(`/products/${id}`, {
+      method: 'DELETE'
+    });
   } catch (error) {
     handleApiError('ecommerce.deleteProduct', error);
-    useStatic = true;
-    await deleteProduct(id);
+    throw error;
+  }
+}
+
+// Get unique unit_of_measure values
+export async function listUnitOfMeasures(): Promise<string[]> {
+  if (!USE_BACKEND_API) {
+    return ['PCS', 'KG', 'L', 'M', 'BOX', 'CARTON'];
+  }
+
+  try {
+    const response = await apiRequest<{
+      success: boolean;
+      data: { units: string[] };
+    }>('/products/units/list');
+    return response.data.units;
+  } catch (error) {
+    handleApiError('ecommerce.listUnitOfMeasures', error);
+    return ['PCS', 'KG', 'L', 'M', 'BOX', 'CARTON'];
   }
 }
 
 // Online Order CRUD
 export async function listOnlineOrders(): Promise<OnlineOrder[]> {
-  if (useStatic) return mockOrders;
-
-  try {
-    const { data, error } = await supabase.from('ecommerce_orders').select('*');
-    if (error) throw error;
-    return (data as OnlineOrder[]) ?? [];
-  } catch (error) {
-    handleApiError('ecommerce.listOnlineOrders', error);
-    useStatic = true;
-    return mockOrders;
-  }
+  // TODO: Implement backend API for online orders
+  // For now, return empty array to prevent hanging
+  return [];
 }
 
 export async function createOnlineOrder(
   payload: Omit<OnlineOrder, 'id' | 'created_at' | 'updated_at'>
 ): Promise<OnlineOrder> {
-  if (useStatic) {
-    const order: OnlineOrder = {
-      ...payload,
-      id: nextOrderId(),
-      created_at: new Date().toISOString()
-    };
-    mockOrders.unshift(order);
-    return order;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('ecommerce_orders')
-      .insert(payload)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as OnlineOrder;
-  } catch (error) {
-    handleApiError('ecommerce.createOnlineOrder', error);
-    useStatic = true;
-    return createOnlineOrder(payload);
-  }
+  // TODO: Implement backend API for online orders
+  const order: OnlineOrder = {
+    ...payload,
+    id: nextOrderId(),
+    created_at: new Date().toISOString()
+  };
+  mockOrders.unshift(order);
+  return order;
 }
 
 export async function updateOnlineOrder(
   id: string,
   changes: Partial<OnlineOrder>
 ): Promise<OnlineOrder | null> {
-  if (useStatic) {
-    const index = mockOrders.findIndex((o) => o.id === id);
-    if (index === -1) return null;
-    mockOrders[index] = { ...mockOrders[index], ...changes };
-    return mockOrders[index];
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('ecommerce_orders')
-      .update(changes)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as OnlineOrder;
-  } catch (error) {
-    handleApiError('ecommerce.updateOnlineOrder', error);
-    useStatic = true;
-    return updateOnlineOrder(id, changes);
-  }
+  // TODO: Implement backend API for online orders
+  const index = mockOrders.findIndex((o) => o.id === id);
+  if (index === -1) return null;
+  mockOrders[index] = { ...mockOrders[index], ...changes };
+  return mockOrders[index];
 }
 
 export async function deleteOnlineOrder(id: string): Promise<void> {
-  if (useStatic) {
-    const index = mockOrders.findIndex((o) => o.id === id);
-    if (index !== -1) mockOrders.splice(index, 1);
-    return;
-  }
-
-  try {
-    const { error } = await supabase.from('ecommerce_orders').delete().eq('id', id);
-    if (error) throw error;
-  } catch (error) {
-    handleApiError('ecommerce.deleteOnlineOrder', error);
-    useStatic = true;
-    await deleteOnlineOrder(id);
-  }
+  // TODO: Implement backend API for online orders
+  const index = mockOrders.findIndex((o) => o.id === id);
+  if (index !== -1) mockOrders.splice(index, 1);
 }
 
