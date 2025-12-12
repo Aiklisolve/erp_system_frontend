@@ -520,7 +520,11 @@ export function AccountManagement() {
   };
 
   if (loading) {
-    return <LoadingState label="Loading accounts..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading accounts..." size="md" variant="default" />
+      </div>
+    );
   }
 
   return (

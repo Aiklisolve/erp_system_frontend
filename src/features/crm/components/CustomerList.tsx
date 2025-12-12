@@ -360,7 +360,11 @@ export function CustomerList() {
   const loading = activeTab === 'users' ? usersLoading : customersLoading;
 
   if (loading) {
-    return <LoadingState label={`Loading ${activeTab}...`} />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label={`Loading ${activeTab}...`} size="md" variant="default" />
+      </div>
+    );
   }
 
   return (

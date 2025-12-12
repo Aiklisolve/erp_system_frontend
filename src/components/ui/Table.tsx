@@ -23,12 +23,12 @@ export function Table<T>({ columns, data, getRowKey, emptyMessage }: TableProps<
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+    <div className="overflow-x-auto -mx-3 sm:mx-0 rounded-xl border border-slate-200 bg-white">
       <table className="min-w-full text-xs text-left">
         <thead className="bg-slate-50 text-slate-500">
           <tr>
             {columns.map((col) => (
-              <th key={String(col.key)} className="px-3 py-2 font-semibold">
+              <th key={String(col.key)} className="px-2 sm:px-3 py-2 font-semibold text-[10px] sm:text-xs">
                 {col.header}
               </th>
             ))}
@@ -41,7 +41,7 @@ export function Table<T>({ columns, data, getRowKey, emptyMessage }: TableProps<
               className="hover:bg-slate-50 transition-colors"
             >
               {columns.map((col) => (
-                <td key={String(col.key)} className="px-3 py-2 text-slate-800">
+                <td key={String(col.key)} className="px-2 sm:px-3 py-2 text-slate-800 text-[10px] sm:text-xs">
                   {col.render ? col.render(row) : (row as any)[col.key]}
                 </td>
               ))}

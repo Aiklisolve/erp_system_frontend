@@ -48,7 +48,7 @@ export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
   const [shippingCost, setShippingCost] = useState(initial?.shipping_cost?.toString() ?? '');
   const [discountAmount, setDiscountAmount] = useState(initial?.discount_amount?.toString() ?? '');
   const [totalAmount, setTotalAmount] = useState(initial?.total_amount?.toString() ?? '');
-  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'USD');
+  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'INR');
   const [exchangeRate, setExchangeRate] = useState(initial?.exchange_rate?.toString() ?? '');
   
   // Payment Information
@@ -421,10 +421,10 @@ export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
               Currency <span className="text-red-500">*</span>
             </label>
             <Select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)} required>
+              <option value="INR">INR - Indian Rupee</option>
               <option value="USD">USD - US Dollar</option>
               <option value="EUR">EUR - Euro</option>
               <option value="GBP">GBP - British Pound</option>
-              <option value="INR">INR - Indian Rupee</option>
               <option value="JPY">JPY - Japanese Yen</option>
               <option value="CNY">CNY - Chinese Yuan</option>
               <option value="AUD">AUD - Australian Dollar</option>

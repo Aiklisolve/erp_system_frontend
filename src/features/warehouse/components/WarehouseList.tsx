@@ -525,7 +525,9 @@ export function WarehouseList() {
             </div>
 
             {warehousesLoading ? (
-              <LoadingState label="Loading warehouses..." />
+              <div className="py-12 sm:py-16">
+                <LoadingState label="Loading warehouses..." size="md" variant="default" />
+              </div>
             ) : filteredWarehouses.length === 0 ? (
               <EmptyState
                 title="No warehouses found"
@@ -586,7 +588,9 @@ export function WarehouseList() {
             )}
           </>
         ) : loading ? (
-          <LoadingState label="Loading stock movements..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading stock movements..." size="md" variant="default" />
+          </div>
         ) : filteredMovements.length === 0 ? (
           <EmptyState
             title="No stock movements found"

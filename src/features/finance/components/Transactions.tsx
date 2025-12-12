@@ -355,7 +355,11 @@ export function Transactions() {
   ];
 
   if (loading) {
-    return <LoadingState label="Loading transactions..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading transactions..." size="md" variant="default" />
+      </div>
+    );
   }
 
   return (

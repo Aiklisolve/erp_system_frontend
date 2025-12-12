@@ -1,13 +1,25 @@
+import { ERPLoader } from './ERPLoader';
+
 type LoadingStateProps = {
   label?: string;
+  fullScreen?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'minimal';
 };
 
-export function LoadingState({ label = 'Loading data...' }: LoadingStateProps) {
+export function LoadingState({ 
+  label = 'Loading data...',
+  fullScreen = false,
+  size = 'md',
+  variant = 'minimal'
+}: LoadingStateProps) {
   return (
-    <div className="flex items-center gap-2 text-xs text-slate-300">
-      <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-      <span>{label}</span>
-    </div>
+    <ERPLoader 
+      label={label}
+      fullScreen={fullScreen}
+      size={size}
+      variant={variant}
+    />
   );
 }
 

@@ -546,7 +546,9 @@ export function InventoryList() {
 
             {/* Table */}
             {loading ? (
-              <LoadingState label="Loading inventory..." />
+              <div className="py-12 sm:py-16">
+                <LoadingState label="Loading inventory..." size="md" variant="default" />
+              </div>
             ) : filteredItems.length === 0 ? (
               <EmptyState
                 title="No inventory items found"
@@ -623,7 +625,9 @@ export function InventoryList() {
 
             {/* Table */}
             {assignedLoading ? (
-              <LoadingState label="Loading assigned inventory..." />
+              <div className="py-12 sm:py-16">
+                <LoadingState label="Loading assigned inventory..." size="md" variant="default" />
+              </div>
             ) : filteredAssigned.length === 0 ? (
               <EmptyState
                 title="No assigned inventory found"
@@ -700,7 +704,9 @@ export function InventoryList() {
 
             {/* Table */}
             {vendorsLoading ? (
-              <LoadingState label="Loading vendors..." />
+              <div className="py-12 sm:py-16">
+                <LoadingState label="Loading vendors..." size="md" variant="default" />
+              </div>
             ) : filteredVendors.length === 0 ? (
               <EmptyState
                 title="No vendors found"
@@ -807,7 +813,9 @@ export function InventoryList() {
 
             {/* Table */}
             {categoriesLoading ? (
-              <LoadingState label="Loading categories..." />
+              <div className="py-12 sm:py-16">
+                <LoadingState label="Loading categories..." size="md" variant="default" />
+              </div>
             ) : filteredCategories.length === 0 ? (
               <EmptyState
                 title="No categories found"

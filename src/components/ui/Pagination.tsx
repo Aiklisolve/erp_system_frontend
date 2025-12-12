@@ -50,47 +50,51 @@ export function Pagination({ page, totalPages, onChange }: PaginationProps) {
   const pageNumbers = getPageNumbers();
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-1 py-1 text-[11px] text-slate-600">
+    <div className="inline-flex items-center gap-0.5 sm:gap-1 rounded-lg border border-slate-200 bg-white px-0.5 sm:px-1 py-1 text-[10px] sm:text-[11px] text-slate-600">
       <button
         type="button"
         disabled={!canPrev}
         onClick={() => canPrev && onChange(page - 1)}
-        className="px-2.5 py-1 rounded-md disabled:opacity-40 hover:bg-slate-100 transition-colors font-medium"
+        className="px-2 sm:px-2.5 py-1 rounded-md disabled:opacity-40 hover:bg-slate-100 transition-colors font-medium text-[10px] sm:text-[11px]"
       >
-        Prev
+        <span className="hidden sm:inline">Prev</span>
+        <span className="sm:hidden">‹</span>
       </button>
       
-      <div className="h-4 w-px bg-slate-200 mx-1" />
+      <div className="h-4 w-px bg-slate-200 mx-0.5 sm:mx-1" />
       
       {/* Page Numbers */}
-      {pageNumbers.map((pageNum, index) => (
-        pageNum === '...' ? (
-          <span key={`ellipsis-${index}`} className="px-1.5 text-slate-400">...</span>
-        ) : (
-          <button
-            key={pageNum}
-            type="button"
-            onClick={() => onChange(pageNum as number)}
-            className={`min-w-[28px] px-2 py-1 rounded-md transition-colors font-medium ${
-              page === pageNum
-                ? 'bg-primary text-white'
-                : 'hover:bg-slate-100 text-slate-700'
-            }`}
-          >
-            {pageNum}
-          </button>
-        )
-      ))}
+      <div className="flex items-center gap-0.5 sm:gap-1">
+        {pageNumbers.map((pageNum, index) => (
+          pageNum === '...' ? (
+            <span key={`ellipsis-${index}`} className="px-1 sm:px-1.5 text-slate-400">...</span>
+          ) : (
+            <button
+              key={pageNum}
+              type="button"
+              onClick={() => onChange(pageNum as number)}
+              className={`min-w-[24px] sm:min-w-[28px] px-1.5 sm:px-2 py-1 rounded-md transition-colors font-medium text-[10px] sm:text-[11px] ${
+                page === pageNum
+                  ? 'bg-primary text-white'
+                  : 'hover:bg-slate-100 text-slate-700'
+              }`}
+            >
+              {pageNum}
+            </button>
+          )
+        ))}
+      </div>
       
-      <div className="h-4 w-px bg-slate-200 mx-1" />
+      <div className="h-4 w-px bg-slate-200 mx-0.5 sm:mx-1" />
       
       <button
         type="button"
         disabled={!canNext}
         onClick={() => canNext && onChange(page + 1)}
-        className="px-2.5 py-1 rounded-md disabled:opacity-40 hover:bg-slate-100 transition-colors font-medium"
+        className="px-2 sm:px-2.5 py-1 rounded-md disabled:opacity-40 hover:bg-slate-100 transition-colors font-medium text-[10px] sm:text-[11px]"
       >
-        Next
+        <span className="hidden sm:inline">Next</span>
+        <span className="sm:hidden">›</span>
       </button>
     </div>
   );

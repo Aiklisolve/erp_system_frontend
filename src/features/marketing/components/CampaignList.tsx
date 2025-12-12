@@ -939,7 +939,9 @@ export function CampaignList() {
 
             {/* Table */}
             {loading ? (
-              <LoadingState label="Loading campaigns..." />
+              <div className="py-12 sm:py-16">
+                <LoadingState label="Loading campaigns..." size="md" variant="default" />
+              </div>
             ) : filteredCampaigns.length === 0 ? (
               <EmptyState
                 title="No campaigns found"
@@ -1047,7 +1049,9 @@ export function CampaignList() {
 
             {/* Assets Table */}
             {assetsLoading ? (
-              <LoadingState label="Loading assets..." />
+              <div className="py-12 sm:py-16">
+                <LoadingState label="Loading assets..." size="md" variant="default" />
+              </div>
             ) : filteredAssets.length === 0 ? (
               <EmptyState
                 title="No assets found"
@@ -1155,7 +1159,9 @@ export function CampaignList() {
 
             {/* Leads Table */}
             {leadsLoading ? (
-              <LoadingState label="Loading leads..." />
+              <div className="py-12 sm:py-16">
+                <LoadingState label="Loading leads..." size="md" variant="default" />
+              </div>
             ) : filteredLeads.length === 0 ? (
               <EmptyState
                 title="No leads found"

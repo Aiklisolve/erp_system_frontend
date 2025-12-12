@@ -456,7 +456,9 @@ export function ProjectList() {
 
         {/* Table */}
         {loading ? (
-          <LoadingState label="Loading projects..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading projects..." size="md" variant="default" />
+          </div>
         ) : filteredProjects.length === 0 ? (
           <EmptyState
             title="No projects found"

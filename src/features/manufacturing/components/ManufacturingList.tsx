@@ -271,7 +271,11 @@ export function ManufacturingList() {
   };
 
   if (loading) {
-    return <LoadingState label="Loading production orders..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading production orders..." size="md" variant="default" />
+      </div>
+    );
   }
 
   return (
