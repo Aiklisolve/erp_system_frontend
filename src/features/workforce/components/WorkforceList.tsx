@@ -428,7 +428,9 @@ export function WorkforceList() {
 
         {/* Table */}
         {loading ? (
-          <LoadingState label="Loading shifts..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading shifts..." size="md" variant="default" />
+          </div>
         ) : filteredShifts.length === 0 ? (
           <EmptyState
             title="No shifts found"

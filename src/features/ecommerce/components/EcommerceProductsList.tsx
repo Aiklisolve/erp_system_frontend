@@ -360,7 +360,9 @@ export function EcommerceProductsList() {
 
         {/* Table */}
         {loading ? (
-          <LoadingState label="Loading products..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading products..." size="md" variant="default" />
+          </div>
         ) : filteredProducts.length === 0 ? (
           <EmptyState
             title="No products found"
@@ -432,7 +434,9 @@ export function EcommerceProductsList() {
         hideCloseButton
       >
         {loadingProduct ? (
-          <LoadingState label="Loading product details..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading product details..." size="md" variant="default" />
+          </div>
         ) : (
           <ProductForm
             initial={editingProduct || undefined}

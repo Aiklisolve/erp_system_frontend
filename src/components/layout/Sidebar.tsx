@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useRolePermissions } from '../../features/auth/hooks/useRolePermissions';
 
 // Icon mapping for menu items
@@ -76,6 +76,7 @@ type SidebarProps = {
 export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const { canAccess } = useRolePermissions();
   const [isHovered, setIsHovered] = useState(false);
+  const location = useLocation();
 
   // Filter groups to show only modules user has access to
   const filteredGroups = allGroups
@@ -94,53 +95,84 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         onMouseLeave={() => setIsHovered(false)}
       >
         <div
-          className={`h-full bg-white border-r-2 border-slate-300 shadow-xl transition-all duration-300 ease-in-out overflow-hidden ${
-            isHovered ? 'w-60' : 'w-16'
+          className={`h-full bg-gradient-to-b from-white via-slate-50/50 to-white border-r-2 border-slate-200/80 shadow-2xl transition-all duration-300 ease-in-out overflow-hidden backdrop-blur-sm ${
+            isHovered ? 'w-64' : 'w-16'
           }`}
+          style={{
+            boxShadow: isHovered 
+              ? '4px 0 20px rgba(13, 148, 136, 0.08), 0 0 0 1px rgba(13, 148, 136, 0.05)' 
+              : '2px 0 10px rgba(0, 0, 0, 0.05)'
+          }}
         >
-          <nav className={`mt-2 flex-1 space-y-4 py-4 text-xs overflow-y-auto h-full transition-all duration-300 custom-scrollbar ${
-            isHovered ? 'px-3' : 'px-2'
+          {/* Decorative top accent */}
+          <div className="h-1 bg-gradient-to-r from-primary via-teal-500 to-primary-light"></div>
+          
+          <nav className={`mt-3 flex-1 space-y-5 py-4 text-xs overflow-y-auto h-[calc(100%-4px)] transition-all duration-300 custom-scrollbar ${
+            isHovered ? 'px-4' : 'px-2'
           }`}>
-            {filteredGroups.map((group) => (
-              <div key={group.label} className="space-y-1.5">
+            {filteredGroups.map((group, groupIndex) => (
+              <div key={group.label} className="space-y-2" style={{ animationDelay: `${groupIndex * 50}ms` }}>
                 {isHovered ? (
-                  <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-secondary whitespace-nowrap">
-                    {group.label}
-                  </p>
+                  <div className="px-3 py-1.5 mb-1">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap flex items-center gap-2">
+                      <span className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></span>
+                      <span>{group.label}</span>
+                      <span className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></span>
+                    </p>
+                  </div>
                 ) : (
-                  <div className="h-4" />
+                  <div className="h-6 flex items-center justify-center">
+                    <div className="h-px w-8 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
+                  </div>
                 )}
-                <div className="space-y-0.5">
-                  {group.items.map((item) => {
+                <div className="space-y-1">
+                  {group.items.map((item, itemIndex) => {
                     const icon = menuIcons[item.label] || '📦';
+                    const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
                     return (
                       <NavLink
                         key={item.to}
                         to={item.to}
-                        className={({ isActive }) =>
-                          [
-                            'flex items-center rounded-lg text-[11px] font-medium transition-all duration-200 group',
-                            isHovered ? 'gap-2 px-2.5 py-1.5' : 'justify-center px-2 py-1.5',
-                            isActive
-                              ? 'bg-primary-light/10 text-primary border border-primary/40 shadow-sm'
-                              : 'text-text-secondary hover:bg-slate-100 hover:text-primary border border-transparent hover:shadow-sm'
-                          ].join(' ')
-                        }
+                        className={[
+                          'flex items-center rounded-xl text-[11px] font-semibold transition-all duration-300 group relative',
+                          isHovered ? 'gap-3 px-3 py-2.5' : 'justify-center px-2 py-2.5',
+                          isActive
+                            ? 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent text-primary border-l-4 border-primary shadow-md shadow-primary/10'
+                            : 'text-slate-600 hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-50/50 hover:to-transparent hover:text-primary border-l-4 border-transparent hover:border-primary/30 hover:shadow-sm'
+                        ].join(' ')}
                         title={!isHovered ? item.label : undefined}
+                        style={{ animationDelay: `${(groupIndex * 50) + (itemIndex * 30)}ms` }}
                       >
-                        <span className={`flex items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-300 text-text-secondary flex-shrink-0 transition-all duration-200 shadow-md overflow-hidden ${
-                          isHovered ? 'h-7 w-7' : 'h-10 w-10'
-                        } group-hover:scale-110 group-hover:shadow-lg`}>
-                          <span className={`drop-shadow-sm leading-none ${isHovered ? 'text-lg' : 'text-xl'}`} style={{ fontSize: isHovered ? '1.125rem' : '1.25rem' }}>{icon}</span>
+                        {/* Active indicator dot */}
+                        {isActive && (
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gradient-to-b from-primary via-primary-light to-primary rounded-r-full"></div>
+                        )}
+                        
+                        <span className={`flex items-center justify-center rounded-xl bg-gradient-to-br from-white to-slate-50 border-2 text-text-secondary flex-shrink-0 transition-all duration-300 shadow-sm overflow-hidden relative ${
+                          isHovered ? 'h-8 w-8' : 'h-9 w-9'
+                        } ${
+                          isActive 
+                            ? 'border-primary/40 shadow-md shadow-primary/20 scale-105' 
+                            : 'border-slate-200 group-hover:border-primary/30 group-hover:scale-110 group-hover:shadow-md'
+                        }`}>
+                          <span className={`drop-shadow-sm leading-none transition-transform duration-300 ${
+                            isHovered ? 'text-base' : 'text-lg'
+                          } group-hover:scale-110`} style={{ fontSize: isHovered ? '1rem' : '1.125rem' }}>
+                            {icon}
+                          </span>
+                          {/* Glow effect on hover */}
+                          <span className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/0 via-primary/0 to-primary/0 group-hover:from-primary/10 group-hover:via-primary/5 group-hover:to-primary/0 transition-all duration-300"></span>
                         </span>
                         <span
-                          className={`whitespace-nowrap transition-all duration-300 font-semibold ${
+                          className={`whitespace-nowrap transition-all duration-300 font-semibold relative ${
                             isHovered 
-                              ? 'opacity-100 ml-2' 
-                              : 'opacity-0 w-0 overflow-hidden ml-0'
+                              ? 'opacity-100 ml-2 translate-x-0' 
+                              : 'opacity-0 w-0 overflow-hidden ml-0 -translate-x-2'
                           }`}
                         >
                           {item.label}
+                          {/* Underline effect on hover */}
+                          <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-primary to-primary-light group-hover:w-full transition-all duration-300"></span>
                         </span>
                       </NavLink>
                     );
@@ -155,17 +187,23 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       {/* Mobile Drawer */}
       <aside
         className={`
-          fixed top-0 left-0 z-50 h-full w-64 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out
+          fixed top-0 left-0 z-50 h-full w-72 bg-gradient-to-b from-white via-slate-50/50 to-white shadow-2xl transform transition-transform duration-300 ease-in-out backdrop-blur-sm
           md:hidden
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
+        style={{
+          boxShadow: '4px 0 30px rgba(13, 148, 136, 0.15), 0 0 0 1px rgba(13, 148, 136, 0.1)'
+        }}
       >
         {/* Mobile header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-primary-light/10 to-transparent">
-          <h2 className="text-sm font-bold text-slate-900">Menu</h2>
+        <div className="relative flex items-center justify-between p-5 border-b-2 border-slate-200/80 bg-gradient-to-r from-primary/5 via-primary-light/10 to-transparent">
+          <div className="h-1 absolute top-0 left-0 right-0 bg-gradient-to-r from-primary via-teal-500 to-primary-light"></div>
+          <h2 className="text-base font-bold bg-gradient-to-r from-primary to-teal-600 bg-clip-text text-transparent">
+            ERP Menu
+          </h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            className="p-2 rounded-xl hover:bg-slate-100/80 transition-all duration-200 hover:scale-110 active:scale-95"
             aria-label="Close menu"
           >
             <svg
@@ -177,7 +215,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
+                strokeWidth={2.5}
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
@@ -185,13 +223,17 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </div>
 
         {/* Mobile navigation */}
-        <nav className="flex-1 space-y-4 px-3 py-4 text-xs overflow-y-auto h-[calc(100vh-64px)] custom-scrollbar">
-          {filteredGroups.map((group) => (
-            <div key={group.label} className="space-y-1.5">
-              <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-secondary">
-                {group.label}
-              </p>
-              <div className="space-y-0.5">
+        <nav className="flex-1 space-y-5 px-4 py-5 text-xs overflow-y-auto h-[calc(100vh-73px)] custom-scrollbar">
+          {filteredGroups.map((group, groupIndex) => (
+            <div key={group.label} className="space-y-2">
+              <div className="px-3 py-2 mb-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                  <span className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></span>
+                  <span>{group.label}</span>
+                  <span className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></span>
+                </p>
+              </div>
+              <div className="space-y-1.5">
                 {group.items.map((item) => {
                   const icon = menuIcons[item.label] || '📦';
                   return (
@@ -204,17 +246,25 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                       }}
                       className={({ isActive }) =>
                         [
-                          'flex items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-medium transition-all duration-200',
+                          'flex items-center gap-3 rounded-xl px-3 py-2.5 text-[11px] font-semibold transition-all duration-300 relative',
                           isActive
-                            ? 'bg-primary-light/10 text-primary border border-primary/40 shadow-sm'
-                            : 'text-text-secondary hover:bg-slate-100 hover:text-primary border border-transparent'
+                            ? 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent text-primary border-l-4 border-primary shadow-md shadow-primary/10'
+                            : 'text-slate-600 hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-50/50 hover:to-transparent hover:text-primary border-l-4 border-transparent hover:border-primary/30 hover:shadow-sm'
                         ].join(' ')
                       }
                     >
-                      <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-300 shadow-md flex-shrink-0 overflow-hidden">
-                        <span className="drop-shadow-sm text-lg leading-none" style={{ fontSize: '1.125rem' }}>{icon}</span>
+                      {({ isActive }) => isActive && (
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gradient-to-b from-primary via-primary-light to-primary rounded-r-full"></div>
+                      )}
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-white to-slate-50 border-2 border-slate-200 shadow-sm flex-shrink-0 overflow-hidden transition-all duration-300 hover:border-primary/30 hover:scale-110 hover:shadow-md">
+                        <span className="drop-shadow-sm text-base leading-none transition-transform duration-300 hover:scale-110" style={{ fontSize: '1rem' }}>
+                          {icon}
+                        </span>
                       </span>
-                      <span className="font-semibold">{item.label}</span>
+                      <span className="font-semibold relative">
+                        {item.label}
+                        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-primary to-primary-light group-hover:w-full transition-all duration-300"></span>
+                      </span>
                     </NavLink>
                   );
                 })}

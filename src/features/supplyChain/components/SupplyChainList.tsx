@@ -366,7 +366,9 @@ export function SupplyChainList() {
 
         {/* Table */}
         {loading ? (
-          <LoadingState label="Loading suppliers..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading suppliers..." size="md" variant="default" />
+          </div>
         ) : filteredSuppliers.length === 0 ? (
           <EmptyState
             title="No suppliers found"

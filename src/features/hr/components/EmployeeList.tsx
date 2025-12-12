@@ -579,7 +579,9 @@ export function EmployeeList() {
 
             {/* Table */}
             {(loading || leavesLoading) ? (
-              <LoadingState label="Loading employees..." />
+              <div className="py-12 sm:py-16">
+                <LoadingState label="Loading employees..." size="md" variant="default" />
+              </div>
             ) : filteredEmployees.length === 0 ? (
               <EmptyState
                 title="No employees found"

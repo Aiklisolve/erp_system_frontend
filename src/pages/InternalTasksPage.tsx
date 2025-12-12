@@ -25,7 +25,11 @@ export function InternalTasksPage() {
   };
 
   if (loading) {
-    return <LoadingState label="Loading task management..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading task management..." size="md" variant="default" />
+      </div>
+    );
   }
 
   return (

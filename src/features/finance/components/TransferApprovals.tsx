@@ -443,7 +443,11 @@ export function TransferApprovals() {
   ];
 
   if (loading) {
-    return <LoadingState label="Loading transfer approvals..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading transfer approvals..." size="md" variant="default" />
+      </div>
+    );
   }
 
   return (

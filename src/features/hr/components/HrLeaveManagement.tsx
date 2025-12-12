@@ -488,7 +488,11 @@ export function HrLeaveManagement({ employees }: { employees: Employee[] }) {
   };
 
   if (loading) {
-    return <LoadingState label="Loading leave requests..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading leave requests..." size="md" variant="default" />
+      </div>
+    );
   }
 
   return (

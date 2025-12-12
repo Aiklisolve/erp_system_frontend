@@ -401,7 +401,9 @@ export function SupplyChainDeliveryList() {
 
         {/* Table */}
         {loading ? (
-          <LoadingState label="Loading deliveries..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading deliveries..." size="md" variant="default" />
+          </div>
         ) : filteredDeliveries.length === 0 ? (
           <EmptyState
             title="No deliveries found"

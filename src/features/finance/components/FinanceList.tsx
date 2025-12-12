@@ -260,7 +260,11 @@ export function FinanceList() {
   };
 
   if (loading) {
-    return <LoadingState label="Loading finance data..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading finance data..." size="md" variant="default" />
+      </div>
+    );
   }
 
   return (

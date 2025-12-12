@@ -355,7 +355,9 @@ export function InvoiceList() {
 
         {/* Table */}
         {loading ? (
-          <LoadingState label="Loading invoices..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading invoices..." size="md" variant="default" />
+          </div>
         ) : paginatedInvoices.length === 0 ? (
           <EmptyState
             title="No invoices found"

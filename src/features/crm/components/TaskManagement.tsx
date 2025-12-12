@@ -649,7 +649,11 @@ export function TaskManagement({ employees }: { employees: ErpUser[] }) {
   };
 
   if (loading) {
-    return <LoadingState label="Loading tasks..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading tasks..." size="md" variant="default" />
+      </div>
+    );
   }
 
   return (

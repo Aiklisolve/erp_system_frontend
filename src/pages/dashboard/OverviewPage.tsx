@@ -5,6 +5,7 @@ import { ModuleGrid } from '../../features/erp/components/ModuleGrid';
 import { Pagination } from '../../components/ui/Pagination';
 import { apiRequest } from '../../config/api';
 import { useSupabaseHealthCheck } from '../../hooks/useSupabaseHealthCheck';
+import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
 
 const MINI_BARS = [60, 90, 40, 75, 55]; // Fallback default values
 
@@ -814,98 +815,109 @@ export function OverviewPage() {
 
       {/* KPI row */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Revenue (MTD)"
-          value={
-            summaryLoading
-              ? 'Loading...'
-              : dashboardSummary
-              ? (() => {
-                  const revenueRaw = dashboardSummary.revenue_mtd || dashboardSummary.total_revenue || 0;
-                  // Convert to number if string
-                  const revenue = typeof revenueRaw === 'string' ? parseFloat(revenueRaw) : revenueRaw;
-                  if (isNaN(revenue)) return '₹0';
-                  
-                  if (revenue >= 1000000) {
-                    return `₹${(revenue / 1000000).toFixed(1)}M`;
-                  } else if (revenue >= 1000) {
-                    return `₹${(revenue / 1000).toFixed(1)}K`;
-                  } else {
-                    return `₹${revenue.toLocaleString()}`;
-                  }
-                })()
-              : '₹248.4K'
-          }
-          trend="up"
-          variant="teal"
-        />
-        <StatCard
-          label="Orders in pipeline"
-          value={
-            summaryLoading
-              ? 'Loading...'
-              : dashboardSummary
-              ? (() => {
-                  // Try multiple field names - prioritize orders_in_pipeline (API field name)
-                  const orders = dashboardSummary.orders_in_pipeline || 
-                                dashboardSummary.orders_pipeline || 
-                                dashboardSummary.orders_count || 
-                                dashboardSummary.orders ||
-                                dashboardSummary.pipeline_orders ||
-                                342;
-                  // Convert to number if string, then back to string
-                  const numOrders = typeof orders === 'string' ? parseInt(orders, 10) : (typeof orders === 'number' ? orders : parseInt(String(orders), 10));
-                  return isNaN(numOrders) ? '342' : numOrders.toString();
-                })()
-              : '342'
-          }
-          trend="up"
-          variant="blue"
-        />
-        <StatCard
-          label="Inventory health"
-          value={
-            summaryLoading
-              ? 'Loading...'
-              : dashboardSummary
-              ? (() => {
-                  const health: any = dashboardSummary.inventory_health;
-                  if (health === undefined || health === null) return '89%';
-                  
-                  // Handle if it's already a string with %
-                  if (typeof health === 'string') {
-                    return health.includes('%') ? health : `${health}%`;
-                  }
-                  // Handle if it's a number
-                  return `${health}%`;
-                })()
-              : '89%'
-          }
-          trend="flat"
-          variant="yellow"
-        />
-        <StatCard
-          label="Workforce availability"
-          value={
-            summaryLoading
-              ? 'Loading...'
-              : dashboardSummary
-              ? (() => {
-                  const availability: any = dashboardSummary.workforce_availability;
-                  if (availability === undefined || availability === null) return '94%';
-                  
-                  // Handle if it's already a string with %
-                  if (typeof availability === 'string') {
-                    return availability.includes('%') ? availability : `${availability}%`;
-                  }
-                  // Handle if it's a number
-                  return `${availability}%`;
-                })()
-              : '94%'
-          }
-          trend="up"
-          variant="purple"
-        />
+        {summaryLoading ? (
+          <>
+            <Card className="space-y-2 border-none shadow-sm bg-gradient-to-br from-teal-50 via-white to-teal-100 min-w-0">
+              <SkeletonLoader variant="statCard" />
+            </Card>
+            <Card className="space-y-2 border-none shadow-sm bg-gradient-to-br from-blue-50 via-white to-blue-100 min-w-0">
+              <SkeletonLoader variant="statCard" />
+            </Card>
+            <Card className="space-y-2 border-none shadow-sm bg-gradient-to-br from-yellow-50 via-white to-yellow-100 min-w-0">
+              <SkeletonLoader variant="statCard" />
+            </Card>
+            <Card className="space-y-2 border-none shadow-sm bg-gradient-to-br from-purple-50 via-white to-purple-100 min-w-0">
+              <SkeletonLoader variant="statCard" />
+            </Card>
+          </>
+        ) : (
+          <>
+            <StatCard
+              label="Revenue (MTD)"
+              value={
+                dashboardSummary
+                  ? (() => {
+                      const revenueRaw = dashboardSummary.revenue_mtd || dashboardSummary.total_revenue || 0;
+                      // Convert to number if string
+                      const revenue = typeof revenueRaw === 'string' ? parseFloat(revenueRaw) : revenueRaw;
+                      if (isNaN(revenue)) return '₹0';
+                      
+                      if (revenue >= 1000000) {
+                        return `₹${(revenue / 1000000).toFixed(1)}M`;
+                      } else if (revenue >= 1000) {
+                        return `₹${(revenue / 1000).toFixed(1)}K`;
+                      } else {
+                        return `₹${revenue.toLocaleString()}`;
+                      }
+                    })()
+                  : '₹248.4K'
+              }
+              trend="up"
+              variant="teal"
+            />
+            <StatCard
+              label="Orders in pipeline"
+              value={
+                dashboardSummary
+                  ? (() => {
+                      // Try multiple field names - prioritize orders_in_pipeline (API field name)
+                      const orders = dashboardSummary.orders_in_pipeline || 
+                                    dashboardSummary.orders_pipeline || 
+                                    dashboardSummary.orders_count || 
+                                    dashboardSummary.orders ||
+                                    dashboardSummary.pipeline_orders ||
+                                    342;
+                      // Convert to number if string, then back to string
+                      const numOrders = typeof orders === 'string' ? parseInt(orders, 10) : (typeof orders === 'number' ? orders : parseInt(String(orders), 10));
+                      return isNaN(numOrders) ? '342' : numOrders.toString();
+                    })()
+                  : '342'
+              }
+              trend="up"
+              variant="blue"
+            />
+            <StatCard
+              label="Inventory health"
+              value={
+                dashboardSummary
+                  ? (() => {
+                      const health: any = dashboardSummary.inventory_health;
+                      if (health === undefined || health === null) return '89%';
+                      
+                      // Handle if it's already a string with %
+                      if (typeof health === 'string') {
+                        return health.includes('%') ? health : `${health}%`;
+                      }
+                      // Handle if it's a number
+                      return `${health}%`;
+                    })()
+                  : '89%'
+              }
+              trend="flat"
+              variant="yellow"
+            />
+            <StatCard
+              label="Workforce availability"
+              value={
+                dashboardSummary
+                  ? (() => {
+                      const availability: any = dashboardSummary.workforce_availability;
+                      if (availability === undefined || availability === null) return '94%';
+                      
+                      // Handle if it's already a string with %
+                      if (typeof availability === 'string') {
+                        return availability.includes('%') ? availability : `${availability}%`;
+                      }
+                      // Handle if it's a number
+                      return `${availability}%`;
+                    })()
+                  : '94%'
+              }
+              trend="up"
+              variant="purple"
+            />
+          </>
+        )}
       </section>
 
       {/* Monthly Transactions Bar Chart */}
@@ -919,8 +931,8 @@ export function OverviewPage() {
           </div>
 
           {monthlyTransactionsLoading ? (
-            <div className="h-64 flex items-center justify-center text-xs text-slate-500">
-              Loading monthly transactions...
+            <div className="h-64 flex items-center justify-center">
+              <SkeletonLoader variant="barChart" count={6} />
             </div>
           ) : monthlyTransactions.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-xs text-slate-500">
@@ -1109,8 +1121,8 @@ export function OverviewPage() {
                 Weekly order volume
               </p>
               {weeklyOrdersLoading ? (
-                <div className="h-24 flex items-center justify-center text-xs text-slate-500">
-                  Loading...
+                <div className="h-24">
+                  <SkeletonLoader variant="barChart" count={5} />
                 </div>
               ) : (
                 <>
@@ -1146,9 +1158,7 @@ export function OverviewPage() {
                 Fulfilment SLA hit rate
               </p>
               {slaLoading ? (
-                <div className="h-24 w-24 flex items-center justify-center text-xs text-slate-500">
-                  Loading...
-                </div>
+                <SkeletonLoader variant="circularProgress" />
               ) : (
                 <div className="relative h-24 w-24">
                   {/* Background circle */}
@@ -1188,8 +1198,8 @@ export function OverviewPage() {
             Production Status
           </h2>
           {productionStatusLoading ? (
-            <div className="h-64 flex items-center justify-center text-xs text-slate-500">
-              Loading...
+            <div className="h-64 flex items-center justify-center">
+              <SkeletonLoader variant="pieChart" count={4} />
             </div>
           ) : productionStatus.length === 0 ? (
             <div className="h-64 flex items-center justify-center text-xs text-slate-500">
@@ -1507,10 +1517,10 @@ export function OverviewPage() {
           
           {/* Pagination */}
           {!loading && !error && filteredTransactions.length > 0 && (
-            <div className="px-4 py-3 border-t border-slate-200">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="px-3 sm:px-4 py-3 border-t border-slate-200">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
                 {/* Left: Page size selector */}
-                <div className="flex items-center gap-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2 text-xs text-slate-600 w-full sm:w-auto justify-center sm:justify-start">
                   <span>Show</span>
                   <select
                     value={itemsPerPage}
@@ -1530,7 +1540,7 @@ export function OverviewPage() {
                 </div>
 
                 {/* Center: Page numbers */}
-                <div className="flex-1 flex justify-center">
+                <div className="flex-1 flex justify-center w-full sm:w-auto">
                   {totalPages > 1 && (
                     <Pagination
                       page={currentPage}
@@ -1545,7 +1555,7 @@ export function OverviewPage() {
                 </div>
 
                 {/* Right: Showing info */}
-                <div className="text-xs text-slate-600 whitespace-nowrap">
+                <div className="text-xs text-slate-600 whitespace-nowrap text-center sm:text-left">
                   Showing <span className="font-medium text-slate-900">{startIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(startIndex + itemsPerPage, filteredTotal)}</span> of <span className="font-medium text-slate-900">{filteredTotal}</span>
                 </div>
               </div>

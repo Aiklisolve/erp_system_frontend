@@ -34,6 +34,7 @@ export function ReportsList() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [generating, setGenerating] = useState(false);
 
   // Filter reports
   const filteredReports = reports.filter((report) => {
@@ -287,6 +288,7 @@ export function ReportsList() {
     filters?: Record<string, any>;
     parameters?: Record<string, any>;
   }) => {
+    setGenerating(true);
     try {
       await generate(data);
       showToast('success', 'Report Generated', `Report "${data.report_name}" is being generated.`);
@@ -295,8 +297,10 @@ export function ReportsList() {
       // Refresh after a delay to check status
       setTimeout(() => {
         refresh();
+        setGenerating(false);
       }, 2000);
     } catch (error) {
+      setGenerating(false);
       showToast('error', 'Generation Failed', 'Failed to generate report. Please try again.');
     }
   };
@@ -374,7 +378,9 @@ export function ReportsList() {
 
         {/* Table */}
         {loading ? (
-          <LoadingState label="Loading reports..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading reports..." size="md" variant="default" />
+          </div>
         ) : filteredReports.length === 0 ? (
           <EmptyState
             title="No reports found"
@@ -435,20 +441,28 @@ export function ReportsList() {
         title={editingReport ? 'View Report' : 'Generate New Report'}
         open={modalOpen}
         onClose={() => {
-          setModalOpen(false);
-          setEditingReport(null);
+          if (!generating) {
+            setModalOpen(false);
+            setEditingReport(null);
+          }
         }}
         hideCloseButton
       >
-        <ReportForm
-          key={editingReport?.id || 'new-report'}
-          initial={editingReport || undefined}
-          onSubmit={handleFormSubmit}
-          onCancel={() => {
-            setModalOpen(false);
-            setEditingReport(null);
-          }}
-        />
+        {generating ? (
+          <div className="py-12">
+            <LoadingState label="Generating report..." size="md" variant="default" />
+          </div>
+        ) : (
+          <ReportForm
+            key={editingReport?.id || 'new-report'}
+            initial={editingReport || undefined}
+            onSubmit={handleFormSubmit}
+            onCancel={() => {
+              setModalOpen(false);
+              setEditingReport(null);
+            }}
+          />
+        )}
       </Modal>
     </div>
   );

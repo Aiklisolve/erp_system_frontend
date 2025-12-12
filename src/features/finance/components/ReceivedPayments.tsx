@@ -525,7 +525,11 @@ export function ReceivedPayments() {
   };
 
   if (loading) {
-    return <LoadingState label="Loading received payments..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading received payments..." size="md" variant="default" />
+      </div>
+    );
   }
 
   return (

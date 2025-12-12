@@ -481,7 +481,11 @@ export function LeaveManagement({ employees }: { employees: ErpUser[] }) {
   };
 
   if (loading) {
-    return <LoadingState label="Loading leaves..." />;
+    return (
+      <div className="py-12 sm:py-16">
+        <LoadingState label="Loading leaves..." size="md" variant="default" />
+      </div>
+    );
   }
 
                         return (

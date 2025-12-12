@@ -311,7 +311,9 @@ export function OrdersList() {
 
         {/* Table */}
         {loading ? (
-          <LoadingState label="Loading orders..." />
+          <div className="py-12 sm:py-16">
+            <LoadingState label="Loading orders..." size="md" variant="default" />
+          </div>
         ) : filteredOrders.length === 0 ? (
           <EmptyState
             title="No orders found"
