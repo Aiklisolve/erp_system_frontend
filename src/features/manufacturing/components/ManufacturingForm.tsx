@@ -117,13 +117,21 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
   const [specialInstructions, setSpecialInstructions] = useState(initial?.special_instructions ?? '');
   const [tags, setTags] = useState(initial?.tags?.join(', ') ?? '');
 
-  // Auto-calculate total cost
+  // Auto-calculate total cost (only if cost field is empty or zero)
   useEffect(() => {
+    // Only auto-calculate if cost is empty, zero, or matches the calculated total
+    // This allows manual entry without being overwritten
     const material = parseFloat(materialCost) || 0;
     const labor = parseFloat(laborCost) || 0;
     const overhead = parseFloat(overheadCost) || 0;
     const total = material + labor + overhead;
-    setCost(total.toFixed(2));
+    const currentCost = parseFloat(cost) || 0;
+    
+    // Only update if cost is empty/zero or if it matches the previous calculated total
+    if (currentCost === 0 || currentCost === total) {
+      setCost(total.toFixed(2));
+    }
+    
     if (!actualCost) {
       setActualCost(total.toFixed(2));
     }
@@ -555,6 +563,18 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               <option value="HIGH">High</option>
               <option value="URGENT">Urgent</option>
             </Select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              Cost
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="0.00"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">

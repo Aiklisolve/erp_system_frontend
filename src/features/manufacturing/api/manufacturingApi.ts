@@ -582,6 +582,11 @@ export async function createProductionOrder(
         backendPayload.quality_status = payload.quality_status;
       }
       
+      // Only include cost if provided
+      if (payload.cost !== undefined && payload.cost !== null) {
+        backendPayload.cost = parseFloat(payload.cost.toString()) || 0;
+      }
+      
       console.log('📤 Backend payload (exact match to curl):', JSON.stringify(backendPayload, null, 2));
       
       const response = await apiRequest<{ success: boolean; data: any }>(
@@ -655,6 +660,11 @@ export async function updateProductionOrder(
       if (changes.inspected_by) backendChanges.inspected_by = changes.inspected_by;
       if (changes.inspection_date) backendChanges.inspection_date = changes.inspection_date;
       if (changes.inspection_notes) backendChanges.inspection_notes = changes.inspection_notes;
+      if (changes.production_line) backendChanges.production_line = changes.production_line;
+      if (changes.shift) backendChanges.shift = changes.shift;
+      if (changes.supervisor_id) backendChanges.supervisor_id = typeof changes.supervisor_id === 'string' 
+        ? parseInt(changes.supervisor_id) 
+        : changes.supervisor_id;
       
       const response = await apiRequest<{ success: boolean; data: any }>(
         `/manufacturing/production-orders/${id}`,

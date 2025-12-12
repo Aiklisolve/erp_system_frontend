@@ -1,9 +1,11 @@
-import { FormEvent, useState, useEffect } from 'react';
+import { FormEvent, useState, useEffect, useMemo } from 'react';
 import type { PurchaseOrder, PurchaseOrderStatus, PurchaseOrderPriority, PaymentTerms, Currency, DeliveryMethod } from '../types';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
+import { apiRequest } from '../../../config/api';
 
 type Props = {
   initial?: Partial<PurchaseOrder>;
@@ -99,6 +101,206 @@ export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
   
   // Tags
   const [tags, setTags] = useState(initial?.tags?.join(', ') ?? '');
+  
+  // Vendors from API
+  const [vendors, setVendors] = useState<Array<{ vendor_id: number; vendor_name: string; email?: string }>>([]);
+  const [loadingVendors, setLoadingVendors] = useState(false);
+  
+  // Managers from API
+  const [managers, setManagers] = useState<Array<{ id: string; full_name: string; role: string }>>([]);
+  const [loadingManagers, setLoadingManagers] = useState(false);
+  
+  // Approvers from API
+  const [approvers, setApprovers] = useState<Array<{ id: string; full_name: string; role: string }>>([]);
+  const [loadingApprovers, setLoadingApprovers] = useState(false);
+  
+  // Fetch vendors on component mount
+  useEffect(() => {
+    const fetchVendors = async () => {
+      try {
+        setLoadingVendors(true);
+        console.log('🔄 Fetching vendors from API...');
+        
+        const response = await apiRequest<{ 
+          success: boolean; 
+          data?: Array<{ vendor_id: number; vendor_name: string; email?: string }>;
+        } | Array<{ vendor_id: number; vendor_name: string; email?: string }>>(
+          '/inventory/list'
+        );
+        
+        console.log('📊 Vendors response:', response);
+        
+        let vendorsData: Array<{ vendor_id: number; vendor_name: string; email?: string }> = [];
+        
+        if (Array.isArray(response)) {
+          vendorsData = response;
+        } else if (response && typeof response === 'object') {
+          if ('success' in response && response.success && 'data' in response) {
+            vendorsData = Array.isArray(response.data) ? response.data : [];
+          } else if ('data' in response && Array.isArray(response.data)) {
+            vendorsData = response.data;
+          }
+        }
+        
+        console.log('✅ Vendors loaded successfully:', vendorsData.length);
+        setVendors(vendorsData);
+      } catch (err: any) {
+        console.error('❌ Error fetching vendors:', err);
+        setVendors([]);
+      } finally {
+        setLoadingVendors(false);
+      }
+    };
+    
+    fetchVendors();
+  }, []);
+  
+  // Fetch managers on component mount
+  useEffect(() => {
+    const fetchManagers = async () => {
+      try {
+        setLoadingManagers(true);
+        console.log('🔄 Fetching managers from API...');
+        
+        const response = await apiRequest<{ 
+          success: boolean; 
+          data?: Array<{ id: string; full_name: string; role: string }>;
+        } | Array<{ id: string; full_name: string; role: string }>>(
+          '/procurement/managers/list'
+        );
+        
+        console.log('📊 Managers response:', response);
+        
+        let managersData: Array<{ id: string; full_name: string; role: string }> = [];
+        
+        if (Array.isArray(response)) {
+          managersData = response;
+        } else if (response && typeof response === 'object') {
+          if ('success' in response && response.success && 'data' in response) {
+            managersData = Array.isArray(response.data) ? response.data : [];
+          } else if ('data' in response && Array.isArray(response.data)) {
+            managersData = response.data;
+          }
+        }
+        
+        console.log('✅ Managers loaded successfully:', managersData.length);
+        setManagers(managersData);
+      } catch (err: any) {
+        console.error('❌ Error fetching managers:', err);
+        setManagers([]);
+      } finally {
+        setLoadingManagers(false);
+      }
+    };
+    
+    fetchManagers();
+  }, []);
+  
+  // Fetch approvers on component mount
+  useEffect(() => {
+    const fetchApprovers = async () => {
+      try {
+        setLoadingApprovers(true);
+        console.log('🔄 Fetching approvers from API...');
+        
+        const response = await apiRequest<{ 
+          success: boolean; 
+          data?: Array<{ id: string; full_name: string; role: string }>;
+        } | Array<{ id: string; full_name: string; role: string }>>(
+          '/procurement/approved/list'
+        );
+        
+        console.log('📊 Approvers response:', response);
+        
+        let approversData: Array<{ id: string; full_name: string; role: string }> = [];
+        
+        if (Array.isArray(response)) {
+          approversData = response;
+        } else if (response && typeof response === 'object') {
+          if ('success' in response && response.success && 'data' in response) {
+            approversData = Array.isArray(response.data) ? response.data : [];
+          } else if ('data' in response && Array.isArray(response.data)) {
+            approversData = response.data;
+          }
+        }
+        
+        console.log('✅ Approvers loaded successfully:', approversData.length);
+        setApprovers(approversData);
+      } catch (err: any) {
+        console.error('❌ Error fetching approvers:', err);
+        setApprovers([]);
+      } finally {
+        setLoadingApprovers(false);
+      }
+    };
+    
+    fetchApprovers();
+  }, []);
+  
+  // Convert vendors to SearchableSelect options format
+  const vendorOptions = useMemo(() => {
+    return vendors.map((vendor) => ({
+      value: vendor.vendor_id.toString(),
+      label: `${vendor.vendor_id} - ${vendor.vendor_name}`,
+      id: vendor.vendor_id,
+    }));
+  }, [vendors]);
+  
+  // Convert managers to SearchableSelect options format
+  const managerOptions = useMemo(() => {
+    return managers.map((manager) => ({
+      value: manager.id.toString(),
+      label: `${manager.id} - ${manager.full_name}`,
+      id: manager.id,
+    }));
+  }, [managers]);
+  
+  // Convert approvers to SearchableSelect options format
+  const approverOptions = useMemo(() => {
+    return approvers.map((approver) => ({
+      value: approver.id.toString(),
+      label: `${approver.id} - ${approver.full_name}`,
+      id: approver.id,
+    }));
+  }, [approvers]);
+  
+  // Handle vendor selection - auto-populate supplier name and email
+  const handleVendorChange = (vendorId: string) => {
+    setSupplierId(vendorId);
+    const selectedVendor = vendors.find(v => v.vendor_id.toString() === vendorId);
+    if (selectedVendor) {
+      setSupplier(selectedVendor.vendor_name);
+      if (selectedVendor.email) {
+        setSupplierEmail(selectedVendor.email);
+      }
+      console.log('✅ Auto-populated supplier name:', selectedVendor.vendor_name);
+      console.log('✅ Auto-populated supplier email:', selectedVendor.email);
+    }
+  };
+  
+  // Handle manager selection - auto-populate requested by name with role
+  const handleManagerChange = (managerId: string) => {
+    setRequestedById(managerId);
+    const selectedManager = managers.find(m => m.id.toString() === managerId);
+    if (selectedManager) {
+      // Format: "Full Name - Role"
+      setRequestedBy(`${selectedManager.full_name} - ${selectedManager.role}`);
+      console.log('✅ Auto-populated requested by:', selectedManager.full_name);
+      console.log('✅ Auto-populated role:', selectedManager.role);
+    }
+  };
+  
+  // Handle approver selection - auto-populate approved by with role
+  const handleApproverChange = (approverId: string) => {
+    setApprovedById(approverId);
+    const selectedApprover = approvers.find(a => a.id.toString() === approverId);
+    if (selectedApprover) {
+      // Auto-populate with role only
+      setApprovedBy(selectedApprover.role);
+      console.log('✅ Auto-populated approved by role:', selectedApprover.role);
+      console.log('✅ Approver name:', selectedApprover.full_name);
+    }
+  };
 
   // Auto-calculate total amount
   useEffect(() => {
@@ -263,19 +465,35 @@ export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
             <Input
               value={supplier}
               onChange={(e) => setSupplier(e.target.value)}
-              placeholder="Industrial Suppliers Ltd"
+              placeholder={supplierId ? "Auto-populated from vendor" : "Industrial Suppliers Ltd"}
               required
+              className={supplierId ? "bg-slate-50" : ""}
+              readOnly={!!supplierId}
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              Supplier ID
+              Supplier ID (Vendor)
             </label>
-            <Input
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-              placeholder="SUP-001"
-            />
+            {loadingVendors ? (
+              <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                Loading vendors...
+              </div>
+            ) : vendors.length === 0 ? (
+              <Input
+                value={supplierId}
+                onChange={(e) => setSupplierId(e.target.value)}
+                placeholder="SUP-001"
+              />
+            ) : (
+              <SearchableSelect
+                value={supplierId}
+                onChange={handleVendorChange}
+                options={vendorOptions}
+                placeholder="Search and select vendor..."
+                maxHeight="200px"
+              />
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
@@ -295,7 +513,9 @@ export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
               type="email"
               value={supplierEmail}
               onChange={(e) => setSupplierEmail(e.target.value)}
-              placeholder="contact@supplier.com"
+              placeholder={supplierId ? "Auto-populated from vendor" : "contact@supplier.com"}
+              className={supplierId ? "bg-slate-50" : ""}
+              readOnly={!!supplierId}
             />
           </div>
           <div>
@@ -701,18 +921,34 @@ export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
             <Input
               value={requestedBy}
               onChange={(e) => setRequestedBy(e.target.value)}
-              placeholder="Production Manager"
+              placeholder={requestedById ? "Auto-populated from manager" : "Production Manager"}
+              className={requestedById ? "bg-slate-50" : ""}
+              readOnly={!!requestedById}
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Requested By ID
             </label>
-            <Input
-              value={requestedById}
-              onChange={(e) => setRequestedById(e.target.value)}
-              placeholder="emp-001"
-            />
+            {loadingManagers ? (
+              <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                Loading managers...
+              </div>
+            ) : managers.length === 0 ? (
+              <Input
+                value={requestedById}
+                onChange={(e) => setRequestedById(e.target.value)}
+                placeholder="emp-001"
+              />
+            ) : (
+              <SearchableSelect
+                value={requestedById}
+                onChange={handleManagerChange}
+                options={managerOptions}
+                placeholder="Search and select manager..."
+                maxHeight="200px"
+              />
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
@@ -721,18 +957,34 @@ export function ProcurementForm({ initial, onSubmit, onCancel }: Props) {
             <Input
               value={approvedBy}
               onChange={(e) => setApprovedBy(e.target.value)}
-              placeholder="Operations Director"
+              placeholder={approvedById ? "Auto-populated from approver" : "Operations Director"}
+              className={approvedById ? "bg-slate-50" : ""}
+              readOnly={!!approvedById}
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
               Approved By ID
             </label>
-            <Input
-              value={approvedById}
-              onChange={(e) => setApprovedById(e.target.value)}
-              placeholder="emp-002"
-            />
+            {loadingApprovers ? (
+              <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                Loading approvers...
+              </div>
+            ) : approvers.length === 0 ? (
+              <Input
+                value={approvedById}
+                onChange={(e) => setApprovedById(e.target.value)}
+                placeholder="emp-002"
+              />
+            ) : (
+              <SearchableSelect
+                value={approvedById}
+                onChange={handleApproverChange}
+                options={approverOptions}
+                placeholder="Search and select approver..."
+                maxHeight="200px"
+              />
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
