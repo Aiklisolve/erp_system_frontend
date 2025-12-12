@@ -491,8 +491,10 @@ const mockPurchaseOrders: PurchaseOrder[] = [
 
 export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
   try {
-    const response = await apiRequest<PurchaseOrderListResponse>('/inventory/purchase-orders');
-    return response.data.purchase_orders;
+    // Request a large limit to get all purchase orders for the dropdown
+    const response = await apiRequest<PurchaseOrderListResponse>('/inventory/purchase-orders?limit=1000&page=1');
+    console.log('📦 Purchase orders fetched:', response.data?.purchase_orders?.length || 0);
+    return response.data.purchase_orders || [];
   } catch (error) {
     console.error('Error fetching purchase orders:', error);
     return mockPurchaseOrders;

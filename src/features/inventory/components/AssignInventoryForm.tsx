@@ -110,20 +110,27 @@ export function AssignInventoryForm({ initial, onSubmit, onCancel }: Props) {
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Product"
-            value={productId.toString()}
-            onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : '')}
-            disabled={dataLoading}
-            required
-          >
-            <option value="">Select product</option>
-            {products.map((product) => (
-              <option key={product.id} value={product.id.toString()}>
-                {product.name} ({product.product_code})
-              </option>
-            ))}
-          </Select>
+          <div>
+            <Select
+              label="Product"
+              value={productId.toString()}
+              onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : '')}
+              disabled={dataLoading}
+              required
+            >
+              <option value="">Select product</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id.toString()}>
+                  {product.name}
+                </option>
+              ))}
+            </Select>
+            {selectedProduct && (
+              <div className="mt-1 text-xs text-slate-600">
+                Product Code: <span className="font-medium text-slate-900">{selectedProduct.product_code}</span>
+              </div>
+            )}
+          </div>
           <Select
             label="Purchase Order"
             value={purchaseOrderId.toString()}
@@ -140,12 +147,6 @@ export function AssignInventoryForm({ initial, onSubmit, onCancel }: Props) {
           </Select>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Product Code"
-            value={selectedProduct?.product_code ?? ''}
-            placeholder="Auto-filled from product"
-            readOnly
-          />
           <Input
             label="Quantity"
             type="number"

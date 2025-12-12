@@ -986,6 +986,7 @@ export function InventoryList() {
           title="Edit Quantity"
           open={!!editingAssignedQuantity}
           onClose={() => setEditingAssignedQuantity(null)}
+          hideCloseButton
         >
           <div className="space-y-4">
             <Input
