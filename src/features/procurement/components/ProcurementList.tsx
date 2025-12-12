@@ -153,16 +153,19 @@ export function ProcurementList() {
     {
       key: 'total_amount',
       header: 'Total Amount',
-      render: (row) => (
-        <div className="text-right">
-          <div className="text-xs font-semibold text-slate-900">
-            {row.currency} {row.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      render: (row) => {
+        const currencySymbol = row.currency === 'INR' ? '₹' : row.currency === 'USD' ? '$' : row.currency === 'EUR' ? '€' : row.currency === 'GBP' ? '£' : row.currency;
+        return (
+          <div className="text-right">
+            <div className="text-xs font-semibold text-slate-900">
+              {currencySymbol} {row.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            {row.items_count && (
+              <div className="text-[10px] text-slate-500">{row.items_count} items</div>
+            )}
           </div>
-          {row.items_count && (
-            <div className="text-[10px] text-slate-500">{row.items_count} items</div>
-          )}
-        </div>
-      )
+        );
+      }
     },
     {
       key: 'receiving',
@@ -278,7 +281,7 @@ export function ProcurementList() {
         />
         <StatCard
           label="Total Amount"
-          value={`$${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={`₹${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         />
         <StatCard
           label="Pending Approvals"

@@ -290,7 +290,7 @@ export function EcommerceProductsList() {
           label="Total Revenue"
           value={metrics.totalRevenue.toLocaleString(undefined, {
             style: 'currency',
-            currency: 'USD'
+            currency: 'INR'
           })}
           helper="From completed orders."
           trend="up"
