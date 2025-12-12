@@ -1,8 +1,10 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import type { Account, AccountType } from '../types';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Button } from '../../../components/ui/Button';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { listUsers, type User } from '../api/financeApi';
 
 type Props = {
   initial?: Partial<Account>;
@@ -16,6 +18,59 @@ export function SimpleAccountForm({ initial, onSubmit, onCancel }: Props) {
   const [accountName, setAccountName] = useState(initial?.account_name ?? '');
   const [accountType, setAccountType] = useState<AccountType>(initial?.account_type ?? 'ASSET');
   const [openingBalance, setOpeningBalance] = useState(initial?.opening_balance?.toString() ?? '0');
+  const [ownerUserId, setOwnerUserId] = useState(initial?.owner_user_id?.toString() ?? '');
+  
+  // Users for dropdown
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  
+  // Fetch users on component mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setUsersLoading(true);
+      try {
+        const fetchedUsers = await listUsers();
+        setUsers(fetchedUsers);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        setUsers([]);
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+    
+    fetchUsers();
+  }, []);
+
+  // Update form state when initial prop changes (for edit mode)
+  useEffect(() => {
+    if (initial) {
+      setAccountCode(initial.account_number ?? '');
+      setAccountName(initial.account_name ?? '');
+      // Ensure account_type is set correctly, validate against allowed types
+      const validAccountType = initial.account_type && 
+        ['ASSET', 'LIABILITY', 'INCOME', 'EXPENSE', 'EQUITY'].includes(initial.account_type)
+        ? initial.account_type 
+        : 'ASSET';
+      setAccountType(validAccountType as AccountType);
+      setOpeningBalance(initial.opening_balance?.toString() ?? '0');
+      setOwnerUserId(initial.owner_user_id?.toString() ?? '');
+    } else {
+      // Reset form when initial is cleared (e.g., closing edit mode)
+      setAccountCode('');
+      setAccountName('');
+      setAccountType('ASSET');
+      setOpeningBalance('0');
+      setOwnerUserId('');
+    }
+  }, [initial]);
+  
+  // Prepare user options for SearchableSelect
+  const userOptions = users.map((user) => ({
+    value: user.id.toString(),
+    label: `${user.id} - ${user.name || user.full_name || user.email}`,
+    id: user.id,
+  }));
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -36,6 +91,7 @@ export function SimpleAccountForm({ initial, onSubmit, onCancel }: Props) {
       ifsc_code: undefined,
       swift_code: undefined,
       account_holder_name: undefined,
+      owner_user_id: ownerUserId ? parseInt(ownerUserId) : undefined,
     };
     
     onSubmit(payload);
@@ -83,14 +139,11 @@ export function SimpleAccountForm({ initial, onSubmit, onCancel }: Props) {
               onChange={(e) => setAccountType(e.target.value as AccountType)} 
               required
             >
-              <option value="BANK">Bank Account</option>
-              <option value="CASH">Cash Account</option>
-              <option value="CREDIT_CARD">Credit Card</option>
               <option value="ASSET">Asset</option>
               <option value="LIABILITY">Liability</option>
-              <option value="EQUITY">Equity</option>
-              <option value="REVENUE">Revenue</option>
+              <option value="INCOME">Income</option>
               <option value="EXPENSE">Expense</option>
+              <option value="EQUITY">Equity</option>
             </Select>
           </div>
           
@@ -107,6 +160,21 @@ export function SimpleAccountForm({ initial, onSubmit, onCancel }: Props) {
               required
             />
             <p className="text-xs text-slate-500 mt-1">Initial balance for this account</p>
+          </div>
+          
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              Account Holder User
+            </label>
+            <SearchableSelect
+              value={ownerUserId}
+              onChange={(value) => setOwnerUserId(value)}
+              options={userOptions}
+              placeholder={usersLoading ? "Loading users..." : "Search and select user..."}
+              disabled={usersLoading}
+              maxHeight="200px"
+            />
+            <p className="text-xs text-slate-500 mt-1">Select the user who owns this account</p>
           </div>
         </div>
       </div>

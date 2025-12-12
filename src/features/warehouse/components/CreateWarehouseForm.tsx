@@ -4,6 +4,8 @@ import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { listUsers, type User } from '../api/warehouseApi';
 
 type Props = {
   initial?: Partial<Warehouse>;
@@ -18,9 +20,31 @@ export function CreateWarehouseForm({ initial, onSubmit, onCancel }: Props) {
   const [state, setState] = useState(initial?.state ?? '');
   const [pincode, setPincode] = useState(initial?.pincode ?? '');
   const [country, setCountry] = useState(initial?.country ?? '');
-  const [managerId, setManagerId] = useState<number | ''>(initial?.manager_id ?? '');
+  const [managerId, setManagerId] = useState<string>(initial?.manager_id?.toString() ?? '');
   const [capacity, setCapacity] = useState<number | ''>(initial?.capacity ?? '');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
+  
+  // Users for manager dropdown
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  // Fetch users on component mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setUsersLoading(true);
+      try {
+        const fetchedUsers = await listUsers();
+        setUsers(fetchedUsers);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        setUsers([]);
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+    
+    fetchUsers();
+  }, []);
 
   // Update form fields when initial prop changes (for edit mode)
   useEffect(() => {
@@ -31,11 +55,29 @@ export function CreateWarehouseForm({ initial, onSubmit, onCancel }: Props) {
       setState(initial.state ?? '');
       setPincode(initial.pincode ?? '');
       setCountry(initial.country ?? '');
-      setManagerId(initial.manager_id ?? '');
+      setManagerId(initial.manager_id?.toString() ?? '');
       setCapacity(initial.capacity ?? '');
       setIsActive(initial.is_active ?? true);
+    } else {
+      // Reset form when initial is cleared
+      setName('');
+      setAddress('');
+      setCity('');
+      setState('');
+      setPincode('');
+      setCountry('');
+      setManagerId('');
+      setCapacity('');
+      setIsActive(true);
     }
   }, [initial]);
+  
+  // Prepare user options for SearchableSelect
+  const userOptions = users.map((user) => ({
+    value: user.id.toString(),
+    label: `${user.id} - ${user.name}${user.email ? ` (${user.email})` : ''}${user.role ? ` [${user.role}]` : ''}`,
+    id: user.id,
+  }));
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -114,13 +156,20 @@ export function CreateWarehouseForm({ initial, onSubmit, onCancel }: Props) {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Management & Capacity</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Manager ID"
-            type="number"
-            value={managerId}
-            onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
-            placeholder="Manager user ID"
-          />
+          <div className="flex flex-col">
+            <label className="text-xs font-medium text-slate-700 mb-1.5">
+              Manager
+            </label>
+            <SearchableSelect
+              value={managerId}
+              onChange={(value) => setManagerId(value)}
+              options={userOptions}
+              placeholder={usersLoading ? "Loading users..." : "Search and select manager..."}
+              disabled={usersLoading}
+              maxHeight="200px"
+            />
+            <p className="text-xs text-slate-500 mt-1">Select a user with manager role/authority</p>
+          </div>
           <Input
             label="Capacity"
             type="number"

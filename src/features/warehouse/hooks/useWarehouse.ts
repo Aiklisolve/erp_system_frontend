@@ -2,20 +2,20 @@ import { useEffect, useState } from 'react';
 import type { StockMovement } from '../types';
 import * as api from '../api/warehouseApi';
 
-export function useWarehouse() {
+export function useWarehouse(movementType?: string) {
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void refresh();
-  }, []);
+    void refresh(movementType);
+  }, [movementType]);
 
-  const refresh = async () => {
+  const refresh = async (type?: string) => {
     setLoading(true);
     try {
-      const data = await api.listStockMovements();
+      const data = await api.listStockMovements(type);
       console.log('useWarehouse - fetched movements:', data);
-      console.log('useWarehouse - movements count:', data.length);
+      console.log('useWarehouse - movements count:', data.length, type ? `(filtered by type: ${type})` : '(all types)');
       setMovements(data);
     } catch (error) {
       console.error('useWarehouse - error fetching movements:', error);
@@ -29,20 +29,20 @@ export function useWarehouse() {
     payload: Omit<StockMovement, 'id' | 'created_at' | 'updated_at'>
   ) => {
     const created = await api.createStockMovement(payload);
-    await refresh(); // Refresh to get latest data
+    await refresh(movementType); // Refresh to get latest data with current filter
     return created;
   };
 
   const update = async (id: string, changes: Partial<StockMovement>) => {
     const updated = await api.updateStockMovement(id, changes);
     if (!updated) return;
-    await refresh(); // Refresh to get latest data
+    await refresh(movementType); // Refresh to get latest data with current filter
     return updated;
   };
 
   const remove = async (id: string) => {
     await api.deleteStockMovement(id);
-    await refresh(); // Refresh to get latest data
+    await refresh(movementType); // Refresh to get latest data with current filter
   };
 
   const metrics = movements.reduce(

@@ -236,6 +236,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               <div className="space-y-1.5">
                 {group.items.map((item) => {
                   const icon = menuIcons[item.label] || '📦';
+                  const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
                   return (
                     <NavLink
                       key={item.to}
@@ -244,16 +245,14 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                         // Close mobile sidebar when link is clicked
                         if (onClose) onClose();
                       }}
-                      className={({ isActive }) =>
-                        [
-                          'flex items-center gap-3 rounded-xl px-3 py-2.5 text-[11px] font-semibold transition-all duration-300 relative',
-                          isActive
-                            ? 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent text-primary border-l-4 border-primary shadow-md shadow-primary/10'
-                            : 'text-slate-600 hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-50/50 hover:to-transparent hover:text-primary border-l-4 border-transparent hover:border-primary/30 hover:shadow-sm'
-                        ].join(' ')
-                      }
+                      className={[
+                        'flex items-center gap-3 rounded-xl px-3 py-2.5 text-[11px] font-semibold transition-all duration-300 relative',
+                        isActive
+                          ? 'bg-gradient-to-r from-primary/10 via-primary/5 to-transparent text-primary border-l-4 border-primary shadow-md shadow-primary/10'
+                          : 'text-slate-600 hover:bg-gradient-to-r hover:from-slate-50 hover:via-slate-50/50 hover:to-transparent hover:text-primary border-l-4 border-transparent hover:border-primary/30 hover:shadow-sm'
+                      ].join(' ')}
                     >
-                      {({ isActive }) => isActive && (
+                      {isActive && (
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-gradient-to-b from-primary via-primary-light to-primary rounded-r-full"></div>
                       )}
                       <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-white to-slate-50 border-2 border-slate-200 shadow-sm flex-shrink-0 overflow-hidden transition-all duration-300 hover:border-primary/30 hover:scale-110 hover:shadow-md">

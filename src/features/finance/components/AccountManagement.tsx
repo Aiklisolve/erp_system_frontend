@@ -26,7 +26,7 @@ type AccountFormProps = {
 function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
   const [accountNumber, setAccountNumber] = useState(initial?.account_number ?? '');
   const [accountName, setAccountName] = useState(initial?.account_name ?? '');
-  const [accountType, setAccountType] = useState<AccountType>(initial?.account_type ?? 'BANK');
+  const [accountType, setAccountType] = useState<AccountType>(initial?.account_type ?? 'ASSET');
   const [parentAccount, setParentAccount] = useState(initial?.parent_account ?? '');
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'USD');
   const [openingBalance, setOpeningBalance] = useState(initial?.opening_balance?.toString() ?? '0');
@@ -103,14 +103,11 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
               Account Type <span className="text-red-500">*</span>
             </label>
             <Select value={accountType} onChange={(e) => setAccountType(e.target.value as AccountType)} required>
-              <option value="BANK">Bank</option>
-              <option value="CASH">Cash</option>
-              <option value="CREDIT_CARD">Credit Card</option>
               <option value="ASSET">Asset</option>
               <option value="LIABILITY">Liability</option>
-              <option value="EQUITY">Equity</option>
-              <option value="REVENUE">Revenue</option>
+              <option value="INCOME">Income</option>
               <option value="EXPENSE">Expense</option>
+              <option value="EQUITY">Equity</option>
             </Select>
       </div>
           <div>
@@ -189,7 +186,7 @@ function AccountForm({ initial, onSubmit, onCancel }: AccountFormProps) {
             </div>
 
       {/* Bank Details */}
-      {(accountType === 'BANK' || accountType === 'CREDIT_CARD') && (
+      {false && (
               <div>
           <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
             Bank Details
@@ -384,8 +381,8 @@ export function AccountManagement() {
   // Calculate metrics
   const totalBalance = accounts.reduce((sum, acc) => sum + acc.current_balance, 0);
   const activeAccounts = accounts.filter((acc) => acc.is_active).length;
-  const bankAccounts = accounts.filter((acc) => acc.account_type === 'BANK').length;
-  const cashAccounts = accounts.filter((acc) => acc.account_type === 'CASH').length;
+  const assetAccounts = accounts.filter((acc) => acc.account_type === 'ASSET').length;
+  const liabilityAccounts = accounts.filter((acc) => acc.account_type === 'LIABILITY').length;
 
   const columns: TableColumn<Account>[] = [
     {
@@ -418,7 +415,7 @@ export function AccountManagement() {
       render: (row) => (
         <Badge
           tone={
-            row.account_type === 'BANK' || row.account_type === 'CASH'
+            row.account_type === 'ASSET' || row.account_type === 'LIABILITY'
               ? 'success'
               : 'neutral'
           }
@@ -560,12 +557,12 @@ export function AccountManagement() {
           value={activeAccounts.toString()}
         />
         <StatCard
-          label="Bank Accounts"
-          value={bankAccounts.toString()}
+          label="Asset Accounts"
+          value={assetAccounts.toString()}
         />
         <StatCard
-          label="Cash Accounts"
-          value={cashAccounts.toString()}
+          label="Liability Accounts"
+          value={liabilityAccounts.toString()}
         />
       </div>
 
@@ -598,15 +595,12 @@ export function AccountManagement() {
                 }}
               >
                 <option value="all">All Types</option>
-                <option value="BANK">Bank</option>
-                <option value="CASH">Cash</option>
-                <option value="CREDIT_CARD">Credit Card</option>
                 <option value="ASSET">Asset</option>
                 <option value="LIABILITY">Liability</option>
-                <option value="EQUITY">Equity</option>
-                <option value="REVENUE">Revenue</option>
+                <option value="INCOME">Income</option>
                 <option value="EXPENSE">Expense</option>
-                </Select>
+                <option value="EQUITY">Equity</option>
+              </Select>
               </div>
               <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">

@@ -3,6 +3,17 @@ import type { StockMovement, Warehouse } from '../types';
 
 const USE_BACKEND_API = true;
 
+// User interface for manager dropdown
+export interface User {
+  id: number;
+  user_id?: number;
+  name: string;
+  full_name?: string;
+  email: string;
+  employee_id?: number;
+  role?: string;
+}
+
 // Backend stock movement structure (matches actual database schema)
 interface BackendStockMovement {
   id: number;
@@ -236,11 +247,34 @@ function mapBackendStockMovement(backendMovement: any): StockMovement {
 }
 
 // List all stock movements
-export async function listStockMovements(): Promise<StockMovement[]> {
+export async function listStockMovements(movementType?: string): Promise<StockMovement[]> {
   try {
-    console.log('Fetching stock movements from:', '/inventory/stock/movements');
-    // Request a large limit to get all movements (or implement pagination later)
-    const response = await apiRequest<StockMovementListResponse>('/inventory/stock/movements?limit=1000&page=1');
+    // Build query parameters
+    const params = new URLSearchParams({
+      limit: '1000',
+      page: '1'
+    });
+    
+    // Add movement_type filter if provided
+    if (movementType && movementType !== 'all') {
+      // Map frontend movement type to backend format
+      let backendType = movementType.toUpperCase();
+      // Handle case where backend might use different format
+      if (backendType === 'TRANSFER') {
+        params.append('movement_type', 'TRANSFER');
+      } else if (backendType === 'RECEIPT') {
+        params.append('movement_type', 'RECEIPT');
+      } else if (backendType === 'SHIPMENT') {
+        params.append('movement_type', 'SHIPMENT');
+      } else if (backendType === 'ADJUSTMENT') {
+        params.append('movement_type', 'ADJUSTMENT');
+      }
+    }
+    
+    const url = `/inventory/stock/movements?${params.toString()}`;
+    console.log('Fetching stock movements from:', url, movementType ? `(filtered by type: ${movementType})` : '(all types)');
+    
+    const response = await apiRequest<StockMovementListResponse>(url);
     console.log('Stock movements API response:', response);
     
     if (!response) {
@@ -509,6 +543,62 @@ export async function updateWarehouse(
   }
 
   throw new Error('Backend API not enabled');
+}
+
+// List users for manager dropdown (filtered by role/authority)
+export async function listUsers(): Promise<User[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching users from backend API for warehouse manager...');
+      
+      const response = await apiRequest<{ success: boolean; data: { users: any[] } } | { users: any[] } | any[]>(
+        '/users?page=1&limit=1000'
+      );
+      
+      console.log('👥 Backend users response:', response);
+      
+      // Handle different response formats
+      let users = null;
+      
+      if (response && typeof response === 'object') {
+        // If wrapped in success/data
+        if ('success' in response && response.success && 'data' in response && response.data.users) {
+          users = response.data.users;
+        }
+        // If direct users array
+        else if ('users' in response) {
+          users = response.users;
+        }
+        // If direct array
+        else if (Array.isArray(response)) {
+          users = response;
+        }
+      }
+      
+      if (users && Array.isArray(users) && users.length > 0) {
+        const mapped = users.map((u: any) => ({
+          id: parseInt(u.id || u.user_id || u.employee_id) || 0,
+          user_id: parseInt(u.id || u.user_id || u.employee_id) || 0,
+          name: u.name || u.full_name || (u.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : '') || u.email || 'Unknown User',
+          full_name: u.name || u.full_name || (u.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : '') || u.email || 'Unknown User',
+          email: u.email || '',
+          employee_id: parseInt(u.id || u.user_id || u.employee_id) || 0,
+          role: u.role || u.erp_role || undefined,
+        }));
+        console.log('✅ Mapped users for warehouse manager:', mapped.length);
+        return mapped;
+      }
+      
+      console.log('⚠️ No users in response');
+      return [];
+    } catch (error) {
+      console.error('❌ Backend API error fetching users:', error);
+      return [];
+    }
+  }
+  
+  // Fallback to empty array if backend API is not available
+  return [];
 }
 
 // Delete a warehouse

@@ -6,6 +6,7 @@ import { Pagination } from '../../components/ui/Pagination';
 import { apiRequest } from '../../config/api';
 import { useSupabaseHealthCheck } from '../../hooks/useSupabaseHealthCheck';
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
+import { Modal } from '../../components/ui/Modal';
 
 const MINI_BARS = [60, 90, 40, 75, 55]; // Fallback default values
 
@@ -72,6 +73,9 @@ export function OverviewPage() {
   const [productionStatusTotal, setProductionStatusTotal] = useState<number>(0);
   const [monthlyTransactions, setMonthlyTransactions] = useState<MonthlyTransactionItem[]>([]);
   const [monthlyTransactionsLoading, setMonthlyTransactionsLoading] = useState(true);
+  
+  // Modal states for graphs
+  const [modalOpen, setModalOpen] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTransactions();
@@ -922,12 +926,20 @@ export function OverviewPage() {
 
       {/* Monthly Transactions Bar Chart */}
       <section>
-        <Card className="space-y-4">
+        <Card className="space-y-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20 cursor-pointer group" onClick={() => setModalOpen('monthly-transactions')}>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Monthly Transactions
-            </h2>
-            <p className="text-[11px] text-slate-500">Income, Expense & Profit by month</p>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 group-hover:text-primary transition-colors">
+                Monthly Transactions
+              </h2>
+              <p className="text-[11px] text-slate-500">Income, Expense & Profit by month</p>
+            </div>
+            <div className="text-xs text-slate-400 group-hover:text-primary transition-colors flex items-center gap-1">
+              <span className="hidden sm:inline">Click to expand</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+              </svg>
+            </div>
           </div>
 
           {monthlyTransactionsLoading ? (
@@ -1004,10 +1016,14 @@ export function OverviewPage() {
                       
                       {/* Stacked Bar Container */}
                       <div
-                        className="w-full rounded-t-lg relative transition-all duration-300 cursor-pointer"
+                        className="w-full rounded-t-lg relative transition-all duration-300 cursor-pointer hover:scale-110 hover:z-10 hover:shadow-lg"
                         style={{ 
                           height: `${minBarHeight}%`,
                           minHeight: total > 0 ? '8px' : '2px'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setModalOpen('monthly-transactions');
                         }}
                       >
                         {/* Income segment (bottom, green) */}
@@ -1106,20 +1122,27 @@ export function OverviewPage() {
 
       {/* Charts & activity */}
       <section className="grid gap-4 lg:grid-cols-[1.4fr,1fr]">
-        <Card className="space-y-4">
+        <Card className="space-y-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Orders & utilization
-            </h2>
-            <p className="text-[11px] text-slate-500">Demo HTML/CSS charts</p>
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">
+                Orders & utilization
+              </h2>
+              <p className="text-[11px] text-slate-500">Demo HTML/CSS charts</p>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             {/* Mini bar graph */}
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-slate-700">
-                Weekly order volume
-              </p>
+            <div className="space-y-3 p-3 rounded-xl hover:bg-slate-50/50 transition-all duration-300 cursor-pointer group" onClick={() => setModalOpen('weekly-orders')}>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-slate-700 group-hover:text-primary transition-colors">
+                  Weekly order volume
+                </p>
+                <svg className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                </svg>
+              </div>
               {weeklyOrdersLoading ? (
                 <div className="h-24">
                   <SkeletonLoader variant="barChart" count={5} />
@@ -1135,8 +1158,12 @@ export function OverviewPage() {
                       return (
                         <div
                           key={idx}
-                          className="flex-1 rounded-t-full bg-gradient-to-t from-sky-200 to-sky-500 transition-transform duration-150 hover:scale-105"
+                          className="flex-1 rounded-t-full bg-gradient-to-t from-sky-200 to-sky-500 transition-all duration-300 hover:scale-110 hover:from-sky-300 hover:to-sky-600 hover:shadow-md cursor-pointer"
                           style={{ height: `${Math.max(percentageHeight, 5)}%` }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setModalOpen('weekly-orders');
+                          }}
                         />
                       );
                     })}
@@ -1153,14 +1180,19 @@ export function OverviewPage() {
             </div>
 
             {/* Progress ring */}
-            <div className="space-y-3 flex flex-col items-center justify-center">
-              <p className="w-full text-left text-xs font-medium text-slate-700">
-                Fulfilment SLA hit rate
-              </p>
+            <div className="space-y-3 flex flex-col items-center justify-center p-3 rounded-xl hover:bg-slate-50/50 transition-all duration-300 cursor-pointer group" onClick={() => setModalOpen('sla-hit-rate')}>
+              <div className="flex items-center justify-between w-full">
+                <p className="text-xs font-medium text-slate-700 group-hover:text-primary transition-colors">
+                  Fulfilment SLA hit rate
+                </p>
+                <svg className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                </svg>
+              </div>
               {slaLoading ? (
                 <SkeletonLoader variant="circularProgress" />
               ) : (
-                <div className="relative h-24 w-24">
+                <div className="relative h-24 w-24 transition-transform duration-300 group-hover:scale-110">
                   {/* Background circle */}
                   <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
                   {/* Progress circle - SVG approach for accurate circular progress */}
@@ -1174,12 +1206,12 @@ export function OverviewPage() {
                       strokeWidth="8"
                       strokeDasharray={`${2 * Math.PI * 45}`}
                       strokeDashoffset={`${2 * Math.PI * 45 * (1 - slaHitRate / 100)}`}
-                      className="transition-all duration-500"
+                      className="transition-all duration-500 group-hover:stroke-emerald-600"
                     />
                   </svg>
                   {/* Center circle with percentage */}
-                  <div className="absolute inset-2 rounded-full bg-white flex items-center justify-center">
-                    <span className="text-sm font-semibold text-emerald-700">
+                  <div className="absolute inset-2 rounded-full bg-white flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+                    <span className="text-sm font-semibold text-emerald-700 group-hover:text-emerald-800 transition-colors">
                       {Math.round(slaHitRate)}%
                     </span>
                   </div>
@@ -1193,10 +1225,18 @@ export function OverviewPage() {
         </Card>
 
         {/* Production Status Pie Chart */}
-        <Card className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-900">
-            Production Status
-          </h2>
+        <Card className="space-y-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20 cursor-pointer group" onClick={() => setModalOpen('production-status')}>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900 group-hover:text-primary transition-colors">
+              Production Status
+            </h2>
+            <div className="text-xs text-slate-400 group-hover:text-primary transition-colors flex items-center gap-1">
+              <span className="hidden sm:inline">Click to expand</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+              </svg>
+            </div>
+          </div>
           {productionStatusLoading ? (
             <div className="h-64 flex items-center justify-center">
               <SkeletonLoader variant="pieChart" count={4} />
@@ -1317,7 +1357,11 @@ export function OverviewPage() {
                           fill={colors[index % colors.length]}
                           stroke="#ffffff"
                           strokeWidth="1.5"
-                          className="transition-all duration-300 hover:opacity-80 cursor-pointer"
+                          className="transition-all duration-300 hover:opacity-80 hover:scale-105 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setModalOpen('production-status');
+                          }}
                         />
                       );
                     }).filter(Boolean);
@@ -1563,6 +1607,420 @@ export function OverviewPage() {
           )}
         </Card>
       </section>
+
+      {/* Graph Modals */}
+      {/* Monthly Transactions Modal */}
+      <Modal
+        title="Monthly Transactions - Detailed View"
+        open={modalOpen === 'monthly-transactions'}
+        onClose={() => setModalOpen(null)}
+      >
+        <div className="space-y-6 py-4">
+          <div className="h-96 flex items-end gap-3 sm:gap-4 pb-12">
+            {monthlyTransactions.map((item, index) => {
+              const income = typeof item.income === 'number' ? item.income : parseFloat(String(item.income || 0)) || 0;
+              const expense = typeof item.expense === 'number' ? item.expense : parseFloat(String(item.expense || 0)) || 0;
+              const profit = typeof item.profit === 'number' ? item.profit : parseFloat(String(item.profit || 0)) || 0;
+              
+              const allTotals = monthlyTransactions.map(i => {
+                const inc = typeof i.income === 'number' ? i.income : parseFloat(String(i.income || 0)) || 0;
+                const exp = typeof i.expense === 'number' ? i.expense : parseFloat(String(i.expense || 0)) || 0;
+                return inc + exp;
+              });
+              const maxValue = Math.max(...allTotals, 1);
+              
+              const total = income + expense;
+              const totalHeightPercent = maxValue > 0 ? (total / maxValue) * 100 : 0;
+              const incomeHeightPercent = total > 0 ? (income / total) * totalHeightPercent : 0;
+              const expenseHeightPercent = total > 0 ? (expense / total) * totalHeightPercent : 0;
+              const minBarHeight = total > 0 ? Math.max(totalHeightPercent, 5) : 0;
+              
+              const monthLabel = item.month 
+                ? (() => {
+                    const [year, month] = item.month.split('-');
+                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    const monthIndex = parseInt(month, 10) - 1;
+                    return monthIndex >= 0 && monthIndex < 12 
+                      ? `${monthNames[monthIndex]} ${year}`
+                      : item.month;
+                  })()
+                : `Month ${index + 1}`;
+              
+              return (
+                <div
+                  key={`${item.month || index}-${index}`}
+                  className="flex-1 flex flex-col items-center group relative min-w-0"
+                >
+                  <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
+                    <div className="bg-slate-900 text-white text-sm rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
+                      <div className="font-bold text-base">{monthLabel}</div>
+                      <div className="border-t border-slate-700 mt-2 pt-2 space-y-1">
+                        <div className="text-emerald-300 font-medium">Income: ₹{income.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="text-amber-300 font-medium">Expense: ₹{expense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className={profit >= 0 ? "text-emerald-300 font-medium" : "text-red-300 font-medium"}>
+                          Profit: ₹{profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                      <div className="border-t border-slate-700 mt-2 pt-2 font-bold text-base">
+                        Total: ₹{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                  </div>
+                  
+                  <div
+                    className="w-full rounded-t-xl relative transition-all duration-300"
+                    style={{ 
+                      height: `${minBarHeight}%`,
+                      minHeight: total > 0 ? '20px' : '4px'
+                    }}
+                  >
+                    {income > 0 && (
+                      <div
+                        className="absolute bottom-0 left-0 right-0 rounded-t-xl bg-gradient-to-t from-emerald-600 to-emerald-400 transition-all border border-emerald-700/20"
+                        style={{ 
+                          height: `${incomeHeightPercent}%`,
+                          minHeight: incomeHeightPercent > 0 ? '8px' : '0px'
+                        }}
+                      />
+                    )}
+                    {expense > 0 && (
+                      <div
+                        className="absolute left-0 right-0 rounded-t-xl bg-gradient-to-t from-amber-600 to-amber-400 transition-all border border-amber-700/20"
+                        style={{ 
+                          bottom: `${incomeHeightPercent}%`,
+                          height: `${expenseHeightPercent}%`,
+                          minHeight: expenseHeightPercent > 0 ? '8px' : '0px'
+                        }}
+                      />
+                    )}
+                    {profit !== 0 && (
+                      <div
+                        className={`absolute left-0 right-0 rounded-t-xl transition-all ${
+                          profit > 0 
+                            ? 'bg-gradient-to-t from-emerald-500 to-emerald-300 border border-emerald-600/30' 
+                            : 'bg-gradient-to-t from-red-500 to-red-300 border border-red-600/30'
+                        }`}
+                        style={{ 
+                          top: '-3px',
+                          height: '4px',
+                        }}
+                      />
+                    )}
+                    {minBarHeight > 8 && total > 0 && (
+                      <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs font-semibold text-slate-700 whitespace-nowrap">
+                        {total >= 1000000
+                          ? `₹${(total / 1000000).toFixed(1)}M`
+                          : total >= 1000 
+                          ? `₹${(total / 1000).toFixed(1)}K`
+                          : `₹${total.toFixed(0)}`
+                        }
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-3 text-xs text-slate-700 font-semibold text-center w-full">
+                    {monthLabel}
+                  </div>
+                  {profit !== 0 && (
+                    <div className={`mt-1 text-xs font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {profit >= 0 ? '↑' : '↓'} {profit >= 0 ? '₹' : '-₹'}{Math.abs(profit).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-center gap-6 text-sm pt-4 border-t border-slate-200">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-gradient-to-br from-emerald-600 to-emerald-400" />
+              <span className="text-slate-700 font-semibold">Income</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-gradient-to-br from-amber-600 to-amber-400" />
+              <span className="text-slate-700 font-semibold">Expense</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded border-2 border-emerald-500 bg-emerald-50" />
+              <span className="text-slate-700 font-semibold">Profit</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded border-2 border-red-500 bg-red-50" />
+              <span className="text-slate-700 font-semibold">Loss</span>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Weekly Orders Modal */}
+      <Modal
+        title="Weekly Order Volume - Detailed View"
+        open={modalOpen === 'weekly-orders'}
+        onClose={() => setModalOpen(null)}
+      >
+        <div className="space-y-6 py-4">
+          <div className="h-80 flex items-end gap-4 sm:gap-6 pb-12">
+            {weeklyOrders.map((height, idx) => {
+              const maxValue = Math.max(...weeklyOrders, 100);
+              const percentageHeight = maxValue > 0 ? (height / maxValue) * 100 : 0;
+              const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+              
+              return (
+                <div key={idx} className="flex-1 flex flex-col items-center group relative">
+                  <div className="absolute bottom-full mb-3 hidden group-hover:block z-10">
+                    <div className="bg-slate-900 text-white text-sm rounded-lg px-4 py-2 whitespace-nowrap shadow-xl">
+                      <div className="font-bold text-base">{days[idx]}</div>
+                      <div className="text-emerald-300 font-semibold text-lg mt-1">
+                        {height} Orders
+                      </div>
+                    </div>
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                  </div>
+                  <div
+                    className="w-full rounded-t-2xl bg-gradient-to-t from-sky-300 via-sky-400 to-sky-500 transition-all duration-300 hover:from-sky-400 hover:via-sky-500 hover:to-sky-600 hover:shadow-xl hover:scale-105 cursor-pointer border-2 border-sky-600/20"
+                    style={{ height: `${Math.max(percentageHeight, 5)}%`, minHeight: '20px' }}
+                  >
+                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 text-sm font-bold text-slate-700 whitespace-nowrap">
+                      {height}
+                    </div>
+                  </div>
+                  <div className="mt-4 text-sm font-semibold text-slate-700">
+                    {days[idx].slice(0, 3)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="text-center text-sm text-slate-600 pt-4 border-t border-slate-200">
+            <p className="font-semibold">Total Weekly Orders: {weeklyOrders.reduce((a, b) => a + b, 0)}</p>
+            <p className="text-xs mt-1">Average per day: {Math.round(weeklyOrders.reduce((a, b) => a + b, 0) / weeklyOrders.length)}</p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* SLA Hit Rate Modal */}
+      <Modal
+        title="Fulfilment SLA Hit Rate - Detailed View"
+        open={modalOpen === 'sla-hit-rate'}
+        onClose={() => setModalOpen(null)}
+      >
+        <div className="space-y-6 py-4">
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="relative h-64 w-64">
+              <div className="absolute inset-0 rounded-full border-8 border-slate-100 shadow-inner" />
+              <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="45"
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="10"
+                  strokeDasharray={`${2 * Math.PI * 45}`}
+                  strokeDashoffset={`${2 * Math.PI * 45 * (1 - slaHitRate / 100)}`}
+                  className="transition-all duration-1000"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-4 rounded-full bg-white flex flex-col items-center justify-center shadow-lg">
+                <span className="text-5xl font-bold text-emerald-700">
+                  {Math.round(slaHitRate)}%
+                </span>
+                <span className="text-sm text-slate-600 mt-1">Hit Rate</span>
+              </div>
+            </div>
+            <div className="mt-8 space-y-4 text-center max-w-md">
+              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+                <p className="text-sm font-semibold text-emerald-900 mb-2">Performance Status</p>
+                <p className="text-xs text-emerald-700">
+                  {slaHitRate >= 95 
+                    ? 'Excellent - Exceeding SLA targets consistently'
+                    : slaHitRate >= 90
+                    ? 'Good - Meeting SLA targets'
+                    : slaHitRate >= 80
+                    ? 'Fair - Close to SLA targets'
+                    : 'Needs Improvement - Below SLA targets'}
+                </p>
+              </div>
+              <p className="text-xs text-slate-600">
+                Orders shipped within agreed SLA windows across all channels.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Production Status Modal */}
+      <Modal
+        title="Production Status - Detailed View"
+        open={modalOpen === 'production-status'}
+        onClose={() => setModalOpen(null)}
+      >
+        <div className="space-y-6 py-4">
+          <div className="flex flex-col items-center justify-center py-4">
+            <div className="relative w-96 h-96 flex items-center justify-center">
+              <svg 
+                className="w-full h-full transform -rotate-90" 
+                viewBox="0 0 100 100"
+                style={{ overflow: 'visible' }}
+              >
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="45"
+                  fill="#f1f5f9"
+                  stroke="#e2e8f0"
+                  strokeWidth="1"
+                />
+                {(() => {
+                  const colors = [
+                    '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6',
+                    '#ef4444', '#06b6d4', '#ec4899', '#84cc16',
+                  ];
+                  const radius = 45;
+                  const centerX = 50;
+                  const centerY = 50;
+                  let currentAngle = 0;
+                  
+                  const total = productionStatus.reduce((sum, item) => 
+                    sum + (typeof item.count === 'number' ? item.count : parseInt(String(item.count), 10)), 0
+                  );
+                  
+                  const hasPercentages = productionStatus.some(item => {
+                    const pct = item.percentage;
+                    if (pct === undefined || pct === null) return false;
+                    const numPct = typeof pct === 'number' ? pct : parseFloat(String(pct));
+                    return !isNaN(numPct) && numPct > 0;
+                  });
+
+                  if (total === 0 && !hasPercentages) {
+                    return (
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="45"
+                        fill="#f1f5f9"
+                        stroke="#cbd5e1"
+                        strokeWidth="2"
+                        strokeDasharray="4 4"
+                      />
+                    );
+                  }
+
+                  return productionStatus.map((item, index) => {
+                    const count = typeof item.count === 'number' ? item.count : parseInt(String(item.count), 10);
+                    
+                    let percentage = 0;
+                    if (item.percentage !== undefined && item.percentage !== null) {
+                      const pct = typeof item.percentage === 'number' 
+                        ? item.percentage 
+                        : parseFloat(String(item.percentage));
+                      if (!isNaN(pct)) {
+                        percentage = pct;
+                      }
+                    } else if (total > 0) {
+                      percentage = (count / total) * 100;
+                    }
+                    
+                    if (percentage <= 0 || isNaN(percentage)) {
+                      return null;
+                    }
+                    
+                    const angle = (percentage / 100) * 360;
+                    const startAngle = currentAngle;
+                    const endAngle = currentAngle + angle;
+                    
+                    const startAngleRad = (startAngle * Math.PI) / 180;
+                    const endAngleRad = (endAngle * Math.PI) / 180;
+                    const x1 = centerX + radius * Math.cos(startAngleRad);
+                    const y1 = centerY + radius * Math.sin(startAngleRad);
+                    const x2 = centerX + radius * Math.cos(endAngleRad);
+                    const y2 = centerY + radius * Math.sin(endAngleRad);
+                    const largeArcFlag = angle > 180 ? 1 : 0;
+                    
+                    const pathData = [
+                      `M ${centerX} ${centerY}`,
+                      `L ${x1} ${y1}`,
+                      `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+                      'Z'
+                    ].join(' ');
+
+                    currentAngle = endAngle;
+                    
+                    return (
+                      <path
+                        key={item.status}
+                        d={pathData}
+                        fill={colors[index % colors.length]}
+                        stroke="#ffffff"
+                        strokeWidth="2"
+                        className="transition-all duration-300 hover:opacity-90 cursor-pointer"
+                      />
+                    );
+                  }).filter(Boolean);
+                })()}
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-slate-900">
+                    {productionStatusTotal > 0 
+                      ? productionStatusTotal 
+                      : productionStatus.reduce((sum, item) => 
+                          sum + (typeof item.count === 'number' ? item.count : parseInt(String(item.count), 10)), 0
+                        )}
+                  </div>
+                  <div className="text-sm text-slate-500 mt-1">Total Orders</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full max-w-md space-y-3 mt-8">
+              {productionStatus.map((item, index) => {
+                const colors = [
+                  '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6',
+                  '#ef4444', '#06b6d4', '#ec4899', '#84cc16',
+                ];
+                const count = typeof item.count === 'number' ? item.count : parseInt(String(item.count), 10);
+                
+                let percentage: number = 0;
+                if (item.percentage !== undefined && item.percentage !== null) {
+                  percentage = typeof item.percentage === 'number' 
+                    ? item.percentage 
+                    : parseFloat(String(item.percentage));
+                  if (isNaN(percentage)) {
+                    percentage = 0;
+                  }
+                } else {
+                  const total = productionStatus.reduce((sum, i) => 
+                    sum + (typeof i.count === 'number' ? i.count : parseInt(String(i.count), 10)), 0
+                  );
+                  percentage = total > 0 ? (count / total) * 100 : 0;
+                }
+
+                return (
+                  <div key={item.status} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-5 h-5 rounded-full shadow-sm" 
+                        style={{ backgroundColor: colors[index % colors.length] }}
+                      />
+                      <span className="font-semibold text-slate-800 capitalize text-sm">
+                        {item.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-slate-900 font-bold text-base">{count}</span>
+                      <span className="text-slate-500 text-xs ml-2">
+                        ({percentage.toFixed(1)}%)
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

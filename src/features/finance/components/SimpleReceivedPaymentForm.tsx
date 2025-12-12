@@ -1,9 +1,12 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import type { ReceivedPayment, PaymentMethod, Currency } from '../types';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { listCustomers } from '../../crm/api/crmApi';
+import type { Customer } from '../../crm/types';
 
 type Props = {
   initial?: Partial<ReceivedPayment>;
@@ -22,22 +25,63 @@ function generatePaymentNumber(): string {
 export function SimpleReceivedPaymentForm({ initial, onSubmit, onCancel }: Props) {
   // Only fields needed for backend API
   const [paymentNumber, setPaymentNumber] = useState(initial?.payment_number ?? generatePaymentNumber());
-  const [customerId, setCustomerId] = useState(initial?.customer_id ?? '1');
+  const [customerId, setCustomerId] = useState(initial?.customer_id?.toString() ?? '');
   const [paymentDate, setPaymentDate] = useState(initial?.payment_date ?? new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState(initial?.amount?.toString() ?? '');
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'INR');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(initial?.payment_method ?? 'CASH');
   const [referenceNumber, setReferenceNumber] = useState(initial?.reference_number ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  
+  // Customers for dropdown
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  
+  // Fetch customers on component mount
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      setCustomersLoading(true);
+      try {
+        const fetchedCustomers = await listCustomers();
+        setCustomers(fetchedCustomers);
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+        setCustomers([]);
+      } finally {
+        setCustomersLoading(false);
+      }
+    };
+    
+    fetchCustomers();
+  }, []);
+
+  // Update form state when initial prop changes (for edit mode)
+  useEffect(() => {
+    if (initial) {
+      setCustomerId(initial.customer_id?.toString() ?? '');
+    } else {
+      setCustomerId('');
+    }
+  }, [initial]);
+
+  // Prepare customer options for SearchableSelect
+  const customerOptions = customers.map((customer) => ({
+    value: customer.id,
+    label: `${customer.id} - ${customer.name}`,
+    id: customer.id,
+  }));
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     
+    // Find selected customer for display
+    const selectedCustomer = customers.find(cust => cust.id === customerId);
+    
     // Create payload with only the fields backend needs
     const payload: Omit<ReceivedPayment, 'id' | 'created_at' | 'updated_at'> = {
       payment_number: paymentNumber,
-      customer_id: customerId,
-      customer_name: `Customer ${customerId}`, // Will be replaced by backend
+      customer_id: customerId || undefined,
+      customer_name: selectedCustomer?.name || `Customer ${customerId}` || 'Unknown Customer',
       payment_date: paymentDate,
       amount: parseFloat(amount),
       currency,
@@ -74,16 +118,18 @@ export function SimpleReceivedPaymentForm({ initial, onSubmit, onCancel }: Props
           
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              Customer ID <span className="text-red-500">*</span>
+              Customer Name <span className="text-red-500">*</span>
             </label>
-            <Input
-              type="number"
+            <SearchableSelect
               value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              placeholder="1"
+              onChange={(value) => setCustomerId(value)}
+              options={customerOptions}
+              placeholder={customersLoading ? "Loading customers..." : "Search and select customer..."}
+              disabled={customersLoading}
+              maxHeight="200px"
               required
             />
-            <p className="text-xs text-slate-500 mt-1">Numeric customer ID</p>
+            <p className="text-xs text-slate-500 mt-1">Select the customer for this payment</p>
           </div>
           
           <div>
