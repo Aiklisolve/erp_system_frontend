@@ -394,16 +394,28 @@ export function WarehouseList() {
             Track stock movements, transfers, receipts, shipments, and adjustments across warehouse locations.
           </p>
         </div>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => {
-            setEditingMovement(null);
-            setModalOpen(true);
-          }}
-        >
-          New Movement
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setEditingMovement(null);
+              setModalOpen(true);
+            }}
+          >
+            New Movement
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setEditingWarehouse(null);
+              setWarehouseModalOpen(true);
+            }}
+          >
+            New Warehouse
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -510,17 +522,6 @@ export function WarehouseList() {
                   }}
                 />
               </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                  setEditingWarehouse(null);
-                  setWarehouseModalOpen(true);
-                }}
-                className="w-full sm:w-auto"
-              >
-                New Warehouse
-              </Button>
             </div>
 
             {warehousesLoading ? (
