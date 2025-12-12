@@ -23,7 +23,7 @@ import { TransferApprovals } from './TransferApprovals';
 export function FinanceList() {
   const { transactions, loading, statsLoading, dashboardStats, create, update, remove } = useFinance();
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'transactions' | 'accounts' | 'payments' | 'history' | 'approvals'>('transactions');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'transactions' | 'payments' | 'history' | 'approvals'>('accounts');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<FinanceTransaction | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,8 +75,8 @@ export function FinanceList() {
   });
 
   const tabs = [
-    { id: 'transactions', label: 'Transactions', count: transactions.length },
     { id: 'accounts', label: 'Accounts', count: 0 },
+    { id: 'transactions', label: 'Transactions', count: transactions.length },
     { id: 'payments', label: 'Received Payments', count: 0 },
     { id: 'history', label: 'Transaction History', count: 0 },
     { id: 'approvals', label: 'Transfer Approvals', count: 0 }

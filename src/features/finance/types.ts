@@ -3,7 +3,7 @@ import type { BaseEntity } from '../../types/common';
 export type FinanceTransactionType = 'INCOME' | 'EXPENSE' | 'TRANSFER';
 export type FinanceTransactionStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'POSTED' | 'RECONCILED' | 'VOID' | 'REJECTED';
 export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CHECK' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'WIRE_TRANSFER' | 'ONLINE_PAYMENT' | 'OTHER';
-export type AccountType = 'BANK' | 'CASH' | 'CREDIT_CARD' | 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+export type AccountType = 'ASSET' | 'LIABILITY' | 'INCOME' | 'EXPENSE' | 'EQUITY';
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'INR' | 'JPY' | 'CNY' | 'AUD' | 'CAD';
 
 export interface FinanceTransaction extends BaseEntity {
@@ -97,6 +97,7 @@ export interface Account extends BaseEntity {
   ifsc_code?: string;
   swift_code?: string;
   account_holder_name?: string;
+  owner_user_id?: number;
   is_active: boolean;
   is_default?: boolean;
   description?: string;

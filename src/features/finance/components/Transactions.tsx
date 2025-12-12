@@ -109,22 +109,57 @@ function mapBackendToHistory(backendTx: any): TransactionHistory {
   else if (backendTx.transaction_type === 'TRANSFER') direction = 'TRANSFER';
   else if (backendTx.transaction_type === 'EXPENSE') direction = 'OUT';
   
+  // Extract account names from nested objects
+  const sourceAccountName = backendTx.from_account?.account_name 
+    || backendTx.source_account_name 
+    || backendTx.account_name 
+    || 'General Account';
+  
+  // For TRANSFER transactions, always try to get destination account name
+  const destinationAccountName = backendTx.to_account?.account_name 
+    || backendTx.destination_account_name 
+    || (backendTx.transaction_type === 'TRANSFER' && backendTx.to_account_id ? `Account ID: ${backendTx.to_account_id}` : '');
+  
+  // Extract customer/vendor name from nested objects
+  const counterpartyName = backendTx.customer?.name 
+    || backendTx.vendor?.name
+    || backendTx.counterparty_name 
+    || backendTx.vendor_name 
+    || backendTx.customer_name 
+    || '';
+  
+  // Extract customer details
+  const counterpartyDetails = backendTx.customer 
+    ? `Customer ID: ${backendTx.customer.id || backendTx.customer.customer_number || ''}, Email: ${backendTx.customer.email || 'N/A'}`
+    : backendTx.counterparty_details || '';
+  
+  // Extract created by user name
+  const createdByName = backendTx.created_by_user?.full_name 
+    || backendTx.created_by_user?.email
+    || backendTx.created_by_name 
+    || '';
+  
   return {
     id: txId,
     transaction_number: backendTx.transaction_number || '',
+    category_id: backendTx.category_id,
     category_name: backendTx.category || 'General',
     transaction_direction: direction,
     transaction_type: backendTx.transaction_type || 'EXPENSE',
-    transaction_title: `${backendTx.transaction_type} - ${backendTx.category || 'General'}`,
+    transaction_title: backendTx.description || `${backendTx.transaction_type} - ${backendTx.category || 'General'}`,
     transaction_description: backendTx.description || '',
     transaction_amount: parseFloat(backendTx.amount) || 0,
     transaction_date: backendTx.transaction_date ? new Date(backendTx.transaction_date).toISOString().split('T')[0] : '',
     transaction_status: backendTx.status || 'POSTED',
     payment_method: backendTx.payment_method?.toUpperCase().replace(/\s+/g, '_') as any,
     reference_number: backendTx.reference_number || '',
-    source_account_name: backendTx.source_account_name || backendTx.account_name || 'General Account',
-    counterparty_name: backendTx.counterparty_name || backendTx.vendor_name || backendTx.customer_name || '',
-    approval_required: backendTx.approval_required ?? true,
+    source_account_id: backendTx.from_account?.account_id || backendTx.account_id || backendTx.source_account_id,
+    source_account_name: sourceAccountName,
+    destination_account_id: backendTx.to_account?.account_id || backendTx.to_account_id || backendTx.destination_account_id,
+    destination_account_name: destinationAccountName,
+    counterparty_name: counterpartyName,
+    counterparty_details: counterpartyDetails,
+    approval_required: backendTx.approval_required ?? false,
     approved_by_name: backendTx.approved_by_name || backendTx.approved_by || '',
     approval_datetime: backendTx.approval_datetime || backendTx.approved_at || '',
     approval_comments: backendTx.approval_comments || '',
@@ -134,7 +169,15 @@ function mapBackendToHistory(backendTx: any): TransactionHistory {
     tags: backendTx.tags || [],
     currency: (backendTx.currency || 'INR') as any,
     created_at: backendTx.created_at || '',
-  };
+    // Store full backend object for details view
+    ...(backendTx.tax_amount && { tax_amount: parseFloat(backendTx.tax_amount) }),
+    ...(backendTx.created_by && { created_by: backendTx.created_by }),
+    ...(backendTx.created_by_user && { created_by_user: backendTx.created_by_user }),
+    ...(backendTx.from_account && { from_account: backendTx.from_account }),
+    // Always preserve to_account object for TRANSFER transactions, even if null
+    ...(backendTx.transaction_type === 'TRANSFER' || backendTx.to_account ? { to_account: backendTx.to_account || {} } : {}),
+    ...(backendTx.customer && { customer: backendTx.customer }),
+  } as any;
 }
 
 export function Transactions() {
@@ -230,7 +273,7 @@ export function Transactions() {
       header: 'Transaction #',
       render: (row) => (
         <div className="font-medium text-slate-900">
-          {row.transaction_number}
+          <div className="text-xs">{row.transaction_number}</div>
           {row.reference_number && (
             <div className="text-[10px] text-slate-500">Ref: {row.reference_number}</div>
           )}
@@ -241,41 +284,52 @@ export function Transactions() {
       key: 'transaction_date',
       header: 'Date',
       render: (row) => (
-        <div className="text-xs text-slate-900">{new Date(row.transaction_date).toLocaleDateString()}</div>
+        <div className="text-xs text-slate-900">
+          {new Date(row.transaction_date).toLocaleDateString()}
+        </div>
       )
     },
     {
       key: 'transaction_direction',
-      header: 'Direction',
+      header: 'Type',
       render: (row) => (
-        <Badge
-          tone={
-            row.transaction_direction === 'IN'
-              ? 'success'
-              : row.transaction_direction === 'OUT'
-              ? 'danger'
-              : 'brand'
-          }
-        >
-          {row.transaction_direction}
-        </Badge>
+        <div>
+          <Badge
+            tone={
+              row.transaction_direction === 'IN'
+                ? 'success'
+                : row.transaction_direction === 'OUT'
+                ? 'danger'
+                : 'brand'
+            }
+          >
+            {row.transaction_direction}
+          </Badge>
+          <div className="text-[10px] text-slate-500 mt-1">{row.transaction_type}</div>
+        </div>
       )
     },
     {
-      key: 'transaction_title',
-      header: 'Title',
+      key: 'source_account_name',
+      header: 'From Account',
       render: (row) => (
-        <div>
-          <div className="text-xs font-medium text-slate-900">{row.transaction_title}</div>
-          {row.category_name && (
-            <div className="text-[10px] text-slate-500">{row.category_name}</div>
-          )}
+        <div className="text-xs text-slate-900">
+          {row.source_account_name || <span className="text-slate-400">—</span>}
+        </div>
+      )
+    },
+    {
+      key: 'destination_account_name',
+      header: 'To Account',
+      render: (row) => (
+        <div className="text-xs text-slate-900">
+          {row.destination_account_name || <span className="text-slate-400">—</span>}
         </div>
       )
     },
     {
       key: 'counterparty_name',
-      header: 'Counterparty',
+      header: 'Customer/Vendor',
       render: (row) => (
         <div className="text-xs text-slate-600">
           {row.counterparty_name || <span className="text-slate-400">—</span>}
@@ -283,16 +337,48 @@ export function Transactions() {
       )
     },
     {
+      key: 'category_name',
+      header: 'Category',
+      render: (row) => (
+        <div className="text-xs text-slate-600">
+          {row.category_name || <span className="text-slate-400">—</span>}
+        </div>
+      )
+    },
+    {
       key: 'transaction_amount',
       header: 'Amount',
-      render: (row) => (
-        <div className="text-right">
-          <div className={`text-xs font-semibold ${
-            row.transaction_direction === 'IN' ? 'text-emerald-600' : row.transaction_direction === 'OUT' ? 'text-red-600' : 'text-slate-900'
-          }`}>
-            {row.transaction_direction === 'OUT' ? '-' : ''}
-            {row.currency} {row.transaction_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      render: (row) => {
+        const taxAmount = (row as any).tax_amount || 0;
+        const netAmount = row.transaction_amount - taxAmount;
+        return (
+          <div className="text-right">
+            <div className={`text-xs font-semibold ${
+              row.transaction_direction === 'IN' ? 'text-emerald-600' : row.transaction_direction === 'OUT' ? 'text-red-600' : 'text-slate-900'
+            }`}>
+              {row.transaction_direction === 'OUT' ? '-' : ''}
+              {row.currency} {row.transaction_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            {taxAmount > 0 && (
+              <div className="text-[10px] text-slate-500">
+                Tax: {row.currency} {taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            )}
+            {taxAmount > 0 && (
+              <div className="text-[10px] text-slate-600 font-medium">
+                Net: {row.currency} {netAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            )}
           </div>
+        );
+      }
+    },
+    {
+      key: 'payment_method',
+      header: 'Payment Method',
+      render: (row) => (
+        <div className="text-xs text-slate-600">
+          {row.payment_method ? row.payment_method.replace(/_/g, ' ') : <span className="text-slate-400">—</span>}
         </div>
       )
     },
@@ -510,138 +596,350 @@ export function Transactions() {
         }}
         title="Transaction Details"
       >
-        {selectedTransaction && (
-          <div className="space-y-6">
-            {/* Basic Information */}
-              <div>
-              <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
-                Basic Information
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-xs">
-            <div>
-                  <span className="text-slate-500">Transaction #:</span>
-                  <div className="font-medium text-slate-900">{selectedTransaction.transaction_number}</div>
-            </div>
-            <div>
-                  <span className="text-slate-500">Date:</span>
-                  <div className="font-medium text-slate-900">{new Date(selectedTransaction.transaction_date).toLocaleDateString()}</div>
-            </div>
-            <div>
-                  <span className="text-slate-500">Direction:</span>
-                  <div><Badge tone={selectedTransaction.transaction_direction === 'IN' ? 'success' : selectedTransaction.transaction_direction === 'OUT' ? 'danger' : 'brand'}>{selectedTransaction.transaction_direction}</Badge></div>
-            </div>
-              <div>
-                  <span className="text-slate-500">Amount:</span>
-                  <div className="font-semibold text-slate-900">{selectedTransaction.currency} {selectedTransaction.transaction_amount.toLocaleString()}</div>
-              </div>
-                <div className="col-span-2">
-                  <span className="text-slate-500">Title:</span>
-                  <div className="font-medium text-slate-900">{selectedTransaction.transaction_title}</div>
-              </div>
-                {selectedTransaction.transaction_description && (
-                  <div className="col-span-2">
-                    <span className="text-slate-500">Description:</span>
-                    <div className="text-slate-900">{selectedTransaction.transaction_description}</div>
-              </div>
-                )}
-                    </div>
-                          </div>
-
-            {/* Account Information */}
-              <div>
-              <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
-                Account Information
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-xs">
-                {selectedTransaction.source_account_name && (
-              <div>
-                    <span className="text-slate-500">Source Account:</span>
-                    <div className="font-medium text-slate-900">{selectedTransaction.source_account_name}</div>
-              </div>
-                )}
-                {selectedTransaction.destination_account_name && (
-                <div>
-                    <span className="text-slate-500">Destination Account:</span>
-                    <div className="font-medium text-slate-900">{selectedTransaction.destination_account_name}</div>
-                </div>
-              )}
-                {selectedTransaction.counterparty_name && (
-                  <div className="col-span-2">
-                    <span className="text-slate-500">Counterparty:</span>
-                    <div className="font-medium text-slate-900">{selectedTransaction.counterparty_name}</div>
-              </div>
-                )}
-              </div>
-            </div>
-
-            {/* Approval Information */}
-            {selectedTransaction.approval_required && (
+        {selectedTransaction && (() => {
+          const tx = selectedTransaction as any;
+          const taxAmount = tx.tax_amount || 0;
+          const netAmount = selectedTransaction.transaction_amount - taxAmount;
+          const fromAccount = tx.from_account || {};
+          const toAccount = tx.to_account || {};
+          const customer = tx.customer || {};
+          const createdByUser = tx.created_by_user || {};
+          
+          return (
+            <div className="space-y-6">
+              {/* Basic Information */}
               <div>
                 <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
-                  Approval Information
+                  Basic Information
                 </h3>
                 <div className="grid grid-cols-2 gap-4 text-xs">
-                  {selectedTransaction.approved_by_name && (
+                  <div>
+                    <span className="text-slate-500">Transaction #:</span>
+                    <div className="font-medium text-slate-900">{selectedTransaction.transaction_number}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Reference Number:</span>
+                    <div className="font-medium text-slate-900">{selectedTransaction.reference_number || '—'}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Date:</span>
+                    <div className="font-medium text-slate-900">{new Date(selectedTransaction.transaction_date).toLocaleDateString()}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Type:</span>
+                    <div>
+                      <Badge tone={selectedTransaction.transaction_direction === 'IN' ? 'success' : selectedTransaction.transaction_direction === 'OUT' ? 'danger' : 'brand'}>
+                        {selectedTransaction.transaction_type}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Status:</span>
+                    <div>
+                      <Badge tone={selectedTransaction.transaction_status === 'POSTED' || selectedTransaction.transaction_status === 'RECONCILED' ? 'success' : selectedTransaction.transaction_status === 'APPROVED' ? 'brand' : 'warning'}>
+                        {selectedTransaction.transaction_status}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Category:</span>
+                    <div className="font-medium text-slate-900">{selectedTransaction.category_name || '—'}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-500">Description:</span>
+                    <div className="text-slate-900">{selectedTransaction.transaction_description || selectedTransaction.transaction_title || '—'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Amount Details */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
+                  Amount Details
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-500">Gross Amount:</span>
+                    <div className={`font-semibold text-slate-900 ${
+                      selectedTransaction.transaction_direction === 'IN' ? 'text-emerald-600' : selectedTransaction.transaction_direction === 'OUT' ? 'text-red-600' : ''
+                    }`}>
+                      {selectedTransaction.transaction_direction === 'OUT' ? '-' : ''}
+                      {selectedTransaction.currency} {selectedTransaction.transaction_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  {taxAmount > 0 && (
                     <>
-              <div>
-                        <span className="text-slate-500">Approved By:</span>
-                        <div className="font-medium text-slate-900">{selectedTransaction.approved_by_name}</div>
-              </div>
-              <div>
-                        <span className="text-slate-500">Approval Date:</span>
-                        <div className="font-medium text-slate-900">{selectedTransaction.approval_datetime ? new Date(selectedTransaction.approval_datetime).toLocaleString() : '—'}</div>
-              </div>
-                      {selectedTransaction.approval_comments && (
-                        <div className="col-span-2">
-                          <span className="text-slate-500">Comments:</span>
-                          <div className="text-slate-900">{selectedTransaction.approval_comments}</div>
-              </div>
-                      )}
+                      <div>
+                        <span className="text-slate-500">Tax Amount:</span>
+                        <div className="font-medium text-slate-900">
+                          {selectedTransaction.currency} {taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-slate-500">Net Amount:</span>
+                        <div className="font-semibold text-slate-900">
+                          {selectedTransaction.currency} {netAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
                     </>
                   )}
-              </div>
-              </div>
-            )}
-
-            {/* Reconciliation Information */}
-              <div>
-              <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
-                Reconciliation
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-xs">
-              <div>
-                  <span className="text-slate-500">Status:</span>
-                  <div><Badge tone={selectedTransaction.reconciliation_status === 'RECONCILED' ? 'success' : 'warning'}>{selectedTransaction.reconciliation_status}</Badge></div>
-              </div>
-                {selectedTransaction.reconciled_by_name && (
-                  <>
-              <div>
-                      <span className="text-slate-500">Reconciled By:</span>
-                      <div className="font-medium text-slate-900">{selectedTransaction.reconciled_by_name}</div>
-              </div>
-                    <div className="col-span-2">
-                      <span className="text-slate-500">Reconciliation Date:</span>
-                      <div className="font-medium text-slate-900">{selectedTransaction.reconciliation_date ? new Date(selectedTransaction.reconciliation_date).toLocaleDateString() : '—'}</div>
+                  <div>
+                    <span className="text-slate-500">Currency:</span>
+                    <div className="font-medium text-slate-900">{selectedTransaction.currency}</div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Payment Method:</span>
+                    <div className="font-medium text-slate-900">
+                      {selectedTransaction.payment_method ? selectedTransaction.payment_method.replace(/_/g, ' ') : '—'}
+                    </div>
+                  </div>
                 </div>
-                  </>
+              </div>
+
+              {/* Account Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
+                  Account Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  {/* From Account */}
+                  {selectedTransaction.source_account_name && (
+                    <div>
+                      <span className="text-slate-500">From Account:</span>
+                      <div className="font-medium text-slate-900">{selectedTransaction.source_account_name}</div>
+                      {fromAccount.account_code && (
+                        <div className="text-[10px] text-slate-500">Code: {fromAccount.account_code}</div>
+                      )}
+                      {fromAccount.account_type && (
+                        <div className="text-[10px] text-slate-500">Type: {fromAccount.account_type}</div>
+                      )}
+                      {selectedTransaction.source_account_id && (
+                        <div className="text-[10px] text-slate-500">ID: {selectedTransaction.source_account_id}</div>
+                      )}
+                      {fromAccount.currency && (
+                        <div className="text-[10px] text-slate-500">Currency: {fromAccount.currency}</div>
+                      )}
+                      {fromAccount.is_active !== undefined && (
+                        <div className="text-[10px] text-slate-500">
+                          Status: {fromAccount.is_active ? 'Active' : 'Inactive'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {/* To Account - Always show for TRANSFER transactions */}
+                  {selectedTransaction.transaction_type === 'TRANSFER' && (
+                    <div>
+                      <span className="text-slate-500">To Account:</span>
+                      {selectedTransaction.destination_account_name || toAccount.account_name ? (
+                        <>
+                          <div className="font-medium text-slate-900">
+                            {selectedTransaction.destination_account_name || toAccount.account_name}
+                          </div>
+                          {toAccount.account_code && (
+                            <div className="text-[10px] text-slate-500">Code: {toAccount.account_code}</div>
+                          )}
+                          {toAccount.account_type && (
+                            <div className="text-[10px] text-slate-500">Type: {toAccount.account_type}</div>
+                          )}
+                          {(selectedTransaction.destination_account_id || toAccount.account_id) && (
+                            <div className="text-[10px] text-slate-500">ID: {selectedTransaction.destination_account_id || toAccount.account_id}</div>
+                          )}
+                          {toAccount.currency && (
+                            <div className="text-[10px] text-slate-500">Currency: {toAccount.currency}</div>
+                          )}
+                          {toAccount.is_active !== undefined && toAccount.is_active !== null && (
+                            <div className="text-[10px] text-slate-500">
+                              Status: {toAccount.is_active ? 'Active' : 'Inactive'}
+                            </div>
+                          )}
+                        </>
+                      ) : (selectedTransaction.destination_account_id || toAccount.account_id) ? (
+                        <>
+                          <div className="font-medium text-slate-900">
+                            Account ID: {selectedTransaction.destination_account_id || toAccount.account_id}
+                          </div>
+                          {toAccount.account_code && (
+                            <div className="text-[10px] text-slate-500">Code: {toAccount.account_code}</div>
+                          )}
+                          {toAccount.account_type && (
+                            <div className="text-[10px] text-slate-500">Type: {toAccount.account_type}</div>
+                          )}
+                          {toAccount.currency && (
+                            <div className="text-[10px] text-slate-500">Currency: {toAccount.currency}</div>
+                          )}
+                          {toAccount.is_active !== undefined && toAccount.is_active !== null && (
+                            <div className="text-[10px] text-slate-500">
+                              Status: {toAccount.is_active ? 'Active' : 'Inactive'}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-slate-400 italic">To account details not available</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Customer/Vendor Information */}
+              {selectedTransaction.counterparty_name && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
+                    Customer/Vendor Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-slate-500">Name:</span>
+                      <div className="font-medium text-slate-900">{selectedTransaction.counterparty_name}</div>
+                    </div>
+                    {customer.id && (
+                      <div>
+                        <span className="text-slate-500">Customer ID:</span>
+                        <div className="font-medium text-slate-900">{customer.id}</div>
+                      </div>
+                    )}
+                    {customer.customer_number && (
+                      <div>
+                        <span className="text-slate-500">Customer Number:</span>
+                        <div className="font-medium text-slate-900">{customer.customer_number}</div>
+                      </div>
+                    )}
+                    {customer.email && (
+                      <div>
+                        <span className="text-slate-500">Email:</span>
+                        <div className="font-medium text-slate-900">{customer.email}</div>
+                      </div>
+                    )}
+                    {customer.phone && (
+                      <div>
+                        <span className="text-slate-500">Phone:</span>
+                        <div className="font-medium text-slate-900">{customer.phone}</div>
+                      </div>
+                    )}
+                    {customer.company_name && (
+                      <div className="col-span-2">
+                        <span className="text-slate-500">Company:</span>
+                        <div className="font-medium text-slate-900">{customer.company_name}</div>
+                      </div>
+                    )}
+                    {selectedTransaction.counterparty_details && (
+                      <div className="col-span-2">
+                        <span className="text-slate-500">Details:</span>
+                        <div className="text-slate-900">{selectedTransaction.counterparty_details}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
-                </div>
-                </div>
 
-            <div className="flex justify-end">
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => {
-                  setDetailsModalOpen(false);
-                  setSelectedTransaction(null);
-                }}
-              >
-                Close
+              {/* Approval Information */}
+              {selectedTransaction.approval_required && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
+                    Approval Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    {selectedTransaction.approved_by_name && (
+                      <>
+                        <div>
+                          <span className="text-slate-500">Approved By:</span>
+                          <div className="font-medium text-slate-900">{selectedTransaction.approved_by_name}</div>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Approval Date:</span>
+                          <div className="font-medium text-slate-900">
+                            {selectedTransaction.approval_datetime ? new Date(selectedTransaction.approval_datetime).toLocaleString() : '—'}
+                          </div>
+                        </div>
+                        {selectedTransaction.approval_comments && (
+                          <div className="col-span-2">
+                            <span className="text-slate-500">Comments:</span>
+                            <div className="text-slate-900">{selectedTransaction.approval_comments}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Reconciliation Information */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
+                  Reconciliation
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="text-slate-500">Status:</span>
+                    <div>
+                      <Badge tone={selectedTransaction.reconciliation_status === 'RECONCILED' ? 'success' : selectedTransaction.reconciliation_status === 'PENDING' ? 'warning' : 'neutral'}>
+                        {selectedTransaction.reconciliation_status}
+                      </Badge>
+                    </div>
+                  </div>
+                  {selectedTransaction.reconciled_by_name && (
+                    <>
+                      <div>
+                        <span className="text-slate-500">Reconciled By:</span>
+                        <div className="font-medium text-slate-900">{selectedTransaction.reconciled_by_name}</div>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-500">Reconciliation Date:</span>
+                        <div className="font-medium text-slate-900">
+                          {selectedTransaction.reconciliation_date ? new Date(selectedTransaction.reconciliation_date).toLocaleDateString() : '—'}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Created Information */}
+              {createdByUser.full_name || createdByUser.email || tx.created_by && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 mb-3 pb-2 border-b border-slate-200">
+                    Created Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    {createdByUser.full_name && (
+                      <div>
+                        <span className="text-slate-500">Created By:</span>
+                        <div className="font-medium text-slate-900">{createdByUser.full_name}</div>
+                      </div>
+                    )}
+                    {createdByUser.email && (
+                      <div>
+                        <span className="text-slate-500">Email:</span>
+                        <div className="font-medium text-slate-900">{createdByUser.email}</div>
+                      </div>
+                    )}
+                    {selectedTransaction.created_at && (
+                      <div>
+                        <span className="text-slate-500">Created At:</span>
+                        <div className="font-medium text-slate-900">
+                          {new Date(selectedTransaction.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4 border-t border-slate-200">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={() => {
+                    setDetailsModalOpen(false);
+                    setSelectedTransaction(null);
+                  }}
+                >
+                  Close
                 </Button>
               </div>
             </div>
-      )}
+          );
+        })()}
       </Modal>
     </div>
   );

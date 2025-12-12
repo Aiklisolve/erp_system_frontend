@@ -1,7 +1,17 @@
 import { supabase, hasSupabaseConfig } from '../../../lib/supabaseClient';
 import { handleApiError } from '../../../lib/errorHandler';
 import { apiRequest } from '../../../config/api';
-import type { FinanceTransaction, Account, ReceivedPayment } from '../types';
+import type { FinanceTransaction, Account, ReceivedPayment, AccountType } from '../types';
+
+// User type for account holder
+export interface User {
+  id: number;
+  user_id: number;
+  name: string;
+  full_name: string;
+  email: string;
+  employee_id: number;
+}
 
 let useStatic = !hasSupabaseConfig;
 
@@ -362,29 +372,75 @@ function nextPaymentId() {
 
 // Map backend transaction to frontend format
 function mapBackendTransaction(backendTx: any): FinanceTransaction {
-  return {
+  // Extract account_id from nested from_account object or direct field
+  const accountId = backendTx.from_account?.account_id !== undefined && backendTx.from_account?.account_id !== null
+    ? backendTx.from_account.account_id.toString()
+    : backendTx.account_id?.toString();
+  
+  // Extract customer_id from nested customer object or direct field
+  const customerId = backendTx.customer?.id !== undefined && backendTx.customer?.id !== null
+    ? backendTx.customer.id.toString()
+    : backendTx.customer_id?.toString() || backendTx.vendor_customer_id?.toString();
+  
+  // Extract to_account_id from nested to_account object or direct field
+  const toAccountId = backendTx.to_account?.account_id !== undefined && backendTx.to_account?.account_id !== null
+    ? backendTx.to_account.account_id.toString()
+    : backendTx.to_account_id?.toString();
+  
+  // Extract account name from nested from_account object or direct field
+  const accountName = backendTx.from_account?.account_name 
+    || backendTx.account_name 
+    || backendTx.account 
+    || 'General Account';
+  
+  // Extract customer name from nested customer object or direct field
+  const customerName = backendTx.customer?.name 
+    || backendTx.customer_name 
+    || backendTx.party_name;
+  
+  // Extract to_account name from nested to_account object or direct field
+  const toAccountName = backendTx.to_account?.account_name 
+    || backendTx.to_account_name 
+    || backendTx.to_account;
+
+  const mapped: any = {
     id: backendTx.id?.toString() || backendTx.transaction_number,
     transaction_number: backendTx.transaction_number,
     reference_number: backendTx.reference_number,
     date: backendTx.transaction_date ? new Date(backendTx.transaction_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
     type: backendTx.transaction_type?.toUpperCase() as any || 'EXPENSE',
     status: (backendTx.status?.toUpperCase() || 'POSTED') as any,
-    account: backendTx.account_id?.toString() || 'General Account',
-    account_type: 'BANK',
+    account: accountName,
+    account_type: backendTx.from_account?.account_type || 'ASSET',
     amount: parseFloat(backendTx.amount) || 0,
     currency: (backendTx.currency || 'INR') as any,
     tax_amount: parseFloat(backendTx.tax_amount) || 0,
     net_amount: parseFloat(backendTx.amount) - parseFloat(backendTx.tax_amount || '0'),
     payment_method: (backendTx.payment_method?.toUpperCase().replace(/\s+/g, '_') || 'BANK_TRANSFER') as any,
     payment_date: backendTx.transaction_date ? new Date(backendTx.transaction_date).toISOString().split('T')[0] : undefined,
-    party_name: backendTx.vendor_customer_id?.toString() || undefined,
+    party_name: customerName,
     category: backendTx.category || 'General',
     description: backendTx.description,
     notes: backendTx.notes,
     created_by: backendTx.created_by?.toString(),
     created_at: backendTx.created_at,
     is_reconciled: backendTx.status === 'COMPLETED',
+    // Preserve to_account for TRANSFER transactions
+    to_account: toAccountName,
   };
+  
+  // Preserve account_id, to_account_id, and customer_id (extracted from nested objects or direct fields)
+  if (accountId !== undefined && accountId !== null) {
+    mapped.account_id = accountId;
+  }
+  if (toAccountId !== undefined && toAccountId !== null) {
+    mapped.to_account_id = toAccountId;
+  }
+  if (customerId !== undefined && customerId !== null) {
+    mapped.customer_id = customerId;
+  }
+  
+  return mapped as FinanceTransaction;
 }
 
 // Get Finance Dashboard Statistics
@@ -468,7 +524,7 @@ export async function createTransaction(
       console.log('Creating transaction via backend API:', payload);
       
       // Map frontend format to backend format
-      const backendPayload = {
+      const backendPayload: any = {
         transaction_type: payload.type,
         category: payload.category || 'General',
         amount: payload.amount,
@@ -480,6 +536,21 @@ export async function createTransaction(
         status: payload.status || 'COMPLETED',
         tax_amount: payload.tax_amount || 0,
       };
+      
+      // Add account_id if provided
+      if ((payload as any).account_id) {
+        backendPayload.account_id = (payload as any).account_id;
+      }
+      
+      // Add to_account_id if provided
+      if ((payload as any).to_account_id) {
+        backendPayload.to_account_id = (payload as any).to_account_id;
+      }
+      
+      // Add customer_id if provided
+      if ((payload as any).customer_id) {
+        backendPayload.customer_id = (payload as any).customer_id;
+      }
       
       console.log('Backend payload:', backendPayload);
       
@@ -552,6 +623,21 @@ export async function updateTransaction(
       if (changes.description !== undefined) backendPayload.description = changes.description;
       if (changes.status) backendPayload.status = changes.status;
       if (changes.tax_amount !== undefined) backendPayload.tax_amount = changes.tax_amount;
+      
+      // Add account_id if provided
+      if ((changes as any).account_id !== undefined) {
+        backendPayload.account_id = (changes as any).account_id;
+      }
+      
+      // Add to_account_id if provided
+      if ((changes as any).to_account_id !== undefined) {
+        backendPayload.to_account_id = (changes as any).to_account_id;
+      }
+      
+      // Add customer_id if provided
+      if ((changes as any).customer_id !== undefined) {
+        backendPayload.customer_id = (changes as any).customer_id;
+      }
       
       console.log('Backend update payload:', backendPayload);
       
@@ -652,15 +738,25 @@ function mapBackendAccount(backendAcc: any): Account {
   // IMPORTANT: Use backend's numeric ID directly as string for consistency
   const accountId = backendAcc.id?.toString() || backendAcc.account_id?.toString();
   
+  // Validate and normalize account_type to ensure it matches allowed values
+  const validAccountTypes: AccountType[] = ['ASSET', 'LIABILITY', 'INCOME', 'EXPENSE', 'EQUITY'];
+  const normalizedAccountType = backendAcc.account_type && 
+    validAccountTypes.includes(backendAcc.account_type as AccountType)
+    ? (backendAcc.account_type as AccountType)
+    : 'ASSET';
+
   return {
     id: accountId, // Convert to string for frontend consistency
     account_number: backendAcc.account_code || '',
     account_name: backendAcc.account_name || '',
-    account_type: backendAcc.account_type || 'BANK',
+    account_type: normalizedAccountType,
     currency: backendAcc.currency || 'INR',
     opening_balance: parseFloat(backendAcc.opening_balance) || 0,
     current_balance: parseFloat(backendAcc.current_balance) || parseFloat(backendAcc.opening_balance) || 0,
     is_active: backendAcc.is_active !== false,
+    owner_user_id: backendAcc.owner_user_id !== undefined && backendAcc.owner_user_id !== null 
+      ? parseInt(backendAcc.owner_user_id) 
+      : undefined,
     created_at: backendAcc.created_at,
   };
 }
@@ -709,12 +805,17 @@ export async function createAccount(
       console.log('Creating account via backend API:', payload);
       
       // Map frontend format to backend format
-      const backendPayload = {
+      const backendPayload: any = {
         account_code: payload.account_number,
         account_name: payload.account_name,
         account_type: payload.account_type,
         opening_balance: payload.opening_balance
       };
+      
+      // Add owner_user_id if provided
+      if (payload.owner_user_id !== undefined && payload.owner_user_id !== null) {
+        backendPayload.owner_user_id = payload.owner_user_id;
+      }
       
       console.log('Backend account payload:', backendPayload);
       
@@ -782,6 +883,9 @@ export async function updateAccount(
       if (changes.account_type) backendPayload.account_type = changes.account_type;
       if (changes.opening_balance !== undefined) backendPayload.opening_balance = changes.opening_balance;
       if (changes.current_balance !== undefined) backendPayload.current_balance = changes.current_balance;
+      if (changes.owner_user_id !== undefined) {
+        backendPayload.owner_user_id = changes.owner_user_id !== null ? changes.owner_user_id : null;
+      }
       
       console.log('Backend update account payload:', backendPayload);
       
@@ -952,8 +1056,7 @@ export async function createReceivedPayment(
       console.log('Creating received payment via backend API:', payload);
       
       // Map frontend format to backend format
-      const backendPayload = {
-        customer_id: parseInt(payload.customer_id || '1'),
+      const backendPayload: any = {
         payment_date: payload.payment_date,
         amount: payload.amount,
         currency: payload.currency || 'INR',
@@ -961,6 +1064,13 @@ export async function createReceivedPayment(
         reference_number: payload.reference_number || '',
         notes: payload.notes || ''
       };
+      
+      // Add customer_id if provided
+      if (payload.customer_id) {
+        backendPayload.customer_id = typeof payload.customer_id === 'string' 
+          ? parseInt(payload.customer_id) 
+          : payload.customer_id;
+      }
       
       console.log('Backend payment payload:', backendPayload);
       
@@ -1023,7 +1133,11 @@ export async function updateReceivedPayment(
       // Map frontend format to backend format
       const backendPayload: any = {};
       
-      if (changes.customer_id) backendPayload.customer_id = parseInt(changes.customer_id) || 1;
+      if (changes.customer_id !== undefined) {
+        backendPayload.customer_id = typeof changes.customer_id === 'string' 
+          ? parseInt(changes.customer_id) 
+          : changes.customer_id;
+      }
       if (changes.payment_date) backendPayload.payment_date = changes.payment_date;
       if (changes.amount !== undefined) backendPayload.amount = changes.amount;
       if (changes.currency) backendPayload.currency = changes.currency;
@@ -1121,4 +1235,61 @@ export async function deleteReceivedPayment(id: string): Promise<void> {
   }
 }
 
+// ============================================
+// USERS API (for Account Holder dropdown)
+// ============================================
+
+export async function listUsers(): Promise<User[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching users from backend API...');
+      
+      const response = await apiRequest<{ success: boolean; data: { users: any[] } } | { users: any[] } | any[]>(
+        '/users?page=1&limit=1000'
+      );
+      
+      console.log('👥 Backend users response:', response);
+      
+      // Handle different response formats
+      let users = null;
+      
+      if (response && typeof response === 'object') {
+        // If wrapped in success/data
+        if ('success' in response && response.success && 'data' in response && response.data.users) {
+          users = response.data.users;
+        }
+        // If direct users array
+        else if ('users' in response) {
+          users = response.users;
+        }
+        // If direct array
+        else if (Array.isArray(response)) {
+          users = response;
+        }
+      }
+      
+      if (users && Array.isArray(users) && users.length > 0) {
+        const mapped = users.map((u: any) => ({
+          id: parseInt(u.id || u.user_id || u.employee_id) || 0,
+          user_id: parseInt(u.id || u.user_id || u.employee_id) || 0,
+          name: u.name || u.full_name || (u.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : '') || u.email || 'Unknown User',
+          full_name: u.name || u.full_name || (u.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : '') || u.email || 'Unknown User',
+          email: u.email || '',
+          employee_id: parseInt(u.id || u.user_id || u.employee_id) || 0,
+        }));
+        console.log('✅ Mapped users:', mapped.length);
+        return mapped;
+      }
+      
+      console.log('⚠️ No users in response');
+      return [];
+    } catch (error) {
+      console.error('❌ Backend API error fetching users:', error);
+      return [];
+    }
+  }
+  
+  // Fallback to empty array if backend API is not available
+  return [];
+}
 
