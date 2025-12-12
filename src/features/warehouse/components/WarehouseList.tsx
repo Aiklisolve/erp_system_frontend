@@ -19,9 +19,16 @@ import { CreateWarehouseForm } from './CreateWarehouseForm';
 import * as warehouseApi from '../api/warehouseApi';
 
 export function WarehouseList() {
-  const { movements, loading, create, update, remove, refresh, metrics } = useWarehouse();
+  // Map tab to movement type for API filtering
+  const getMovementTypeForTab = (tab: string): string | undefined => {
+    if (tab === 'all') return undefined;
+    return tab.toUpperCase(); // transfer -> TRANSFER, receipt -> RECEIPT, etc.
+  };
+  
+  const [activeTab, setActiveTab] = useState<'all' | 'transfer' | 'receipt' | 'shipment' | 'adjustment' | 'warehouses'>('all');
+  const movementTypeForApi = getMovementTypeForTab(activeTab);
+  const { movements, loading, create, update, remove, refresh, metrics } = useWarehouse(movementTypeForApi);
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'all' | 'transfers' | 'receipts' | 'shipments' | 'adjustments' | 'warehouses'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<StockMovement | null>(null);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -36,11 +43,10 @@ export function WarehouseList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Filter movements based on search, type, status, and active tab
+  // Filter movements based on search and status (movement type filtering is done by API)
   const filteredMovements = movements.filter((movement) => {
-    if (!searchTerm) {
-      // No search term, check other filters
-    } else {
+    // Search filter
+    if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch =
         (movement.item_id?.toLowerCase() || '').includes(searchLower) ||
@@ -56,14 +62,16 @@ export function WarehouseList() {
       if (!matchesSearch) return false;
     }
     
+    // Status filter
     const matchesStatus = statusFilter === 'all' || movement.status === statusFilter;
     
+    // Movement type is already filtered by API, but double-check for safety
     const matchesTab =
       activeTab === 'all' ||
-      (activeTab === 'transfers' && movement.movement_type === 'TRANSFER') ||
-      (activeTab === 'receipts' && movement.movement_type === 'RECEIPT') ||
-      (activeTab === 'shipments' && movement.movement_type === 'SHIPMENT') ||
-      (activeTab === 'adjustments' && movement.movement_type === 'ADJUSTMENT');
+      (activeTab === 'transfer' && movement.movement_type === 'TRANSFER') ||
+      (activeTab === 'receipt' && movement.movement_type === 'RECEIPT') ||
+      (activeTab === 'shipment' && movement.movement_type === 'SHIPMENT') ||
+      (activeTab === 'adjustment' && movement.movement_type === 'ADJUSTMENT');
     
     return matchesStatus && matchesTab;
   });
@@ -81,17 +89,34 @@ export function WarehouseList() {
     new Set(movements.map((mv) => mv.status).filter((status): status is Exclude<StockMovement["status"], undefined | null> => status != null))
   );
 
-  // Calculate metrics by type
-  const metricsByType = movements.reduce(
+  // Calculate metrics by type - need to fetch all movements for accurate metrics
+  // Store all movements separately for metrics calculation
+  const [allMovementsForMetrics, setAllMovementsForMetrics] = useState<StockMovement[]>([]);
+  
+  useEffect(() => {
+    // Fetch all movements for metrics calculation (without type filter)
+    const fetchAllForMetrics = async () => {
+      try {
+        const data = await warehouseApi.listStockMovements();
+        setAllMovementsForMetrics(data);
+      } catch (error) {
+        console.error('Error fetching all movements for metrics:', error);
+      }
+    };
+    fetchAllForMetrics();
+  }, []);
+  
+  const metricsByType = allMovementsForMetrics.reduce(
     (acc, mv) => {
       if (mv.movement_type === 'TRANSFER') acc.transfers += 1;
       if (mv.movement_type === 'RECEIPT') acc.receipts += 1;
       if (mv.movement_type === 'SHIPMENT') acc.shipments += 1;
+      if (mv.movement_type === 'ADJUSTMENT') acc.adjustments += 1;
       if (mv.status === 'PENDING') acc.pending += 1;
       if (mv.status === 'COMPLETED') acc.completed += 1;
       return acc;
     },
-    { transfers: 0, receipts: 0, shipments: 0, pending: 0, completed: 0 }
+    { transfers: 0, receipts: 0, shipments: 0, adjustments: 0, pending: 0, completed: 0 }
   );
 
   const columns: TableColumn<StockMovement>[] = [
@@ -224,6 +249,9 @@ export function WarehouseList() {
       }
       setModalOpen(false);
       setEditingMovement(null);
+      // Refresh metrics after create/update
+      const allData = await warehouseApi.listStockMovements();
+      setAllMovementsForMetrics(allData);
     } catch (error) {
       showToast('error', 'Operation Failed', 'Failed to save stock movement. Please try again.');
     }
@@ -234,6 +262,9 @@ export function WarehouseList() {
       try {
         await remove(movement.id);
         showToast('success', 'Stock Movement Deleted', `Movement ${movement.movement_number || 'record'} has been deleted successfully.`);
+        // Refresh metrics after delete
+        const allData = await warehouseApi.listStockMovements();
+        setAllMovementsForMetrics(allData);
       } catch (error) {
         showToast('error', 'Deletion Failed', 'Failed to delete stock movement. Please try again.');
       }
@@ -419,10 +450,10 @@ export function WarehouseList() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <StatCard
           label="Total Movements"
-          value={metrics.totalMoves.toString()}
+          value={allMovementsForMetrics.length.toString()}
           helper="All stock movements."
           trend="up"
           variant="teal"
@@ -442,18 +473,25 @@ export function WarehouseList() {
           variant="teal"
         />
         <StatCard
+          label="Shipments"
+          value={metricsByType.shipments.toString()}
+          helper="Goods shipped."
+          trend="flat"
+          variant="purple"
+        />
+        <StatCard
+          label="Adjustments"
+          value={metricsByType.adjustments.toString()}
+          helper="Stock adjustments."
+          trend="flat"
+          variant="orange"
+        />
+        <StatCard
           label="Pending"
           value={metricsByType.pending.toString()}
           helper="Awaiting completion."
           trend={metricsByType.pending > 0 ? 'down' : 'flat'}
           variant="yellow"
-        />
-        <StatCard
-          label="Total Quantity"
-          value={metrics.totalQty.toString()}
-          helper="Total units moved."
-          trend="flat"
-          variant="purple"
         />
       </div>
 
@@ -462,15 +500,15 @@ export function WarehouseList() {
         <Tabs
           items={[
             { id: 'all', label: 'All Movements' },
-            { id: 'transfers', label: 'Transfers' },
-            { id: 'receipts', label: 'Receipts' },
-            { id: 'shipments', label: 'Shipments' },
-            { id: 'adjustments', label: 'Adjustments' },
+            { id: 'transfer', label: 'Transfers' },
+            { id: 'receipt', label: 'Receipts' },
+            { id: 'shipment', label: 'Shipments' },
+            { id: 'adjustment', label: 'Adjustments' },
             { id: 'warehouses', label: 'Warehouses' },
           ]}
           activeId={activeTab}
           onChange={(id) => {
-            setActiveTab(id as 'all' | 'transfers' | 'receipts' | 'shipments' | 'adjustments' | 'warehouses');
+            setActiveTab(id as 'all' | 'transfer' | 'receipt' | 'shipment' | 'adjustment' | 'warehouses');
             setCurrentPage(1);
           }}
         />
