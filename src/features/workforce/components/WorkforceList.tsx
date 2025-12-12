@@ -13,6 +13,7 @@ import { StatCard } from '../../../components/ui/StatCard';
 import { Tabs } from '../../../components/ui/Tabs';
 import { Badge } from '../../../components/ui/Badge';
 import { Pagination } from '../../../components/ui/Pagination';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import type { Shift } from '../types';
 import { ShiftForm } from './ShiftForm';
 
@@ -28,6 +29,9 @@ export function WorkforceList() {
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [shiftToDelete, setShiftToDelete] = useState<Shift | null>(null);
+  const [sortOrder, setSortOrder] = useState<'ascending' | 'descending'>('descending');
 
   // Filter shifts based on search, status, type, department, and active tab
   const filteredShifts = shifts.filter((shift) => {
@@ -55,10 +59,28 @@ export function WorkforceList() {
     return matchesSearch && matchesStatus && matchesType && matchesDepartment && matchesTab;
   });
 
+  // Sort filtered shifts
+  const sortedShifts = [...filteredShifts].sort((a, b) => {
+    // Sort by date first, then by employee name
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    
+    if (dateA !== dateB) {
+      return sortOrder === 'ascending' ? dateA - dateB : dateB - dateA;
+    }
+    
+    // If dates are equal, sort by employee name
+    const nameA = (a.employee_name || '').toLowerCase();
+    const nameB = (b.employee_name || '').toLowerCase();
+    return sortOrder === 'ascending' 
+      ? nameA.localeCompare(nameB)
+      : nameB.localeCompare(nameA);
+  });
+
   // Pagination
-  const totalPages = Math.ceil(filteredShifts.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedShifts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedShifts = filteredShifts.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedShifts = sortedShifts.slice(startIndex, startIndex + itemsPerPage);
 
   // Get unique values for filters
   const statuses = Array.from(new Set(shifts.map((s) => s.status)));
@@ -272,19 +294,29 @@ export function WorkforceList() {
       }
       setModalOpen(false);
       setEditingShift(null);
-    } catch (error) {
-      showToast('error', 'Operation Failed', 'Failed to save shift. Please try again.');
+    } catch (error: any) {
+      // Re-throw error so form can handle validation errors
+      // The form will display detailed validation errors
+      throw error;
     }
   };
 
-  const handleDelete = async (shift: Shift) => {
-    if (window.confirm('Are you sure you want to delete this shift?')) {
-      try {
-        await remove(shift.id);
-        showToast('success', 'Shift Deleted', `Shift for "${shift.employee_name}" has been deleted successfully.`);
-      } catch (error) {
-        showToast('error', 'Deletion Failed', 'Failed to delete shift. Please try again.');
-      }
+  const handleDelete = (shift: Shift) => {
+    setShiftToDelete(shift);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!shiftToDelete) return;
+    
+    try {
+      await remove(shiftToDelete.id);
+      showToast('success', 'Shift Deleted', `Shift for "${shiftToDelete.employee_name}" has been deleted successfully.`);
+    } catch (error) {
+      showToast('error', 'Deletion Failed', 'Failed to delete shift. Please try again.');
+    } finally {
+      setShiftToDelete(null);
+      setDeleteConfirmOpen(false);
     }
   };
 
@@ -424,6 +456,17 @@ export function WorkforceList() {
               </option>
             ))}
           </Select>
+          <Select
+            value={sortOrder}
+            onChange={(e) => {
+              setSortOrder(e.target.value as 'ascending' | 'descending');
+              setCurrentPage(1);
+            }}
+            className="w-full sm:w-48"
+          >
+            <option value="ascending">Sort By: Ascending</option>
+            <option value="descending">Sort By: Descending</option>
+          </Select>
         </div>
 
         {/* Table */}
@@ -431,7 +474,7 @@ export function WorkforceList() {
           <div className="py-12 sm:py-16">
             <LoadingState label="Loading shifts..." size="md" variant="default" />
           </div>
-        ) : filteredShifts.length === 0 ? (
+        ) : sortedShifts.length === 0 ? (
           <EmptyState
             title="No shifts found"
             description={
@@ -483,7 +526,7 @@ export function WorkforceList() {
 
                 {/* Right: Showing info */}
                 <div className="text-xs text-slate-600 whitespace-nowrap">
-                  Showing <span className="font-medium text-slate-900">{startIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(startIndex + itemsPerPage, filteredShifts.length)}</span> of <span className="font-medium text-slate-900">{filteredShifts.length}</span>
+                  Showing <span className="font-medium text-slate-900">{startIndex + 1}</span> to <span className="font-medium text-slate-900">{Math.min(startIndex + itemsPerPage, sortedShifts.length)}</span> of <span className="font-medium text-slate-900">{sortedShifts.length}</span>
                 </div>
               </div>
             </div>
@@ -502,6 +545,7 @@ export function WorkforceList() {
         hideCloseButton
       >
         <ShiftForm
+          key={editingShift?.id || 'new-shift'}
           initial={editingShift || undefined}
           onSubmit={handleFormSubmit}
           onCancel={() => {
@@ -510,6 +554,25 @@ export function WorkforceList() {
           }}
         />
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete Shift"
+        message={
+          shiftToDelete
+            ? `Are you sure you want to delete the shift for "${shiftToDelete.employee_name}"? This action cannot be undone.`
+            : 'Are you sure you want to delete this shift? This action cannot be undone.'
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setDeleteConfirmOpen(false);
+          setShiftToDelete(null);
+        }}
+      />
     </div>
   );
 }

@@ -85,12 +85,26 @@ export async function apiRequest<T>(
     const data = await response.json();
     
     if (!response.ok) {
-      throw new Error(data.message || `API Error: ${response.status}`);
+      // Create error with response data attached for validation error handling
+      const error: any = new Error(data.message || `API Error: ${response.status}`);
+      error.response = {
+        status: response.status,
+        statusText: response.statusText,
+        data: data
+      };
+      throw error;
     }
     
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('API Request Error:', error);
+    // If error already has response data, preserve it
+    if (!error.response && error.message) {
+      // Try to preserve error message
+      const preservedError: any = new Error(error.message);
+      preservedError.response = error.response || { data: { message: error.message } };
+      throw preservedError;
+    }
     throw error;
   }
 }

@@ -284,13 +284,39 @@ export async function createShift(
       console.log('🔄 Creating shift via backend API...', payload);
       console.log('📋 Attendance status in payload:', payload.attendance_status);
       
-      const response = await apiRequest<{ success: boolean; data: { shift: any } } | { shift: any } | any>(
-        '/workforce/shifts',
-        {
-          method: 'POST',
-          body: JSON.stringify(payload),
+      let response;
+      try {
+        response = await apiRequest<{ success: boolean; data: { shift: any } } | { shift: any } | any>(
+          '/workforce/shifts',
+          {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }
+        );
+      } catch (apiError: any) {
+        // Extract error data from API response
+        console.error('❌ API request failed:', apiError);
+        
+        // Try to extract error response data
+        let errorData: any = {};
+        if (apiError?.response) {
+          errorData = apiError.response;
+        } else if (apiError?.data) {
+          errorData = { data: apiError.data };
+        } else {
+          // Try to parse error message as JSON
+          try {
+            const parsed = JSON.parse(apiError.message);
+            if (parsed) errorData = { data: parsed };
+          } catch {
+            errorData = { data: { message: apiError.message || 'Failed to create shift' } };
+          }
         }
-      );
+        
+        const validationError: any = new Error(errorData.data?.message || apiError.message || 'Failed to create shift');
+        validationError.response = errorData;
+        throw validationError;
+      }
 
       console.log('📦 Backend create shift response:', response);
 
@@ -313,9 +339,15 @@ export async function createShift(
       }
 
       throw new Error('Invalid response format from backend');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Backend API error creating shift:', error);
-      // Fall through to mock data
+      
+      // Re-throw validation errors so form can handle them
+      if (error?.response || error instanceof Error) {
+        throw error;
+      }
+      
+      // Fall through to mock data for unknown errors
     }
   }
 
@@ -353,13 +385,39 @@ export async function updateShift(
       console.log('🔄 Updating shift via backend API...', { id, changes });
       console.log('📋 Attendance status in changes:', changes.attendance_status);
       
-      const response = await apiRequest<{ success: boolean; data: { shift: any } } | { shift: any } | any>(
-        `/workforce/shifts/${id}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(changes),
+      let response;
+      try {
+        response = await apiRequest<{ success: boolean; data: { shift: any } } | { shift: any } | any>(
+          `/workforce/shifts/${id}`,
+          {
+            method: 'PUT',
+            body: JSON.stringify(changes),
+          }
+        );
+      } catch (apiError: any) {
+        // Extract error data from API response
+        console.error('❌ API request failed:', apiError);
+        
+        // Try to extract error response data
+        let errorData: any = {};
+        if (apiError?.response) {
+          errorData = apiError.response;
+        } else if (apiError?.data) {
+          errorData = { data: apiError.data };
+        } else {
+          // Try to parse error message as JSON
+          try {
+            const parsed = JSON.parse(apiError.message);
+            if (parsed) errorData = { data: parsed };
+          } catch {
+            errorData = { data: { message: apiError.message || 'Failed to update shift' } };
+          }
         }
-      );
+        
+        const validationError: any = new Error(errorData.data?.message || apiError.message || 'Failed to update shift');
+        validationError.response = errorData;
+        throw validationError;
+      }
 
       console.log('📦 Backend update shift response:', response);
 
@@ -382,9 +440,15 @@ export async function updateShift(
       }
 
       throw new Error('Invalid response format from backend');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Backend API error updating shift:', error);
-      // Fall through to mock data
+      
+      // Re-throw validation errors so form can handle them
+      if (error?.response || error instanceof Error) {
+        throw error;
+      }
+      
+      // Fall through to mock data for unknown errors
     }
   }
 

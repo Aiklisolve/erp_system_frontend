@@ -71,10 +71,17 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
   const [endTime, setEndTime] = useState(initial?.end_time ?? '16:00');
   const [breakDuration, setBreakDuration] = useState<number | ''>(initial?.break_duration_minutes ?? '');
   
-  const [role, setRole] = useState(initial?.role ?? '');
-  const [erpRole, setErpRole] = useState<ErpRole | ''>(initial?.erp_role ?? '');
-  const [department, setDepartment] = useState<Department | ''>(initial?.department ?? '');
-  const [jobTitle, setJobTitle] = useState(initial?.job_title ?? '');
+  // Initialize erp_role and department, handling nested data.shift structure
+  const getErpRoleFromInitial = () => {
+    if (!initial) return '';
+    return (initial as any)?.shift?.erp_role || initial.erp_role || '';
+  };
+  const getDepartmentFromInitial = () => {
+    if (!initial) return '';
+    return (initial as any)?.shift?.department || initial.department || '';
+  };
+  const [erpRole, setErpRole] = useState<ErpRole | ''>(getErpRoleFromInitial());
+  const [department, setDepartment] = useState<Department | ''>(getDepartmentFromInitial());
   const [location, setLocation] = useState(initial?.location ?? '');
   
   const [shiftType, setShiftType] = useState<ShiftType>(initial?.shift_type ?? 'REGULAR');
@@ -107,6 +114,114 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
   
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [internalNotes, setInternalNotes] = useState(initial?.internal_notes ?? '');
+
+  // Error state for backend validation errors
+  const [backendErrors, setBackendErrors] = useState<string[]>([]);
+
+  // Sync form fields when initial prop changes (for editing)
+  // This runs AFTER employees are loaded to ensure initial values take priority
+  useEffect(() => {
+    if (initial) {
+      // Debug: Log the entire initial object to see its structure
+      console.log('🔍 ShiftForm initial prop received:', {
+        fullInitial: initial,
+        erp_role: initial.erp_role,
+        department: initial.department,
+        nestedShift: (initial as any)?.shift,
+        nestedErpRole: (initial as any)?.shift?.erp_role,
+        nestedDepartment: (initial as any)?.shift?.department,
+        allKeys: Object.keys(initial)
+      });
+      
+      // Read erp_role and department from initial data
+      // Handle both direct properties and nested data.shift structure
+      const erpRoleValue = (initial as any)?.shift?.erp_role || initial.erp_role;
+      const departmentValue = (initial as any)?.shift?.department || initial.department;
+      
+      console.log('📋 Extracted values:', {
+        erpRoleValue,
+        departmentValue,
+        erpRoleType: typeof erpRoleValue,
+        departmentType: typeof departmentValue
+      });
+      
+      // Always set the values, ensuring they're strings and match option values
+      // This ensures dropdowns show the correct selected value
+      const erpRoleStr = String(erpRoleValue || '').trim();
+      const departmentStr = String(departmentValue || '').trim();
+      
+      console.log('🔧 Processed values:', {
+        erpRoleStr,
+        departmentStr,
+        erpRoleMatches: erpRoles.includes(erpRoleStr as ErpRole),
+        departmentMatches: departments.includes(departmentStr as Department),
+        availableErpRoles: erpRoles,
+        availableDepartments: departments
+      });
+      
+      // Set erp_role - always set from initial when editing (takes priority)
+      if (erpRoleStr) {
+        if (erpRoles.includes(erpRoleStr as ErpRole)) {
+          console.log('✅ Setting erpRole to valid value:', erpRoleStr);
+          setErpRole(erpRoleStr as ErpRole);
+        } else {
+          console.warn('⚠️ erp_role value does not match available options:', erpRoleStr);
+          setErpRole(erpRoleStr as ErpRole);
+        }
+      } else {
+        console.log('⚠️ erpRoleStr is empty, setting to empty string');
+        setErpRole('');
+      }
+      
+      // Set department - ALWAYS set from initial when editing (takes priority over employee auto-fill)
+      if (departmentStr) {
+        if (departments.includes(departmentStr as Department)) {
+          console.log('✅ Setting department to valid value:', departmentStr);
+          setDepartment(departmentStr as Department);
+        } else {
+          console.warn('⚠️ department value does not match available options:', departmentStr);
+          setDepartment(departmentStr as Department);
+        }
+      } else {
+        console.log('⚠️ departmentStr is empty, setting to empty string');
+        setDepartment('');
+      }
+      
+      // Sync all other fields as well
+      if (initial.shift_number) setShiftNumber(initial.shift_number);
+      if (initial.employee_id) setEmployeeId(initial.employee_id);
+      if (initial.employee_name) setEmployeeName(initial.employee_name);
+      if (initial.employee_email) setEmployeeEmail(initial.employee_email);
+      if (initial.date) setDate(initial.date);
+      if (initial.start_time) setStartTime(initial.start_time);
+      if (initial.end_time) setEndTime(initial.end_time);
+      if (initial.break_duration_minutes !== undefined) setBreakDuration(initial.break_duration_minutes);
+      if (initial.location) setLocation(initial.location);
+      if (initial.shift_type) setShiftType(initial.shift_type);
+      if (initial.status) setStatus(initial.status);
+      if (initial.is_overtime !== undefined) setIsOvertime(initial.is_overtime);
+      if (initial.scheduled_by) setScheduledBy(initial.scheduled_by);
+      if (initial.approved_by) setApprovedBy(initial.approved_by);
+      if (initial.approval_date) setApprovalDate(initial.approval_date);
+      if (initial.clock_in_time) setClockInTime(initial.clock_in_time);
+      if (initial.clock_out_time) setClockOutTime(initial.clock_out_time);
+      if (initial.actual_hours !== undefined) setActualHours(initial.actual_hours);
+      if (initial.attendance_status) setAttendanceStatus(initial.attendance_status);
+      if (initial.late_minutes !== undefined) setLateMinutes(initial.late_minutes);
+      if (initial.early_leave_minutes !== undefined) setEarlyLeaveMinutes(initial.early_leave_minutes);
+      if (initial.assigned_tasks) setAssignedTasks(initial.assigned_tasks.join(', '));
+      if (initial.task_completion_rate !== undefined) setTaskCompletionRate(initial.task_completion_rate);
+      if (initial.performance_rating !== undefined) setPerformanceRating(initial.performance_rating);
+      if (initial.quality_score !== undefined) setQualityScore(initial.quality_score);
+      if (initial.hourly_rate !== undefined) setHourlyRate(initial.hourly_rate);
+      if (initial.total_pay !== undefined) setTotalPay(initial.total_pay);
+      if (initial.overtime_hours !== undefined) setOvertimeHours(initial.overtime_hours);
+      if (initial.overtime_rate !== undefined) setOvertimeRate(initial.overtime_rate);
+      if (initial.currency) setCurrency(initial.currency);
+      if (initial.notes) setNotes(initial.notes);
+      if (initial.internal_notes) setInternalNotes(initial.internal_notes);
+    }
+  }, [initial, employees.length]); // Include employees.length to ensure this runs AFTER employees load
 
   // Calculate total hours from start/end time and break duration
   const calculateTotalHours = (): number => {
@@ -288,8 +403,10 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
   });
 
   // Auto-fill employee details when employee is selected
+  // Only auto-fill if we're NOT editing (initial prop means we're editing)
   useEffect(() => {
-    if (employeeId) {
+    if (employeeId && !initial) {
+      // Only auto-fill for new shifts, not when editing
       const employee = employees.find((e) => e.id === employeeId || e.employee_id === employeeId);
       if (employee) {
         setEmployeeName(employee.full_name || employee.name);
@@ -299,11 +416,13 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
         }
       }
     }
-  }, [employeeId, employees]);
+  }, [employeeId, employees, initial]);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!employeeName || !date || !startTime || !endTime || !role) return;
+    setBackendErrors([]);
+    
+    if (!employeeName || !date || !startTime || !endTime) return;
     
     // Calculate total hours from schedule
     const calculatedHours = calculateTotalHours();
@@ -311,49 +430,124 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
     // Calculate total pay (recalculate to ensure accuracy)
     const calculatedPay = calculateTotalPay();
     
-    onSubmit({
-      shift_number: shiftNumber,
-      employee_id: employeeId || undefined,
-      employee_name: employeeName,
-      employee_email: employeeEmail || undefined,
-      date,
-      start_time: startTime,
-      end_time: endTime,
-      break_duration_minutes: Number(breakDuration) || undefined,
-      total_hours: calculatedHours,
-      role,
-      erp_role: erpRole || undefined,
-      department: department || undefined,
-      job_title: jobTitle || undefined,
-      location: location || undefined,
-      shift_type: shiftType,
-      status,
-      is_overtime: isOvertime,
-      scheduled_by: scheduledBy || undefined,
-      approved_by: approvedBy || undefined,
-      approval_date: approvalDate || undefined,
-      clock_in_time: clockInTime || undefined,
-      clock_out_time: clockOutTime || undefined,
-      actual_hours: Number(actualHours) || undefined,
-      attendance_status: attendanceStatus ? (attendanceStatus as 'PRESENT' | 'ABSENT' | 'LATE' | 'EARLY_LEAVE' | 'ON_TIME') : undefined,
-      late_minutes: Number(lateMinutes) || undefined,
-      early_leave_minutes: Number(earlyLeaveMinutes) || undefined,
-      assigned_tasks: assignedTasks ? assignedTasks.split(',').map(t => t.trim()).filter(t => t) : undefined,
-      task_completion_rate: Number(taskCompletionRate) || undefined,
-      performance_rating: Number(performanceRating) || undefined,
-      quality_score: Number(qualityScore) || undefined,
-      hourly_rate: Number(hourlyRate) || undefined,
-      total_pay: calculatedPay > 0 ? calculatedPay : (Number(totalPay) || undefined),
-      overtime_hours: Number(overtimeHours) || undefined,
-      overtime_rate: Number(overtimeRate) || undefined,
-      currency: currency || undefined,
-      notes: notes || undefined,
-      internal_notes: internalNotes || undefined,
-    });
+    try {
+      await onSubmit({
+        shift_number: shiftNumber,
+        employee_id: employeeId || undefined,
+        employee_name: employeeName,
+        employee_email: employeeEmail || undefined,
+        date,
+        start_time: startTime,
+        end_time: endTime,
+        break_duration_minutes: Number(breakDuration) || undefined,
+        total_hours: calculatedHours,
+        role: '', // Removed from form, providing empty string as default
+        erp_role: erpRole || undefined,
+        department: department || undefined,
+        location: location || undefined,
+        shift_type: shiftType,
+        status,
+        is_overtime: isOvertime,
+        scheduled_by: scheduledBy || undefined,
+        approved_by: approvedBy || undefined,
+        approval_date: approvalDate || undefined,
+        clock_in_time: clockInTime || undefined,
+        clock_out_time: clockOutTime || undefined,
+        actual_hours: Number(actualHours) || undefined,
+        attendance_status: attendanceStatus ? (attendanceStatus as 'PRESENT' | 'ABSENT' | 'LATE' | 'EARLY_LEAVE' | 'ON_TIME') : undefined,
+        late_minutes: Number(lateMinutes) || undefined,
+        early_leave_minutes: Number(earlyLeaveMinutes) || undefined,
+        assigned_tasks: assignedTasks ? assignedTasks.split(',').map(t => t.trim()).filter(t => t) : undefined,
+        task_completion_rate: Number(taskCompletionRate) || undefined,
+        performance_rating: Number(performanceRating) || undefined,
+        quality_score: Number(qualityScore) || undefined,
+        hourly_rate: Number(hourlyRate) || undefined,
+        total_pay: calculatedPay > 0 ? calculatedPay : (Number(totalPay) || undefined),
+        overtime_hours: Number(overtimeHours) || undefined,
+        overtime_rate: Number(overtimeRate) || undefined,
+        currency: currency || undefined,
+        notes: notes || undefined,
+        internal_notes: internalNotes || undefined,
+      });
+    } catch (error: any) {
+      // Extract validation errors from backend response
+      const errorMessages: string[] = [];
+      
+      console.error('Form submission error:', error);
+      
+      // Check for nested error structure (data.shift.erp_role format)
+      const errorData = error?.response?.data || error?.data || {};
+      
+      if (errorData.errors) {
+        // Handle array of error messages
+        if (Array.isArray(errorData.errors)) {
+          errorMessages.push(...errorData.errors.map((e: any) => 
+            typeof e === 'string' ? e : e.message || JSON.stringify(e)
+          ));
+        } else if (typeof errorData.errors === 'object') {
+          // Handle object with field-specific errors
+          Object.entries(errorData.errors).forEach(([field, err]: [string, any]) => {
+            if (Array.isArray(err)) {
+              err.forEach((e: any) => {
+                const msg = typeof e === 'string' ? e : e.message || JSON.stringify(e);
+                errorMessages.push(`${field}: ${msg}`);
+              });
+            } else if (typeof err === 'string') {
+              errorMessages.push(`${field}: ${err}`);
+            }
+          });
+        }
+      } else if (errorData.message) {
+        errorMessages.push(errorData.message);
+      } else if (error?.message) {
+        errorMessages.push(error.message);
+      } else if (typeof error === 'string') {
+        errorMessages.push(error);
+      } else {
+        errorMessages.push('Failed to save shift. Please check your input and try again.');
+      }
+      
+      // If no errors extracted, add a generic message
+      if (errorMessages.length === 0) {
+        errorMessages.push('An unexpected error occurred. Please try again.');
+      }
+      
+      setBackendErrors(errorMessages);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-xs">
+      {/* Backend Validation Errors */}
+      {backendErrors.length > 0 && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-red-800 mb-2">Validation Errors</h3>
+              <ul className="list-disc list-inside space-y-1">
+                {backendErrors.map((error, index) => (
+                  <li key={index} className="text-xs text-red-700">{error}</li>
+                ))}
+              </ul>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBackendErrors([])}
+              className="flex-shrink-0 text-red-600 hover:text-red-800"
+            >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Shift Information */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Shift Information</h3>
@@ -467,35 +661,28 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
       {/* Role & Department */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Role & Department</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Input
-            label="Role/Job Title"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            placeholder="Job title or role"
-            required
-          />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Select
             label="ERP Role"
-            value={erpRole}
+            value={erpRole || ''}
             onChange={(e) => setErpRole(e.target.value as ErpRole)}
           >
             <option value="">Select ERP role</option>
             {erpRoles.map((r) => (
               <option key={r} value={r}>
-                {r.replace('_', ' ')}
+                {r.replace(/_/g, ' ')}
               </option>
             ))}
           </Select>
           <Select
             label="Department"
-            value={department}
+            value={department || ''}
             onChange={(e) => setDepartment(e.target.value as Department)}
           >
             <option value="">Select department</option>
             {departments.map((dept) => (
               <option key={dept} value={dept}>
-                {dept.replace('_', ' ')}
+                {dept.replace(/_/g, ' ')}
               </option>
             ))}
           </Select>
@@ -506,12 +693,6 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
             placeholder="Work location"
           />
         </div>
-        <Input
-          label="Job Title"
-          value={jobTitle}
-          onChange={(e) => setJobTitle(e.target.value)}
-          placeholder="Specific job title"
-        />
       </div>
 
       {/* Time Schedule */}
@@ -830,7 +1011,7 @@ export function ShiftForm({ initial, onSubmit, onCancel }: Props) {
         />
       </div>
 
-      <div className="mt-4 border-t border-slate-200 bg-white pt-3 flex flex-col sm:flex-row justify-end gap-2 sticky bottom-0">
+      <div className="mt-4 border-t border-slate-200 bg-white pt-3 flex flex-col sm:flex-row justify-end gap-2">
         <Button
           type="button"
           variant="ghost"
