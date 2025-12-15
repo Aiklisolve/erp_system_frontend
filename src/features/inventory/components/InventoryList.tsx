@@ -318,6 +318,7 @@ export function InventoryList() {
   const [formLoading, setFormLoading] = useState(false);
 
   const handleFormSubmit = async (data: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>) => {
+    if (formLoading) return; // Prevent double submission
     setFormLoading(true);
     try {
       if (editingItem) {

@@ -21,13 +21,15 @@ export function useInventory() {
     payload: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at'>
   ) => {
     const created = await api.createInventoryItem(payload);
-    setItems((prev) => [created, ...prev]);
+    // Don't update local state here - let refresh() handle it to avoid duplicates
+    // setItems((prev) => [created, ...prev]);
   };
 
   const update = async (id: string, changes: Partial<InventoryItem>) => {
     const updated = await api.updateInventoryItem(id, changes);
     if (!updated) return;
-    setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+    // Don't update local state here - let refresh() handle it to avoid duplicates
+    // setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
   };
 
   const remove = async (id: string) => {
@@ -37,8 +39,10 @@ export function useInventory() {
 
   const metrics = items.reduce(
     (acc, item) => {
-      if (item.qty_on_hand <= item.reorder_level) acc.lowStock += 1;
-      acc.totalQty += item.qty_on_hand;
+      const qtyOnHand = Number(item.qty_on_hand) || 0;
+      const reorderLevel = Number(item.reorder_level) || 0;
+      if (qtyOnHand <= reorderLevel) acc.lowStock += 1;
+      acc.totalQty += qtyOnHand;
       return acc;
     },
     { lowStock: 0, totalQty: 0 }
