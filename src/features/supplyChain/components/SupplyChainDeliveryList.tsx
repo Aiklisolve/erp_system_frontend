@@ -28,6 +28,7 @@ export function SupplyChainDeliveryList() {
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [formLoading, setFormLoading] = useState(false);
 
   // Filter deliveries based on search, filters, and active tab
   const filteredDeliveries = deliveries.filter((delivery) => {
@@ -233,6 +234,8 @@ export function SupplyChainDeliveryList() {
   ];
 
   const handleFormSubmit = async (data: Omit<SupplyChainDelivery, 'id' | 'created_at' | 'updated_at'>) => {
+    if (formLoading) return; // Prevent double submission
+    setFormLoading(true);
     try {
       if (editingDelivery) {
         await update(String(editingDelivery.id), data);
@@ -243,8 +246,11 @@ export function SupplyChainDeliveryList() {
       }
       setModalOpen(false);
       setEditingDelivery(null);
+      await refresh(); // Refresh the list to get updated data
     } catch (error) {
       showToast('error', 'Operation Failed', 'Failed to save delivery. Please try again.');
+    } finally {
+      setFormLoading(false);
     }
   };
 
@@ -481,6 +487,7 @@ export function SupplyChainDeliveryList() {
             setModalOpen(false);
             setEditingDelivery(null);
           }}
+          isLoading={formLoading}
         />
       </Modal>
     </div>
