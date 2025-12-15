@@ -63,6 +63,9 @@ export function LeadForm({ initial, campaigns, onSubmit, onCancel }: Props) {
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       newErrors.email = 'Invalid email format';
     }
+    if (phone && phone.length !== 10) {
+      newErrors.phone = 'Phone number must be exactly 10 digits';
+    }
     if (score && (isNaN(parseInt(score, 10)) || parseInt(score, 10) < 0 || parseInt(score, 10) > 100)) {
       newErrors.score = 'Score must be between 0 and 100';
     }
@@ -189,9 +192,20 @@ export function LeadForm({ initial, campaigns, onSubmit, onCancel }: Props) {
             <Input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1-555-0101"
+              onChange={(e) => {
+                // Remove any non-digit characters
+                const digitsOnly = e.target.value.replace(/\D/g, '');
+                // Limit to 10 digits
+                const limitedDigits = digitsOnly.slice(0, 10);
+                setPhone(limitedDigits);
+              }}
+              placeholder="1234567890"
+              maxLength={10}
             />
+            {errors.phone && <p className="text-xs text-red-600 mt-1">{errors.phone}</p>}
+            {phone.length === 10 && !errors.phone && (
+              <p className="text-xs text-slate-500 mt-1">10 digits entered</p>
+            )}
           </div>
         </div>
       </div>
