@@ -38,6 +38,7 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
   const [shift, setShift] = useState(initial?.shift ?? '');
   const [supervisorId, setSupervisorId] = useState(initial?.supervisor_id ?? '');
   const [qualityStatus, setQualityStatus] = useState(initial?.quality_status ?? 'PENDING');
+  const [cost, setCost] = useState(initial?.cost?.toString() ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   
   // Products and Users for dropdowns
@@ -108,13 +109,13 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
       shift: shift || undefined,
       supervisor_id: supervisorId ? supervisorId.toString() : undefined, // Will be converted to number in API
       quality_status: qualityStatus as any,
+      cost: cost ? parseFloat(cost) : 0,
       notes: notes || undefined,
       // Required by frontend type but not sent to backend
       product: '', // Not sent to backend
       unit: 'Units', // Not sent to backend
       production_type: 'MAKE_TO_STOCK', // Not sent to backend
       estimated_cost: 0, // Not sent to backend
-      cost: 0, // Not sent to backend
       currency: 'INR', // Not sent to backend
     };
     
@@ -130,6 +131,7 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
       shift: shift,
       supervisor_id: supervisorId,
       quality_status: qualityStatus,
+      cost: cost,
       notes: notes
     });
 
@@ -264,6 +266,15 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
             <option value="HIGH">High</option>
             <option value="URGENT">Urgent</option>
           </Select>
+
+          <Input
+            label="Cost"
+            type="number"
+            step="0.01"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="0.00"
+          />
         </div>
       </div>
 
