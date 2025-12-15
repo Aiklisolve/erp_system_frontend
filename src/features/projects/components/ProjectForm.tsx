@@ -16,6 +16,27 @@ type Props = {
   onCancel?: () => void;
 };
 
+// Normalize phone to +91XXXXXXXXXX (10-digit mobile with Indian country code)
+function normalizeIndianPhone(rawPhone?: string | null): string {
+  if (!rawPhone) return '';
+  const digits = rawPhone.replace(/\D/g, '');
+  if (!digits) return '';
+
+  // Remove leading country code if present
+  let local = digits;
+  if (local.startsWith('91')) {
+    local = local.slice(2);
+  }
+
+  // Keep only last 10 digits (in case of longer input)
+  if (local.length > 10) {
+    local = local.slice(-10);
+  }
+
+  if (!local) return '';
+  return `+91${local}`;
+}
+
 // Generate project code
 function generateProjectCode(): string {
   const prefix = 'PROJ';
@@ -34,7 +55,7 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
   const [clientId, setClientId] = useState(initial?.client_id ?? '');
   const [clientContactPerson, setClientContactPerson] = useState(initial?.client_contact_person ?? '');
   const [clientEmail, setClientEmail] = useState(initial?.client_email ?? '');
-  const [clientPhone, setClientPhone] = useState(initial?.client_phone ?? '');
+  const [clientPhone, setClientPhone] = useState(normalizeIndianPhone(initial?.client_phone));
   
   // Customer dropdown state
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -45,6 +66,9 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
   const [projectManagers, setProjectManagers] = useState<ProjectManagerOption[]>([]);
   const [projectManagersLoading, setProjectManagersLoading] = useState(false);
   const [selectedProjectManagerId, setSelectedProjectManagerId] = useState(initial?.project_manager_id ?? '');
+  
+  // Validation errors state
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   // Update selected project manager when project managers list loads or initial data changes (edit mode)
   useEffect(() => {
@@ -97,7 +121,7 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
       setClientId(initial.client_id ?? '');
       setClientContactPerson(initial.client_contact_person ?? '');
       setClientEmail(initial.client_email ?? '');
-      setClientPhone(initial.client_phone ?? '');
+      setClientPhone(normalizeIndianPhone(initial.client_phone));
       setSelectedCustomerId(initial.client_id ?? '');
       setProjectType(initial.project_type ?? 'FIXED_PRICE');
       setStatus(initial.status ?? 'PLANNING');
@@ -197,7 +221,7 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
             setClientEmail(customer.email);
           }
           if (!clientPhone && customer.phone) {
-            setClientPhone(customer.phone);
+            setClientPhone(normalizeIndianPhone(customer.phone));
           }
         }
       }
@@ -226,7 +250,7 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
         setClientEmail(selectedCustomer.email);
       }
       if (selectedCustomer.phone) {
-        setClientPhone(selectedCustomer.phone);
+        setClientPhone(normalizeIndianPhone(selectedCustomer.phone));
       }
     }
   };
@@ -317,9 +341,84 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
     return statusProgressMap[statusValue];
   };
 
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    // Validate mandatory fields
+    if (!name || name.trim() === '') {
+      newErrors.name = 'Project Name is required';
+    }
+    
+    if (!selectedCustomerId || selectedCustomerId === '') {
+      newErrors.client = 'Client Name is required';
+    }
+    
+    if (budget === '' || budget === null || budget === undefined) {
+      newErrors.budget = 'Budget is required';
+    } else if (Number(budget) <= 0) {
+      newErrors.budget = 'Budget must be greater than 0';
+    }
+    
+    if (!startDate || startDate.trim() === '') {
+      newErrors.startDate = 'Start Date is required';
+    }
+    
+    if (!projectType || projectType.trim() === '') {
+      newErrors.projectType = 'Project Type is required';
+    }
+    
+    if (!status || status.trim() === '') {
+      newErrors.status = 'Status is required';
+    }
+    
+    if (!selectedProjectManagerId || selectedProjectManagerId === '') {
+      newErrors.projectManager = 'Project Manager is required';
+    }
+    
+    // Validate contract number (10 digit mobile number)
+    if (contractNumber && contractNumber.trim() !== '') {
+      const cleanedContractNumber = contractNumber.replace(/\D/g, ''); // Remove non-digits
+      if (cleanedContractNumber.length !== 10) {
+        newErrors.contractNumber = 'Contract Number must be exactly 10 digits';
+      } else if (!/^[0-9]{10}$/.test(cleanedContractNumber)) {
+        newErrors.contractNumber = 'Contract Number must contain only digits';
+      }
+    }
+
+    // Validate client phone (Indian mobile: +91 followed by 10 digits)
+    if (clientPhone && clientPhone.trim() !== '') {
+      const phone = clientPhone.trim();
+      if (!/^\+91\d{10}$/.test(phone)) {
+        newErrors.clientPhone = 'Client Phone must be +91 followed by 10 digits';
+      }
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!name || !client || budget === '' || !startDate) return;
+    
+    // Validate form before submission
+    if (!validateForm()) {
+      // Scroll to first error
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField) {
+        // Try to find the field by name attribute or ID
+        const element = document.querySelector(`[name="${firstErrorField}"]`) || 
+                       document.querySelector(`#${firstErrorField}`) ||
+                       document.querySelector(`[data-field="${firstErrorField}"]`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          // Fallback: scroll to the error message
+          const errorElement = document.querySelector(`[data-error="${firstErrorField}"]`);
+          errorElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+      return;
+    }
     
     // Calculate progress percentage based on status
     const progressPercentage = getProgressPercentageByStatus(status);
@@ -350,37 +449,75 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-xs">
+      {/* Mandatory Fields Notice */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+        <p className="text-xs text-blue-800 font-medium mb-1">Required Fields</p>
+        <p className="text-xs text-blue-700">
+          Fields marked with <span className="text-red-500 font-bold">*</span> are mandatory and must be filled before submitting.
+        </p>
+      </div>
+
       {/* Project Information */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Project Information</h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Input
-            label="Project Code"
-            value={projectCode}
-            onChange={(e) => setProjectCode(e.target.value)}
-            placeholder="Auto-generated"
-          />
-          <Input
-            label="Project Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Project name"
-            required
-          />
-          <Select
-            label="Project Type"
-            value={projectType}
-            onChange={(e) => setProjectType(e.target.value as ProjectType)}
-            required
-          >
-            <option value="FIXED_PRICE">Fixed Price</option>
-            <option value="TIME_MATERIALS">Time & Materials</option>
-            <option value="HYBRID">Hybrid</option>
-            <option value="SUPPORT">Support</option>
-            <option value="CONSULTING">Consulting</option>
-            <option value="IMPLEMENTATION">Implementation</option>
-            <option value="OTHER">Other</option>
-          </Select>
+          <div>
+            <Input
+              label="Project Code"
+              value={projectCode}
+              onChange={(e) => setProjectCode(e.target.value)}
+              placeholder="Auto-generated"
+            />
+          </div>
+          <div>
+            <div className="flex items-center gap-1 mb-1.5">
+              <label className="text-xs font-medium text-slate-700">Project Name</label>
+              <span className="text-red-500 text-xs">*</span>
+            </div>
+            <Input
+              name="name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (errors.name) {
+                  setErrors({ ...errors, name: '' });
+                }
+              }}
+              placeholder="Project name"
+              className={errors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            />
+            {errors.name && (
+              <p className="text-xs text-red-500 mt-1" data-error="name">{errors.name}</p>
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-1 mb-1.5">
+              <label className="text-xs font-medium text-slate-700">Project Type</label>
+              <span className="text-red-500 text-xs">*</span>
+            </div>
+            <Select
+              name="projectType"
+              value={projectType}
+              onChange={(e) => {
+                setProjectType(e.target.value as ProjectType);
+                if (errors.projectType) {
+                  setErrors({ ...errors, projectType: '' });
+                }
+              }}
+              className={errors.projectType ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            >
+              <option value="FIXED_PRICE">Fixed Price</option>
+              <option value="TIME_MATERIALS">Time & Materials</option>
+              <option value="HYBRID">Hybrid</option>
+              <option value="SUPPORT">Support</option>
+              <option value="CONSULTING">Consulting</option>
+              <option value="IMPLEMENTATION">Implementation</option>
+              <option value="OTHER">Other</option>
+            </Select>
+            {errors.projectType && (
+              <p className="text-xs text-red-500 mt-1" data-error="projectType">{errors.projectType}</p>
+            )}
+          </div>
         </div>
         <Textarea
           label="Description"
@@ -395,14 +532,28 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Client Information</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <SearchableSelect
-            label="Client Name"
-            value={selectedCustomerId}
-            onChange={handleCustomerSelect}
-            options={customerOptions}
-            placeholder={customersLoading ? "Loading customers..." : "Search and select client"}
-            required
-          />
+          <div>
+            <div className="flex items-center gap-1 mb-1.5">
+              <label className="text-xs font-medium text-slate-700">Client Name</label>
+              <span className="text-red-500 text-xs">*</span>
+            </div>
+            <div className={errors.client ? '[&_button]:border-red-500 [&_button]:focus:border-red-500 [&_button]:focus:ring-red-500' : ''}>
+              <SearchableSelect
+                value={selectedCustomerId}
+                onChange={(value) => {
+                  handleCustomerSelect(value);
+                  if (errors.client) {
+                    setErrors({ ...errors, client: '' });
+                  }
+                }}
+                options={customerOptions}
+                placeholder={customersLoading ? "Loading customers..." : "Search and select client"}
+              />
+            </div>
+            {errors.client && (
+              <p className="text-xs text-red-500 mt-1" data-error="client">{errors.client}</p>
+            )}
+          </div>
           <Input
             label="Client ID"
             value={clientId}
@@ -425,13 +576,44 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
             onChange={(e) => setClientEmail(e.target.value)}
             placeholder="client@company.com"
           />
-          <Input
-            label="Client Phone"
-            type="tel"
-            value={clientPhone}
-            onChange={(e) => setClientPhone(e.target.value)}
-            placeholder="+1 (555) 123-4567"
-          />
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              Client Phone <span className="text-[10px] font-normal text-slate-500">(+91 and 10 digit mobile)</span>
+            </label>
+            <Input
+              name="clientPhone"
+              type="tel"
+              value={clientPhone}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const digits = raw.replace(/\D/g, '');
+
+                // Extract local 10-digit part, ignoring any leading country code
+                let local = digits;
+                if (local.startsWith('91')) {
+                  local = local.slice(2);
+                }
+                if (local.length > 10) {
+                  local = local.slice(0, 10);
+                }
+
+                const formatted = local ? `+91${local}` : '';
+                setClientPhone(formatted);
+
+                if (errors.clientPhone) {
+                  setErrors({ ...errors, clientPhone: '' });
+                }
+              }}
+              placeholder="+91XXXXXXXXXX"
+              maxLength={13}
+              className={errors.clientPhone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            />
+            {errors.clientPhone && (
+              <p className="text-xs text-red-500 mt-1" data-error="clientPhone">
+                {errors.clientPhone}
+              </p>
+            )}
+          </div>
         </div>
         {/* Display selected client name */}
         {client && (
@@ -445,19 +627,33 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Status & Priority</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as ProjectStatus)}
-            required
-          >
-            <option value="PLANNING">Planning</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="ON_HOLD">On Hold</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="ARCHIVED">Archived</option>
-          </Select>
+          <div>
+            <div className="flex items-center gap-1 mb-1.5">
+              <label className="text-xs font-medium text-slate-700">Status</label>
+              <span className="text-red-500 text-xs">*</span>
+            </div>
+            <Select
+              name="status"
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value as ProjectStatus);
+                if (errors.status) {
+                  setErrors({ ...errors, status: '' });
+                }
+              }}
+              className={errors.status ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            >
+              <option value="PLANNING">Planning</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="ON_HOLD">On Hold</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+              <option value="ARCHIVED">Archived</option>
+            </Select>
+            {errors.status && (
+              <p className="text-xs text-red-500 mt-1">{errors.status}</p>
+            )}
+          </div>
           <Select
             label="Priority"
             value={priority}
@@ -476,13 +672,27 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Dates</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Start Date"
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            required
-          />
+          <div>
+            <div className="flex items-center gap-1 mb-1.5">
+              <label className="text-xs font-medium text-slate-700">Start Date</label>
+              <span className="text-red-500 text-xs">*</span>
+            </div>
+            <Input
+              name="startDate"
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                if (errors.startDate) {
+                  setErrors({ ...errors, startDate: '' });
+                }
+              }}
+              className={errors.startDate ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            />
+            {errors.startDate && (
+              <p className="text-xs text-red-500 mt-1" data-error="startDate">{errors.startDate}</p>
+            )}
+          </div>
           <Input
             label="End Date"
             type="date"
@@ -497,16 +707,30 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Budget & Financial</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Budget"
-            type="number"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value === '' ? '' : Number(e.target.value))}
-            placeholder="0.00"
-            min={0}
-            step="0.01"
-            required
-          />
+          <div>
+            <div className="flex items-center gap-1 mb-1.5">
+              <label className="text-xs font-medium text-slate-700">Budget</label>
+              <span className="text-red-500 text-xs">*</span>
+            </div>
+            <Input
+              name="budget"
+              type="number"
+              value={budget}
+              onChange={(e) => {
+                setBudget(e.target.value === '' ? '' : Number(e.target.value));
+                if (errors.budget) {
+                  setErrors({ ...errors, budget: '' });
+                }
+              }}
+              placeholder="0.00"
+              min={0}
+              step="0.01"
+              className={errors.budget ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            />
+            {errors.budget && (
+              <p className="text-xs text-red-500 mt-1" data-error="budget">{errors.budget}</p>
+            )}
+          </div>
           <Select
             label="Currency"
             value={currency}
@@ -524,19 +748,52 @@ export function ProjectForm({ initial, onSubmit, onCancel }: Props) {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Project Management</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <SearchableSelect
-            label="Project Manager"
-            value={selectedProjectManagerId}
-            onChange={handleProjectManagerSelect}
-            options={projectManagerOptions}
-            placeholder={projectManagersLoading ? "Loading project managers..." : "Search and select project manager"}
-          />
-          <Input
-            label="Contract Number"
-            value={contractNumber}
-            onChange={(e) => setContractNumber(e.target.value)}
-            placeholder="Contract #"
-          />
+          <div>
+            <div className="flex items-center gap-1 mb-1.5">
+              <label className="text-xs font-medium text-slate-700">Project Manager</label>
+              <span className="text-red-500 text-xs">*</span>
+            </div>
+            <div className={errors.projectManager ? '[&_button]:border-red-500 [&_button]:focus:border-red-500 [&_button]:focus:ring-red-500' : ''}>
+              <SearchableSelect
+                value={selectedProjectManagerId}
+                onChange={(value) => {
+                  handleProjectManagerSelect(value);
+                  if (errors.projectManager) {
+                    setErrors({ ...errors, projectManager: '' });
+                  }
+                }}
+                options={projectManagerOptions}
+                placeholder={projectManagersLoading ? "Loading project managers..." : "Search and select project manager"}
+              />
+            </div>
+            {errors.projectManager && (
+              <p className="text-xs text-red-500 mt-1" data-error="projectManager">{errors.projectManager}</p>
+            )}
+          </div>
+          <div>
+            <Input
+              name="contractNumber"
+              label="Contract Number"
+              value={contractNumber}
+              onChange={(e) => {
+                // Only allow digits and limit to 10 digits
+                const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                setContractNumber(value);
+                if (errors.contractNumber) {
+                  setErrors({ ...errors, contractNumber: '' });
+                }
+              }}
+              placeholder="10 digit mobile number"
+              maxLength={10}
+              className={errors.contractNumber ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            />
+            {errors.contractNumber && (
+              <p className="text-xs text-red-500 mt-1" data-error="contractNumber">{errors.contractNumber}</p>
+            )}
+            {!errors.contractNumber && contractNumber && (
+              <p className="text-xs text-slate-500 mt-1">{contractNumber.length}/10 digits</p>
+            )}
+          </div>
         </div>
         {/* Display selected project manager name */}
         {projectManager && (
