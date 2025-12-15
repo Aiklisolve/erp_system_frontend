@@ -65,6 +65,8 @@ export function ReportForm({ initial, onSubmit, onCancel }: Props) {
   const [format, setFormat] = useState<ReportFormat>(initial?.format ?? 'PDF');
   const [startDate, setStartDate] = useState(initial?.start_date ? initial.start_date.slice(0, 10) : '');
   const [endDate, setEndDate] = useState(initial?.end_date ? initial.end_date.slice(0, 10) : '');
+  // Current date (for limiting date pickers)
+  const today = new Date().toISOString().slice(0, 10);
 
   // Sync form fields when initial prop changes (for edit/view mode)
   useEffect(() => {
@@ -212,6 +214,7 @@ export function ReportForm({ initial, onSubmit, onCancel }: Props) {
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             min={startDate}
+            max={today}
             disabled={!!initial}
           />
         </div>
