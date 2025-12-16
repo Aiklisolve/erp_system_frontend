@@ -3,6 +3,7 @@ import { useCrm } from '../hooks/useCrm';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
+import { Select } from '../../../components/ui/Select';
 import { Table, type TableColumn } from '../../../components/ui/Table';
 import { Modal } from '../../../components/ui/Modal';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
@@ -43,6 +44,7 @@ export function CustomerList() {
   const [usersCurrentPage, setUsersCurrentPage] = useState(1);
   const [customersCurrentPage, setCustomersCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [sortOrder, setSortOrder] = useState<'ascending' | 'descending'>('ascending');
 
   // Load users
   useEffect(() => {
@@ -93,17 +95,33 @@ export function CustomerList() {
     );
   });
 
+  // Sort users by created_at
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    
+    return sortOrder === 'ascending' ? dateA - dateB : dateB - dateA;
+  });
+
+  // Sort customers by created_at
+  const sortedCustomers = [...filteredCustomers].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    
+    return sortOrder === 'ascending' ? dateA - dateB : dateB - dateA;
+  });
+
   // Pagination for users
-  const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+  const usersTotalPages = Math.max(1, Math.ceil(sortedUsers.length / itemsPerPage));
   const usersStartIndex = (usersCurrentPage - 1) * itemsPerPage;
   const usersEndIndex = usersStartIndex + itemsPerPage;
-  const paginatedUsers = filteredUsers.slice(usersStartIndex, usersEndIndex);
+  const paginatedUsers = sortedUsers.slice(usersStartIndex, usersEndIndex);
 
   // Pagination for customers
-  const customersTotalPages = Math.max(1, Math.ceil(filteredCustomers.length / itemsPerPage));
+  const customersTotalPages = Math.max(1, Math.ceil(sortedCustomers.length / itemsPerPage));
   const customersStartIndex = (customersCurrentPage - 1) * itemsPerPage;
   const customersEndIndex = customersStartIndex + itemsPerPage;
-  const paginatedCustomers = filteredCustomers.slice(customersStartIndex, customersEndIndex);
+  const paginatedCustomers = sortedCustomers.slice(customersStartIndex, customersEndIndex);
 
   // Reset pagination when switching tabs
   useEffect(() => {
@@ -116,6 +134,12 @@ export function CustomerList() {
     setUsersCurrentPage(1);
     setCustomersCurrentPage(1);
   }, [searchTerm]);
+
+  // Reset pagination when sort order changes
+  useEffect(() => {
+    setUsersCurrentPage(1);
+    setCustomersCurrentPage(1);
+  }, [sortOrder]);
 
   // User columns
   const userColumns: TableColumn<ErpUser>[] = [
@@ -455,7 +479,7 @@ export function CustomerList() {
       {/* Search Filter */}
       <Card>
         <div className="p-4 border-b border-slate-200">
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Search
@@ -468,6 +492,22 @@ export function CustomerList() {
                   // Page reset is handled by useEffect
                 }}
               />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Sort By
+              </label>
+              <Select
+                value={sortOrder}
+                onChange={(e) => {
+                  setSortOrder(e.target.value as 'ascending' | 'descending');
+                  // Page reset is handled by useEffect
+                }}
+                className="w-full"
+              >
+                <option value="ascending">Ascending</option>
+                <option value="descending">Descending</option>
+              </Select>
             </div>
           </div>
         </div>
@@ -540,10 +580,10 @@ export function CustomerList() {
                     {/* Right: Showing info */}
                     <div className="text-xs text-slate-600 whitespace-nowrap">
                       Showing <span className="font-medium text-slate-900">
-                        {filteredUsers.length === 0 ? 0 : usersStartIndex + 1}
+                        {sortedUsers.length === 0 ? 0 : usersStartIndex + 1}
                       </span> to <span className="font-medium text-slate-900">
-                        {Math.min(usersEndIndex, filteredUsers.length)}
-                      </span> of <span className="font-medium text-slate-900">{filteredUsers.length}</span>
+                        {Math.min(usersEndIndex, sortedUsers.length)}
+                      </span> of <span className="font-medium text-slate-900">{sortedUsers.length}</span>
                     </div>
                   </div>
                 </div>
@@ -620,10 +660,10 @@ export function CustomerList() {
                     {/* Right: Showing info */}
                     <div className="text-xs text-slate-600 whitespace-nowrap">
                       Showing <span className="font-medium text-slate-900">
-                        {filteredCustomers.length === 0 ? 0 : customersStartIndex + 1}
+                        {sortedCustomers.length === 0 ? 0 : customersStartIndex + 1}
                       </span> to <span className="font-medium text-slate-900">
-                        {Math.min(customersEndIndex, filteredCustomers.length)}
-                      </span> of <span className="font-medium text-slate-900">{filteredCustomers.length}</span>
+                        {Math.min(customersEndIndex, sortedCustomers.length)}
+                      </span> of <span className="font-medium text-slate-900">{sortedCustomers.length}</span>
                     </div>
                   </div>
                 </div>

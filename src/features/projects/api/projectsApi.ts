@@ -416,7 +416,7 @@ function mapBackendProject(backendProject: any): Project {
     currency: backendProject.currency || 'INR',
     project_manager: backendProject.project_manager || backendProject.projectManager || '',
     project_manager_id: backendProject.project_manager_id || backendProject.projectManagerId || undefined,
-    contract_number: backendProject.manager_mobile || backendProject.contract_number || backendProject.contractNumber || '',
+    contract_number: backendProject.contract_number || backendProject.contractNumber || backendProject.manager_mobile || '',
     progress_percentage: backendProject.progress_percentage !== undefined && backendProject.progress_percentage !== null 
       ? Number(backendProject.progress_percentage) 
       : undefined,

@@ -332,6 +332,89 @@ export async function listEmployees(): Promise<Employee[]> {
   }
 }
 
+// List managers (employees with role containing "Manager" and deleted_flag = true or null)
+export async function listManagers(searchTerm: string = ''): Promise<Employee[]> {
+  if (USE_BACKEND_API) {
+    try {
+      console.log('🔄 Fetching managers from backend API...');
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: '1',
+        limit: '1000',
+        search: searchTerm || '',
+      });
+      
+      const response = await apiRequest<{ success: boolean; data: { employees: any[]; pagination?: any } } | { employees: any[] } | any[]>(
+        `/hr/employees?${params.toString()}`
+      );
+
+      // Handle different response formats
+      let employees = [];
+      if (response && typeof response === 'object') {
+        if ('success' in response && response.success && 'data' in response && response.data.employees) {
+          employees = response.data.employees;
+        } else if ('employees' in response) {
+          employees = response.employees;
+        } else if (Array.isArray(response)) {
+          employees = response;
+        }
+      }
+
+      // Filter managers: role contains "Manager" (case-insensitive) and deleted_flag is true or null
+      const managers = employees.filter((emp: any) => {
+        const role = (emp.role || emp.position || emp.job_title || emp.designation || '').toLowerCase();
+        const isManager = role.includes('manager');
+        const deletedFlag = emp.deleted_flag;
+        const matchesDeletedFlag = deletedFlag === true || deletedFlag === null || deletedFlag === undefined;
+        return isManager && matchesDeletedFlag;
+      });
+
+      if (managers.length > 0) {
+        const mapped = managers.map(mapBackendEmployee);
+        console.log('✅ Mapped managers:', mapped.length);
+        return mapped;
+      }
+
+      console.log('⚠️ No managers found');
+      return [];
+    } catch (error) {
+      console.error('❌ Backend API error fetching managers:', error);
+      // Fallback: filter from mock employees
+      return mockEmployees.filter(emp => {
+        const role = (emp.role || '').toLowerCase();
+        return role.includes('manager');
+      });
+    }
+  }
+
+  // Fallback to Supabase or mock
+  if (useStatic) {
+    return mockEmployees.filter(emp => {
+      const role = (emp.role || '').toLowerCase();
+      return role.includes('manager');
+    });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .or('deleted_flag.is.null,deleted_flag.eq.true')
+      .ilike('role', '%Manager%');
+    
+    if (error) throw error;
+    return (data as Employee[]) ?? [];
+  } catch (error) {
+    handleApiError('hr.listManagers', error);
+    useStatic = true;
+    return mockEmployees.filter(emp => {
+      const role = (emp.role || '').toLowerCase();
+      return role.includes('manager');
+    });
+  }
+}
+
 export async function createEmployee(
   payload: Omit<Employee, 'id' | 'created_at' | 'updated_at'>
 ): Promise<Employee> {

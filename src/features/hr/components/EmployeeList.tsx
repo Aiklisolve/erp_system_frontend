@@ -32,6 +32,7 @@ export function EmployeeList() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leavesLoading, setLeavesLoading] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'ascending' | 'descending'>('descending');
 
   // Fetch leave requests to determine who is on leave
   useEffect(() => {
@@ -133,10 +134,18 @@ export function EmployeeList() {
     return matchesSearch && matchesStatus && matchesDepartment && matchesEmploymentType && matchesTab;
   });
 
+  // Sort employees by created_at (applies to all tabs)
+  const sortedEmployees = [...filteredEmployees].sort((a, b) => {
+    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+
+    return sortOrder === 'ascending' ? dateA - dateB : dateB - dateA;
+  });
+
   // Pagination
-  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedEmployees.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedEmployees = filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedEmployees = sortedEmployees.slice(startIndex, startIndex + itemsPerPage);
 
   // Get unique values for filters
   const statuses = Array.from(new Set(employees.map((e) => e.status).filter(Boolean)));
@@ -536,7 +545,7 @@ export function EmployeeList() {
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full sm:w-48"
+                className="w-full sm:w-40"
               >
                 <option value="all">All Statuses</option>
                 {statuses.map((status) => (
@@ -551,7 +560,7 @@ export function EmployeeList() {
                   setDepartmentFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full sm:w-48"
+                className="w-full sm:w-40"
               >
                 <option value="all">All Departments</option>
                 {departments.map((dept) => (
@@ -566,7 +575,7 @@ export function EmployeeList() {
                   setEmploymentTypeFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full sm:w-48"
+                className="w-full sm:w-40"
               >
                 <option value="all">All Types</option>
                 {employmentTypes.map((type) => (
@@ -574,6 +583,17 @@ export function EmployeeList() {
                     {String(type).replace(/_/g, ' ')}
                   </option>
                 ))}
+              </Select>
+              <Select
+                value={sortOrder}
+                onChange={(e) => {
+                  setSortOrder(e.target.value as 'ascending' | 'descending');
+                  setCurrentPage(1);
+                }}
+                className="w-full sm:w-40"
+              >
+                <option value="ascending">Sort By: Ascending</option>
+                <option value="descending">Sort By: Descending</option>
               </Select>
             </div>
 

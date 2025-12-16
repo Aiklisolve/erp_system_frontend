@@ -307,8 +307,8 @@ function mapBackendPurchaseOrder(backendPO: any): PurchaseOrder {
     tracking_number: backendPO.tracking_number,
     
     // Items Information
-    items_count: parseInt(backendPO.items_count) || 0,
-    total_quantity: parseInt(backendPO.total_quantity) || 0,
+    items_count: backendPO.items_count != null ? (parseInt(backendPO.items_count) || 0) : undefined,
+    total_quantity: backendPO.total_quantity != null ? (parseInt(backendPO.total_quantity) || 0) : undefined,
     
     // Approval & Workflow
     requested_by: backendPO.requested_by_name || backendPO.requested_by,
@@ -329,8 +329,8 @@ function mapBackendPurchaseOrder(backendPO: any): PurchaseOrder {
     terms_and_conditions: backendPO.terms_and_conditions,
     
     // Receiving Information
-    received_quantity: parseInt(backendPO.received_quantity) || 0,
-    pending_quantity: parseInt(backendPO.pending_quantity) || 0,
+    received_quantity: backendPO.received_quantity != null ? (parseInt(backendPO.received_quantity) || 0) : undefined,
+    pending_quantity: backendPO.pending_quantity != null ? (parseInt(backendPO.pending_quantity) || 0) : undefined,
     quality_check_required: backendPO.quality_check_required || false,
     quality_check_passed: backendPO.quality_check_passed,
     inspected_by: backendPO.inspected_by,

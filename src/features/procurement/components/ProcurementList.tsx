@@ -172,11 +172,11 @@ export function ProcurementList() {
       header: 'Receiving',
       render: (row) => (
         <div className="text-xs text-slate-600">
-          {row.received_quantity !== undefined && row.total_quantity ? (
+          {row.total_quantity !== undefined && row.total_quantity !== null && row.total_quantity > 0 ? (
             <div>
-              <div>{row.received_quantity} / {row.total_quantity}</div>
+              <div>{(row.received_quantity ?? 0)} / {row.total_quantity}</div>
               <div className="text-[10px] text-slate-500">
-                {((row.received_quantity / row.total_quantity) * 100).toFixed(0)}%
+                {((row.received_quantity ?? 0) / row.total_quantity * 100).toFixed(0)}%
               </div>
             </div>
           ) : (

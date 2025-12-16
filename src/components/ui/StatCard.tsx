@@ -72,18 +72,18 @@ export function StatCard({
 
   return (
     <Card className={`space-y-2 border-none shadow-sm ${colors.bg} min-w-0`}>
-      <div className="flex items-center justify-between gap-2 min-w-0">
-        <p className="text-xs font-medium text-slate-600 truncate flex-1">{label}</p>
+      <div className="flex items-start justify-between gap-2 min-w-0">
+        <p className="text-xs font-medium text-slate-600 flex-1 leading-tight break-words">{label}</p>
         <Badge
           variant="solid"
           tone={trend === 'down' ? 'neutral' : 'brand'}
-          className="uppercase tracking-wide flex-shrink-0 text-[9px] sm:text-[10px]"
+          className="uppercase tracking-wide flex-shrink-0 text-[9px] sm:text-[10px] mt-0.5"
         >
           {TREND_LABEL[trend]}
         </Badge>
       </div>
-      <p className={`text-xl sm:text-2xl md:text-3xl font-semibold ${colors.value} break-words`}>{value}</p>
-      {helper && <p className="text-[10px] sm:text-[11px] text-slate-500">{helper}</p>}
+      <p className={`text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold ${colors.value} break-all leading-tight whitespace-normal`}>{value}</p>
+      {helper && <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight">{helper}</p>}
     </Card>
   );
 }

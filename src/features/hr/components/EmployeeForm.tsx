@@ -5,6 +5,8 @@ import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
 import { Button } from '../../../components/ui/Button';
+import { AsyncSearchableSelect } from '../../../components/ui/AsyncSearchableSelect';
+import * as hrApi from '../api/hrApi';
 
 type Props = {
   initial?: Partial<Employee>;
@@ -241,6 +243,37 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
         </div>
       </div>
 
+      {/* Address Information */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-900">Address Information</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Input
+            label="Address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Street, Building, Area"
+          />
+          <Input
+            label="City"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="City"
+          />
+          <Input
+            label="State"
+            value={state}
+            onChange={(e) => setState(e.target.value)}
+            placeholder="State"
+          />
+          <Input
+            label="Pincode"
+            value={postalCode}
+            onChange={(e) => setPostalCode(e.target.value)}
+            placeholder="Postal / ZIP code"
+          />
+        </div>
+      </div>
+
       {/* Employment Details */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Employment Details</h3>
@@ -341,11 +374,25 @@ export function EmployeeForm({ initial, onSubmit, onCancel }: Props) {
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-900">Manager & Reporting</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input
+          <AsyncSearchableSelect<Employee>
             label="Manager Name"
             value={managerName}
-            onChange={(e) => setManagerName(e.target.value)}
-            placeholder="Direct manager"
+            onChange={(value, selectedOption) => {
+              setManagerName(value);
+            }}
+            loadOptions={async (searchTerm: string) => {
+              const managers = await hrApi.listManagers(searchTerm);
+              return managers;
+            }}
+            getOptionLabel={(option) => {
+              const fullName = option.full_name || `${option.first_name || ''} ${option.last_name || ''}`.trim();
+              const role = option.role || '';
+              return fullName ? `${fullName}${role ? ` (${role})` : ''}` : option.email || '';
+            }}
+            getOptionValue={(option) => {
+              return option.full_name || `${option.first_name || ''} ${option.last_name || ''}`.trim() || option.email || '';
+            }}
+            placeholder="Search and select manager..."
           />
         </div>
       </div>
