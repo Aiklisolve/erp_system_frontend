@@ -654,6 +654,11 @@ export async function updateProductionOrder(
       if (changes.start_date) backendChanges.start_date = changes.start_date;
       if (changes.end_date) backendChanges.end_date = changes.end_date;
       if (changes.cost !== undefined) backendChanges.cost = changes.cost;
+      if (changes.estimated_cost !== undefined) backendChanges.estimated_cost = changes.estimated_cost;
+      if (changes.actual_cost !== undefined) backendChanges.actual_cost = changes.actual_cost;
+      if (changes.material_cost !== undefined) backendChanges.material_cost = changes.material_cost;
+      if (changes.labor_cost !== undefined) backendChanges.labor_cost = changes.labor_cost;
+      if (changes.overhead_cost !== undefined) backendChanges.overhead_cost = changes.overhead_cost;
       if (changes.notes) backendChanges.notes = changes.notes;
       if (changes.quality_status) backendChanges.quality_status = changes.quality_status;
       if (changes.quality_check_required !== undefined) backendChanges.quality_check_required = changes.quality_check_required;

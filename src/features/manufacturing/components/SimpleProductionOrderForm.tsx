@@ -21,6 +21,13 @@ function generateProductionOrderNumber(): string {
   return `${prefix}-${year}-${random}`;
 }
 
+// Helper function to remove leading zeros from number input
+const removeLeadingZeros = (value: string): string => {
+  if (value === '' || value === '0') return '';
+  // Remove leading zeros but keep decimal point and digits after it
+  return value.replace(/^0+(?=\d)/, '');
+};
+
 export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props) {
   // Only fields that backend API actually accepts (based on curl example)
   const [productionOrderNumber, setProductionOrderNumber] = useState(
@@ -206,7 +213,7 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
           label="Planned Quantity"
           type="number"
           value={plannedQty}
-          onChange={(e) => setPlannedQty(e.target.value)}
+          onChange={(e) => setPlannedQty(removeLeadingZeros(e.target.value))}
           required
           min="1"
           placeholder="543"
@@ -218,6 +225,7 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
+            min={new Date().toISOString().split('T')[0]}
             required
           />
           
@@ -226,6 +234,7 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
+            min={startDate || new Date().toISOString().split('T')[0]}
             required
           />
         </div>
@@ -272,7 +281,7 @@ export function SimpleProductionOrderForm({ initial, onSubmit, onCancel }: Props
             type="number"
             step="0.01"
             value={cost}
-            onChange={(e) => setCost(e.target.value)}
+            onChange={(e) => setCost(removeLeadingZeros(e.target.value))}
             placeholder="0.00"
           />
         </div>

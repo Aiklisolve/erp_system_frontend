@@ -19,6 +19,13 @@ function generateProductionOrderNumber(): string {
   return `${prefix}-${year}-${random}`;
 }
 
+// Helper function to remove leading zeros from number input
+const removeLeadingZeros = (value: string): string => {
+  if (value === '' || value === '0') return '';
+  // Remove leading zeros but keep decimal point and digits after it
+  return value.replace(/^0+(?=\d)/, '');
+};
+
 export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
   // Production Order Identification
   const [productionOrderNumber, setProductionOrderNumber] = useState(initial?.production_order_number ?? generateProductionOrderNumber());
@@ -381,7 +388,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={plannedQty}
-              onChange={(e) => setPlannedQty(e.target.value)}
+              onChange={(e) => setPlannedQty(removeLeadingZeros(e.target.value))}
               placeholder="100"
               required
             />
@@ -405,7 +412,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={producedQty}
-              onChange={(e) => setProducedQty(e.target.value)}
+              onChange={(e) => setProducedQty(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -417,7 +424,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={goodQty}
-              onChange={(e) => setGoodQty(e.target.value)}
+              onChange={(e) => setGoodQty(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -429,7 +436,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={scrapQty}
-              onChange={(e) => setScrapQty(e.target.value)}
+              onChange={(e) => setScrapQty(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -441,7 +448,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={reworkQty}
-              onChange={(e) => setReworkQty(e.target.value)}
+              onChange={(e) => setReworkQty(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -572,7 +579,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={cost}
-              onChange={(e) => setCost(e.target.value)}
+              onChange={(e) => setCost(removeLeadingZeros(e.target.value))}
               placeholder="0.00"
             />
           </div>
@@ -606,7 +613,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={estimatedCost}
-              onChange={(e) => setEstimatedCost(e.target.value)}
+              onChange={(e) => setEstimatedCost(removeLeadingZeros(e.target.value))}
               placeholder="0.00"
               required
             />
@@ -634,7 +641,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={materialCost}
-              onChange={(e) => setMaterialCost(e.target.value)}
+              onChange={(e) => setMaterialCost(removeLeadingZeros(e.target.value))}
               placeholder="0.00"
             />
           </div>
@@ -646,7 +653,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={laborCost}
-              onChange={(e) => setLaborCost(e.target.value)}
+              onChange={(e) => setLaborCost(removeLeadingZeros(e.target.value))}
               placeholder="0.00"
             />
           </div>
@@ -658,20 +665,20 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={overheadCost}
-              onChange={(e) => setOverheadCost(e.target.value)}
+              onChange={(e) => setOverheadCost(removeLeadingZeros(e.target.value))}
               placeholder="0.00"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              Total Cost (Auto-calculated)
+              Total Cost
             </label>
             <Input
               type="number"
               step="0.01"
               value={cost}
-              readOnly
-              className="bg-slate-50"
+              onChange={(e) => setCost(removeLeadingZeros(e.target.value))}
+              placeholder="0.00"
             />
           </div>
           <div>
@@ -682,7 +689,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={actualCost}
-              onChange={(e) => setActualCost(e.target.value)}
+              onChange={(e) => setActualCost(removeLeadingZeros(e.target.value))}
               placeholder="0.00"
             />
           </div>
@@ -786,7 +793,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={completionPercentage}
-              onChange={(e) => setCompletionPercentage(e.target.value)}
+              onChange={(e) => setCompletionPercentage(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -798,7 +805,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={efficiencyPercentage}
-              onChange={(e) => setEfficiencyPercentage(e.target.value)}
+              onChange={(e) => setEfficiencyPercentage(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -831,7 +838,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={estimatedHours}
-              onChange={(e) => setEstimatedHours(e.target.value)}
+              onChange={(e) => setEstimatedHours(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -843,7 +850,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={actualHours}
-              onChange={(e) => setActualHours(e.target.value)}
+              onChange={(e) => setActualHours(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -855,7 +862,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={setupTimeHours}
-              onChange={(e) => setSetupTimeHours(e.target.value)}
+              onChange={(e) => setSetupTimeHours(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -867,7 +874,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={runTimeHours}
-              onChange={(e) => setRunTimeHours(e.target.value)}
+              onChange={(e) => setRunTimeHours(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
@@ -879,7 +886,7 @@ export function ManufacturingForm({ initial, onSubmit, onCancel }: Props) {
               type="number"
               step="0.01"
               value={downtimeHours}
-              onChange={(e) => setDowntimeHours(e.target.value)}
+              onChange={(e) => setDowntimeHours(removeLeadingZeros(e.target.value))}
               placeholder="0"
             />
           </div>
