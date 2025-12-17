@@ -191,21 +191,15 @@ export function ManufacturingList() {
           <div className="text-xs font-semibold text-slate-900">
             {row.currency || 'INR'} {(row.cost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          {row.actual_cost && row.actual_cost !== row.cost && (
+          {row.actual_cost !== undefined && 
+           row.actual_cost !== null && 
+           row.actual_cost > 0 &&
+           row.actual_cost !== row.cost && (
             <div className="text-[10px] text-slate-500">
               Actual: {row.currency || 'INR'} {row.actual_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           )}
         </div>
-      )
-    },
-    {
-      key: 'production_type',
-      header: 'Type',
-      render: (row) => (
-        <Badge tone="neutral">
-          {row.production_type ? row.production_type.replace(/_/g, ' ') : 'STANDARD'}
-        </Badge>
       )
     },
     {

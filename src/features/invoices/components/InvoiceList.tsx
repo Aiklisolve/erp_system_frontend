@@ -7,6 +7,7 @@ import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Table, type TableColumn } from '../../../components/ui/Table';
 import { Modal } from '../../../components/ui/Modal';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { LoadingState } from '../../../components/ui/LoadingState';
 import { StatCard } from '../../../components/ui/StatCard';
@@ -20,6 +21,8 @@ export function InvoiceList() {
   const { showToast } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -75,15 +78,38 @@ export function InvoiceList() {
     }
   };
 
-  const handleDelete = async (invoice: Invoice) => {
-    if (window.confirm(`Are you sure you want to delete invoice ${invoice.invoice_number}?`)) {
-      try {
-        await remove(invoice.id);
-        showToast('success', 'Invoice Deleted', 'Invoice has been deleted successfully.');
-        await refresh();
-      } catch (error) {
-        showToast('error', 'Error', 'Failed to delete invoice. Please try again.');
+  const handleDeleteClick = (invoice: Invoice) => {
+    setInvoiceToDelete(invoice);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!invoiceToDelete) return;
+    
+    try {
+      await remove(invoiceToDelete.id);
+      showToast('success', 'Invoice Deleted', 'Invoice has been deleted successfully.');
+      await refresh();
+      setDeleteConfirmOpen(false);
+      setInvoiceToDelete(null);
+    } catch (error: any) {
+      // Extract error message from API response
+      const errorMessage = error?.response?.data?.message || 
+                          error?.message || 
+                          error?.error || 
+                          '';
+      
+      // Check if error message indicates invoice cannot be deleted
+      if (errorMessage.includes('Only DRAFT or CANCELLED invoices can be deleted') || 
+          errorMessage.toLowerCase().includes('cannot be deleted')) {
+        const status = invoiceToDelete.status.replace(/_/g, ' ');
+        showToast('error', 'Cannot Delete Invoice', 
+          `This invoice cannot be deleted. Current status: ${status}. Only DRAFT or CANCELLED invoices can be deleted.`);
+      } else {
+        showToast('error', 'Error', errorMessage || 'Failed to delete invoice. Please try again.');
       }
+      setDeleteConfirmOpen(false);
+      setInvoiceToDelete(null);
     }
   };
 
@@ -231,7 +257,7 @@ export function InvoiceList() {
           )}
           <button
             type="button"
-            onClick={() => void handleDelete(row)}
+            onClick={() => handleDeleteClick(row)}
             className="text-[11px] text-red-600 hover:text-red-800"
           >
             Delete
@@ -415,6 +441,21 @@ export function InvoiceList() {
           }}
         />
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete Invoice"
+        message={`Are you sure you want to delete invoice ${invoiceToDelete?.invoice_number}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setDeleteConfirmOpen(false);
+          setInvoiceToDelete(null);
+        }}
+      />
     </div>
   );
 }
